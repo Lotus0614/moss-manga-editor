@@ -35,7 +35,7 @@ const STYLE_LABELS = [
   ['sketch', '线稿'],
 ];
 
-export default function EditorPage({ projectId, pageId }) {
+export default function EditorPage({ projectId, pageId, config, onOpenSettings }) {
   const [project, setProject] = useState(null);
   const [pages, setPages] = useState([]);
   const [pagesLoaded, setPagesLoaded] = useState(false);
@@ -45,6 +45,7 @@ export default function EditorPage({ projectId, pageId }) {
   const [selection, setSelection] = useState(null);
   const [tab, setTab] = useState('prompt');
   const [gen, setGen] = useState(null);
+  const [busyGen, setBusyGen] = useState(false);
   const [scale, setScale] = useState(0.55);
   const [changes, setChanges] = useState(null);
   const [showExport, setShowExport] = useState(false);
@@ -137,10 +138,12 @@ export default function EditorPage({ projectId, pageId }) {
       if (!cur || job.page !== cur.id) return;
       setGen(job);
       if (job.status === 'done') {
+        setBusyGen(false);
         toast('生成完成');
         reloadPage(cur.id);
         refreshPages();
       } else if (job.status === 'error') {
+        setBusyGen(false);
         toast(job.error || '生成失败', 'bad');
       }
     });
@@ -213,11 +216,18 @@ export default function EditorPage({ projectId, pageId }) {
   }, [page, project]);
 
   async function generate() {
-    if (!page) return;
+    if (!page || generating) return;
+    if (!config?.workflow?.name) {
+      toast('还没有工作流：在设置里粘贴 ComfyUI「导出 (API)」的 JSON，或让 Agent 用 workflow save 导入', 'bad');
+      onOpenSettings?.();
+      return;
+    }
+    setBusyGen(true);
     try {
       const res = await apiPost(`/api/projects/${projectId}/pages/${page.id}/render`, {});
       setGen({ status: 'running', progress: 0, id: res.jobId });
     } catch (err) {
+      setBusyGen(false);
       toast(err.message, 'bad');
     }
   }
@@ -306,6 +316,7 @@ export default function EditorPage({ projectId, pageId }) {
   const selectedBubble = selection?.kind === 'bubble' ? page.bubbles.find((b) => b.id === selection.id) : null;
   const version = versions.find((v) => v.id === current) || versions.slice(-1)[0];
   const image = version?.image || '';
+  const generating = busyGen || Boolean(gen && (gen.status === 'queued' || gen.status === 'running'));
 
   return html`<div class="editor">
     <aside class="rail">
@@ -342,9 +353,10 @@ export default function EditorPage({ projectId, pageId }) {
             ? html`<span class="tag">${warns.length} 个提醒</span>`
             : null}
         <div class="spacer"></div>
-        ${gen && gen.status !== 'done' && gen.status !== 'error' ? html`<span class="meta">生成 ${gen.progress || 0}%</span>` : null}
         <button class="btn ghost" onClick=${() => setShowExport(true)}>导出</button>
-        <button class="btn inv" disabled=${errors.length > 0} onClick=${generate}>生成</button>
+        <button class="btn inv" disabled=${errors.length > 0 || generating} onClick=${generate}>
+          ${generating ? `生成中 ${gen?.progress || 0}%` : '生成'}
+        </button>
       </div>
 
       <div class="stage" ref=${stageRef}>

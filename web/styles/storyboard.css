@@ -608,6 +608,7 @@ a { color: inherit; }
   max-height: 86vh;
   overflow: auto;
 }
+.modal.wide { width: min(720px, 100%); }
 .modal > header {
   padding: 8px 14px;
   border-bottom: 1px solid var(--ink);
@@ -615,7 +616,7 @@ a { color: inherit; }
   font-size: 10px;
   letter-spacing: 0.2em;
 }
-.modal > .body { padding: 16px 14px; display: grid; gap: 12px; }
+.modal > .body { padding: 14px; display: grid; gap: 12px; overflow: auto; }
 .modal > footer {
   padding: 10px 14px;
   border-top: 1px solid var(--line);

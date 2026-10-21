@@ -1,9 +1,9 @@
-// 应用根组件：顶栏 + 路由 + 全局提示。
+// 应用根组件：顶栏 + 路由 + 设置弹窗 + 全局提示。
 
 import { html, render, useEffect, useState, useRoute, useApp, setApp, useToasts, api, go, toast } from './lib.mjs';
 import ProjectsPage from './pages/projects.mjs';
-import SettingsPage from './pages/settings.mjs';
 import EditorPage from './pages/editor.mjs';
+import SettingsModal from './components/settings-modal.mjs';
 
 function Toasts() {
   const items = useToasts();
@@ -12,7 +12,7 @@ function Toasts() {
   </div>`;
 }
 
-function Topbar({ route }) {
+function Topbar({ route, onOpenSettings }) {
   const app = useApp();
   const project = app.project;
   const page = app.page;
@@ -21,23 +21,23 @@ function Topbar({ route }) {
     <span class="tag">PREVIEW</span>
     ${route.name === 'editor' && project
       ? html`<div class="crumb"><b>${project.name}</b>${page ? ` / 第 ${page.index} 页${page.title ? ` · ${page.title}` : ''}` : ''}</div>`
-      : html`<div class="crumb">${route.name === 'settings' ? '设置' : '项目'}</div>`}
+      : html`<div class="crumb">项目</div>`}
     <div class="spacer"></div>
     ${route.name === 'editor' ? html`<button class="btn ghost" onClick=${() => go('/projects')}>项目列表</button>` : null}
-    <button class="btn" onClick=${() => go('/settings')}>设置</button>
+    <button class="btn" onClick=${onOpenSettings}>设置</button>
   </div>`;
 }
 
 function App() {
   const route = useRoute();
   const [config, setConfig] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     Promise.all([api('/api/config'), api('/api/health')])
       .then(([cfg, health]) => {
         setConfig({ ...cfg, archive: health.archive });
         setApp({ settings: cfg });
-        if (!cfg.defaults?.ckpt && route.name !== 'settings') go('/settings');
       })
       .catch((err) => toast(err.message, 'bad'));
   }, []);
@@ -46,24 +46,27 @@ function App() {
     if (route.name !== 'editor') setApp({ project: null, page: null });
   }, [route.name]);
 
+  const applyConfig = (next) => {
+    setConfig((prev) => ({ ...prev, ...next }));
+    setApp({ settings: next });
+  };
+
   let body;
-  if (route.name === 'settings') {
-    body = html`<${SettingsPage}
+  if (route.name === 'editor' && route.params.projectId) {
+    body = html`<${EditorPage}
+      projectId=${route.params.projectId}
+      pageId=${route.params.pageId}
       config=${config}
-      onSaved=${(next) => {
-        setConfig(next);
-        setApp({ settings: next });
-      }}
+      onOpenSettings=${() => setSettingsOpen(true)}
     />`;
-  } else if (route.name === 'editor' && route.params.projectId) {
-    body = html`<${EditorPage} projectId=${route.params.projectId} pageId=${route.params.pageId} />`;
   } else {
     body = html`<${ProjectsPage} />`;
   }
 
   return html`<div>
-    <${Topbar} route=${route} />
+    <${Topbar} route=${route} onOpenSettings=${() => setSettingsOpen(true)} />
     ${body}
+    <${SettingsModal} open=${settingsOpen} config=${config} onClose=${() => setSettingsOpen(false)} onSaved=${applyConfig} />
     <${Toasts} />
   </div>`;
 }

@@ -200,10 +200,27 @@ async function route(req, res, url) {
       const projects = await listProjects(ARCHIVE);
       const withCover = [];
       for (const project of projects) {
-        const versions = await getVersions(ARCHIVE, project.slug);
+        const store = await getVersions(ARCHIVE, project.slug);
         const pages = await listPages(ARCHIVE, project.slug);
-        const cover = versions.items.slice(-1)[0]?.image || '';
-        withCover.push({ slug: project.slug, name: project.name, size: project.size, pages: pages.length, cover, updatedAt: versions.items.slice(-1)[0]?.at || project.createdAt });
+        const latest = store.items.slice(-1)[0];
+        // 每页当前版，最多取 3 张做成胶片条，让「这个项目一共几张图」看得出来
+        const covers = pages
+          .map((p) => {
+            const id = currentOf(store, p.id);
+            return store.items.find((v) => v.id === id)?.image || '';
+          })
+          .filter(Boolean)
+          .slice(0, 3);
+        withCover.push({
+          slug: project.slug,
+          name: project.name,
+          size: project.size,
+          pages: pages.length,
+          images: store.items.length,
+          covers,
+          cover: latest?.image || '',
+          updatedAt: latest?.at || project.createdAt,
+        });
       }
       return json(res, 200, { projects: withCover });
     }

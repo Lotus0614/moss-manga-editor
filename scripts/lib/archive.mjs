@@ -264,6 +264,12 @@ export async function getVersions(dir, slug) {
     const picked = items.find((v) => v.id === raw.current);
     if (picked) currentByPage[picked.page] = picked.id;
   }
+  // 有图但没有采用记录的页，默认取该页最新一版（不覆盖已有的选择）
+  const latestByPage = {};
+  for (const item of items) latestByPage[item.page] = item.id;
+  for (const [pageId, versionId] of Object.entries(latestByPage)) {
+    if (!currentByPage[pageId]) currentByPage[pageId] = versionId;
+  }
   return { currentByPage, items };
 }
 

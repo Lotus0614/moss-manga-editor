@@ -79,11 +79,16 @@ export default function ProjectsPage() {
                 (p) => html`<div class="card" key=${p.slug} onClick=${() => go(`/p/${p.slug}`)}>
                   <div class="cover">
                     ${p.cover ? html`<img src=${p.cover} alt="" loading="lazy" />` : html`<span class="empty">NO IMAGE</span>`}
+                    ${p.covers && p.covers.length > 1
+                      ? html`<div class="filmstrip">
+                          ${p.covers.map((src) => html`<img src=${src} alt="" loading="lazy" />`)}
+                        </div>`
+                      : null}
                   </div>
                   <div class="meta">
                     <div class="name">${p.name}</div>
                     <div class="row">
-                      <span class="sub">${p.pages} 页</span>
+                      <span class="sub">${p.pages} 页 · ${p.images || 0} 张图</span>
                       <div class="spacer"></div>
                       <button class="btn sm ghost" onClick=${(e) => remove(e, p)}>删除</button>
                     </div>

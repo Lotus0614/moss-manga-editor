@@ -15,13 +15,11 @@ import {
   toast,
   cls,
   setApp,
-  formatTime,
-  BUBBLE_LABELS,
-  CAMERA_LABELS,
-  SHAPE_LABELS,
-  FRAME_LABELS,
+
 } from '../lib.mjs';
 import Canvas from '../components/canvas.mjs';
+import { PageInspector, ItemInspector } from '../components/page-inspector.mjs';
+import { PromptPanel, HistoryPanel, ChangesPanel } from '../components/workbench.mjs';
 import { exportLongImage, exportPdf } from '../components/export.mjs';
 import { compilePage } from '../../core/compile.mjs';
 import { compileContext } from '../../core/bible.mjs';
@@ -535,14 +533,26 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
           <span class="meta">${version ? `${version.id} · seed ${version.seed}` : '还没有生成过'}</span>
         </div>
         <div class="dock-body">
-          ${tab === 'prompt' ? renderPrompt() : tab === 'history' ? renderHistory() : renderChanges()}
+          ${tab === 'prompt'
+            ? html`<${PromptPanel} compiled=${compiled} warnings=${warnings} />`
+            : tab === 'history'
+              ? html`<${HistoryPanel} versions=${versions} current=${current} onPick=${pickVersion} />`
+              : html`<${ChangesPanel} changes=${changes} onReload=${loadChanges} onAck=${confirmChanges} />`}
         </div>
       </div>
     </section>
 
     <aside class="inspect">
       <div class="inspect-head">${selected ? `${TYPE_NAME[selected.type]}属性` : '页面属性'}</div>
-      <div class="inspect-body">${selected ? itemForm(selected) : pageForm()}</div>
+      <div class="inspect-body">${selected
+        ? html`<${ItemInspector}
+            item=${selected}
+            patchItem=${patchItem}
+            removeItem=${removeItem}
+            onBack=${() => setSelection(null)}
+            onCopy=${copySelected}
+          />`
+        : html`<${PageInspector} page=${page} mutate=${mutate} setSelection=${setSelection} addItem=${addItem} />`}</div>
     </aside>
 
     ${showExport
@@ -566,315 +576,6 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
 
   // ---------------------------------------------------------------- 页面属性
 
-  function pageForm() {
-    return html`<div class="col">
-      <div class="row2">
-        <div class="field">
-          <label>阅读顺序</label>
-          <select class="select" value=${page.reading} onChange=${(e) => mutate({ reading: e.currentTarget.value })}>
-            <option value="rtl">右 → 左</option>
-            <option value="ltr">左 → 右</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>画风</label>
-          <select class="select" value=${page.style} onChange=${(e) => mutate({ style: e.currentTarget.value })}>
-            ${STYLE_LABELS.map(([v, n]) => html`<option value=${v}>${n}</option>`)}
-          </select>
-        </div>
-      </div>
-
-      <div class="field">
-        <label>文字排版（全局）</label>
-        <div class="row">
-          <button
-            class=${cls('chip', page.vertical !== false ? 'on' : 'ghost')}
-            onClick=${() =>
-              mutate((cur) => ({
-                ...cur,
-                vertical: true,
-                items: cur.items.map((it) => (it.type === 'bubble' ? { ...it, vertical: undefined } : it)),
-              }))}
-          >全部竖排</button>
-          <button
-            class=${cls('chip', page.vertical === false ? 'on' : 'ghost')}
-            onClick=${() =>
-              mutate((cur) => ({
-                ...cur,
-                vertical: false,
-                items: cur.items.map((it) => (it.type === 'bubble' ? { ...it, vertical: undefined } : it)),
-              }))}
-          >全部横排</button>
-        </div>
-        <span class="hint">单条文字可以在它的属性里单独覆盖。</span>
-      </div>
-
-      <div class="field">
-        <label>场景（写进 SETTING）</label>
-        <textarea class="textarea" style="min-height:48px" value=${page.scene || ''} onInput=${(e) => mutate({ scene: e.currentTarget.value })}></textarea>
-      </div>
-      <div class="field">
-        <label>补充说明</label>
-        <textarea class="textarea" style="min-height:48px" value=${page.note || ''} onInput=${(e) => mutate({ note: e.currentTarget.value })}></textarea>
-      </div>
-
-      <div class="divider"></div>
-
-      <div class="divider"></div>
-      <span class="label">本页内容（点选编辑）</span>
-      <div class="col" style="gap:3px">
-        ${page.items.length
-          ? page.items.map(
-              (it, i) => html`<div class="rowitem" onClick=${() => setSelection({ kind: it.type, id: it.id })}>
-                <span class="mono small">${TYPE_NAME[it.type]}${it.type === 'panel' ? i + 1 : ''}</span>
-                <span class="grow ellipsis">${(it.type === 'bubble' ? it.text : it.caption) || '（空）'}</span>
-              </div>`
-            )
-          : html`<span class="hint">还没有内容，点上面的按钮加一个框。</span>`}
-      </div>
-    </div>`;
-  }
-
-  // ---------------------------------------------------------------- item 属性
-
-  function itemForm(item) {
-    const bboxInputs = html`<div class="field">
-      <label>坐标 x1 / y1 / x2 / y2</label>
-      <div class="row">
-        ${item.bbox.map(
-          (v, i) => html`<input
-            class="input"
-            type="number"
-            style="width:25%"
-            value=${Math.round(v)}
-            onInput=${(e) => {
-              const bbox = [...item.bbox];
-              bbox[i] = Number(e.currentTarget.value);
-              patchItem(item.id, { bbox });
-            }}
-          />`
-        )}
-      </div>
-    </div>`;
-
-    const metaInputs = html`<div class="field">
-      <label>tags（3–6 个英文短词，选填）</label>
-      <input
-        class="input"
-        value=${(item.tags || []).join(' ')}
-        placeholder="ceramic_cup speckled_glaze"
-        onInput=${(e) => patchItem(item.id, { tags: e.currentTarget.value.split(/[\s,]+/).filter(Boolean) })}
-      />
-    </div>
-    <div class="field">
-      <label>palette（最多 5 个，按面积从大到小）</label>
-      <div class="row wrap">
-        ${(item.palette || []).map(
-          (hex, i) => html`<span class="swatch" key=${`${hex}-${i}`}>
-            <input
-              type="color"
-              value=${hex}
-              title=${hex}
-              onInput=${(e) => {
-                const next = [...(item.palette || [])];
-                next[i] = e.currentTarget.value.toUpperCase();
-                patchItem(item.id, { palette: next });
-              }}
-            />
-            <button
-              class="swatch-x"
-              title="移除"
-              onClick=${() => patchItem(item.id, { palette: (item.palette || []).filter((_, j) => j !== i) })}
-            >×</button>
-          </span>`
-        )}
-        ${(item.palette || []).length < 5
-          ? html`<button class="chip" onClick=${() => patchItem(item.id, { palette: [...(item.palette || []), '#000000'] })}>＋ 颜色</button>`
-          : null}
-      </div>
-    </div>`;
-    const header = html`<div class="row">
-      <button class="btn sm ghost" onClick=${() => setSelection(null)}>← 返回</button>
-      <div class="spacer"></div>
-      <button class="btn sm ghost" onClick=${copySelected}>复制</button>
-      <button class="btn sm ghost" onClick=${() => removeItem(item.id)}>删除</button>
-    </div>`;
-
-    if (item.type === 'bubble') {
-      return html`<div class="col">
-        ${header}
-        <div class="field">
-          <label>文字</label>
-          <textarea class="textarea" style="min-height:90px" value=${item.text || ''} onInput=${(e) => patchItem(item.id, { text: e.currentTarget.value })}></textarea>
-        </div>
-        <div class="row2">
-          <div class="field">
-            <label>类型</label>
-            <select class="select" value=${item.kind} onChange=${(e) => patchItem(item.id, { kind: e.currentTarget.value })}>
-              ${BUBBLE_LABELS.map((b) => html`<option value=${b.key}>${b.name}</option>`)}
-            </select>
-          </div>
-          <div class="field">
-            <label>字号</label>
-            <input class="input" type="number" value=${item.size} onInput=${(e) => patchItem(item.id, { size: Number(e.currentTarget.value) || 22 })} />
-          </div>
-        </div>
-        <div class="row2">
-          <div class="field">
-            <label>排版</label>
-            <select
-              class="select"
-              value=${item.vertical === undefined ? 'auto' : item.vertical ? 'v' : 'h'}
-              onChange=${(e) => {
-                const v = e.currentTarget.value;
-                patchItem(item.id, { vertical: v === 'auto' ? undefined : v === 'v' });
-              }}
-            >
-              <option value="auto">跟随全局</option>
-              <option value="v">竖排</option>
-              <option value="h">横排</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>尾巴</label>
-            <select class="select" value=${item.tail} onChange=${(e) => patchItem(item.id, { tail: e.currentTarget.value })}>
-              <option value="none">无（说话者不在画面）</option>
-              ${['down-left', 'down', 'down-right', 'left', 'right', 'up-left', 'up', 'up-right'].map((d) => html`<option value=${d}>${d}</option>`)}
-            </select>
-          </div>
-        </div>
-        ${bboxInputs}
-        ${metaInputs}
-      </div>`;
-    }
-
-    if (item.type === 'native') {
-      return html`<div class="col">
-        ${header}
-        <div class="field">
-          <label>label（原生 Moss 字段）</label>
-          <select class="select" value=${item.label} onChange=${(e) => patchItem(item.id, { label: e.currentTarget.value })}>
-            ${['object', 'text', 'character'].map((l) => html`<option value=${l}>${l}</option>`)}
-          </select>
-        </div>
-        <div class="field">
-          <label>caption</label>
-          <textarea class="textarea" style="min-height:80px" value=${item.caption || ''} onInput=${(e) => patchItem(item.id, { caption: e.currentTarget.value })}></textarea>
-        </div>
-        ${item.label === 'text'
-          ? html`<div class="field">
-              <label>text（要渲染的字）</label>
-              <textarea class="textarea" style="min-height:60px" value=${item.text || ''} onInput=${(e) => patchItem(item.id, { text: e.currentTarget.value })}></textarea>
-            </div>`
-          : null}
-        ${bboxInputs}
-        ${metaInputs}
-      </div>`;
-    }
-
-    return html`<div class="col">
-      ${header}
-      <div class="field">
-        <label>这一格画什么</label>
-        <textarea class="textarea" style="min-height:110px" value=${item.caption || ''} onInput=${(e) => patchItem(item.id, { caption: e.currentTarget.value })}></textarea>
-      </div>
-      <div class="row2">
-        <div class="field">
-          <label>机位</label>
-          <select class="select" value=${item.camera} onChange=${(e) => patchItem(item.id, { camera: e.currentTarget.value })}>
-            ${CAMERA_LABELS.map(([v, n]) => html`<option value=${v}>${n}</option>`)}
-          </select>
-        </div>
-        <div class="field">
-          <label>形状</label>
-          <select class="select" value=${item.shape} onChange=${(e) => patchItem(item.id, { shape: e.currentTarget.value })}>
-            ${SHAPE_LABELS.map(([v, n]) => html`<option value=${v}>${n}</option>`)}
-          </select>
-        </div>
-      </div>
-      <div class="field">
-        <label>边框</label>
-        <select class="select" value=${item.frame} onChange=${(e) => patchItem(item.id, { frame: e.currentTarget.value })}>
-          ${FRAME_LABELS.map(([v, n]) => html`<option value=${v}>${n}</option>`)}
-        </select>
-      </div>
-      ${bboxInputs}
-      ${metaInputs}
-    </div>`;
-  }
-
   // ---------------------------------------------------------------- 工作台
 
-  function renderPrompt() {
-    return html`<div class="row" style="align-items:flex-start;gap:16px">
-      <div class="grow col" style="min-width:0;flex:1.2">
-        <div class="row">
-          <span class="mono small muted">${compiled?.stats?.items || 0} 项 · ${compiled?.stats?.bytes || 0} 字节</span>
-          <div class="spacer"></div>
-          <button class="btn sm ghost" onClick=${() => {
-            navigator.clipboard?.writeText(compiled?.json || '');
-            toast('已复制');
-          }}>复制 JSON</button>
-        </div>
-        <div class="prompt-box">${compiled?.json || '（编译失败）'}</div>
-      </div>
-      <div class="col" style="width:42%;min-width:0">
-        <span class="mono small muted">校验</span>
-        ${warnings.length
-          ? html`<ul class="warn-list">
-              ${warnings.map(
-                (w) => html`<li class=${w.level}>
-                  <span class="code">${w.code}</span>
-                  <span>${w.message}</span>
-                </li>`
-              )}
-            </ul>`
-          : html`<span class="hint">没有发现问题。</span>`}
-      </div>
-    </div>`;
-  }
-
-  function renderHistory() {
-    const list = [...versions].reverse();
-    if (!list.length) return html`<div class="hint">这一页还没有生成过图片。点右上角「生成」。</div>`;
-    return html`<div class="col" style="gap:10px">
-      <div class="history-strip">
-        ${list.map(
-          (v) => html`<div class=${cls('version', v.id === (current || list[0]?.id) && 'on')} key=${v.id} onClick=${() => pickVersion(v.id)}>
-            <img src=${v.image} alt="" loading="lazy" />
-            <div class="vmeta"><b>${v.seed}</b>${formatTime(v.at).slice(5)}</div>
-          </div>`
-        )}
-      </div>
-      <span class="hint">点缩略图切换当前采用版；历史只读，不会改布局。</span>
-    </div>`;
-  }
-
-  function renderChanges() {
-    if (!changes) return html`<div class="hint">读取中…</div>`;
-    if (!changes.pages.length) return html`<div class="hint">自 rev ${changes.since} 以来没有改动（当前 rev ${changes.to}）。</div>`;
-    return html`<div class="col" style="gap:8px">
-      <div class="row">
-        <span class="mono small muted">rev ${changes.since} → ${changes.to}</span>
-        <div class="spacer"></div>
-        <button class="btn sm" onClick=${confirmChanges}>确认已查看</button>
-      </div>
-      ${changes.pages.map(
-        (group) => html`<div class="col" style="gap:2px">
-          <span class="mono small">第 ${group.index ?? '?'} 页 · ${group.title || group.page}</span>
-          ${group.ops.map((op) => html`<div class="small" style="border-left:2px solid var(--line);padding-left:8px">${describe(op)}</div>`)}
-        </div>`
-      )}
-    </div>`;
-  }
-}
-
-function describe(op) {
-  if (op.op === 'create') return '新建页面';
-  if (op.op === 'add') return `+ ${op.target} ${op.id} [${(op.bbox || []).join(',')}]${op.text ? `「${op.text}」` : ''}`;
-  if (op.op === 'remove') return `- ${op.target} ${op.id}`;
-  if (op.op === 'bbox') return `~ ${op.target} ${op.id} [${op.from.join(',')}] → [${op.to.join(',')}]`;
-  if (op.op === 'text') return `~ 文字 ${op.id}「${op.from}」→「${op.to}」`;
-  if (op.op === 'page') return `~ 页.${op.field}：${op.from ?? '（空）'} → ${op.to ?? '（空）'}`;
-  return `~ ${op.target} ${op.id} ${op.field}`;
 }

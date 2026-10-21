@@ -230,7 +230,12 @@ async function route(req, res, url) {
     if (method === 'POST') {
       const payload = await body(req);
       const cfg = await readConfig(CONFIG_DIR);
-      const project = await createProject(ARCHIVE, { name: payload.name, size: payload.size, canvas: payload.canvas || cfg.defaults.canvas });
+      const project = await createProject(ARCHIVE, {
+        name: payload.name,
+        size: payload.size,
+        canvas: payload.canvas || cfg.defaults.canvas,
+        defaults: { reading: cfg.defaults.reading, style: cfg.defaults.style, vertical: cfg.defaults.vertical },
+      });
       if (payload.withSamplePage) {
         await createPage(ARCHIVE, project.slug, {});
       }

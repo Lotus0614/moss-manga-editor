@@ -77,17 +77,19 @@ node scripts/manga.mjs workflow check
 
 如果 `check` 报「缺 {{prompt}}」之类的，说明你改写时漏了，回去补——不要靠脚本猜。
 
-**1.3 哪些部分允许你改**
+**1.3 项目默认值（一次问完，别一项一项问）**
 
-> 「哪些内容允许我直接改？默认我改版面、台词、气泡类型，不改画风。你也可以把某几项关掉。」
-
-按回答写：
+> 「开始画之前定几个默认值，之后新建的项目都按这个来（建好后也能在项目设置里改）：
+> ① 阅读顺序：右→左（日式）还是左→右？
+> ② 画风：黑白网点 / 彩色 / 线稿？
+> ③ 文字：竖排还是横排？
+> ④ 画布尺寸：768×1280 竖版分镜，还是别的（必须是 16 的倍数）？」
 
 ```bash
-node scripts/manga.mjs config set editable.layout=true editable.text=true editable.bubbleType=true editable.style=false
+node scripts/manga.mjs config set defaults.reading=rtl defaults.style=mono defaults.vertical=true "defaults.canvas=[768,1280]"
 ```
 
-关掉的范围，CLI 会拒绝越权改动（`page set` 直接报错），这是保护用户的手段。
+**不要问「哪些内容允许我改」——全部都能改。** 也没有子 Agent、没有锁定开关。
 
 **1.4 检查点（只有工作流用到时才需要）**
 
@@ -182,6 +184,16 @@ node scripts/manga.mjs render --page 1 --json
 
 **渲染很慢（十几秒到几分钟）**，一页一页来，不要并发提交。
 
+### 如果模型自己往空格子里塞气泡 / 假文字
+
+编译器已经在 `summary` 里锁死了数量：`This page has exactly N panels and exactly M text elements…Do NOT invent any additional dialogue…`，纯图页则会写 `NO lettering at all`。
+
+如果仍然出现假文字，按顺序试：
+
+1. 减少这一页的 bubble 数量（气泡越多越容易诱发它继续编）
+2. 把该条文字改成 `type: "native"`（`label: "text"`）——原生文字项不触发对话规则，代价是那条不再套竖排/气泡模板
+3. 在 `note` 里补一句 `no lettering except the listed text`
+
 ---
 
 ## 第 4 步：交付预览（一定要把网址给用户）
@@ -222,7 +234,7 @@ node scripts/manga.mjs ack
 |---|---|
 | 检查配置 | `manga doctor` |
 | 初始化 | `manga init --comfy URL [--ckpt 名] [--workflow 文件]` |
-| 导入工作流 | `manga workflow path` 拿目录，改写后 `manga workflow save <文件>` |
+| 改默认值 | `manga config set defaults.reading=rtl defaults.style=mono "defaults.canvas=[768,1280]"` |
 | 校验工作流 | `manga workflow check` |
 | 改配置 | `manga config set defaults.ckpt=xxx editable.text=true` |
 | 看配置 | `manga config get defaults` |
@@ -252,8 +264,8 @@ node scripts/manga.mjs ack
 4. **工作流占位符由你改写文件完成**：读用户给的 API JSON → 自己判断节点 → 生成完整新文件 → `workflow save` → `workflow check`。不要让用户手写占位符，也不要指望脚本猜节点。
 5. **可以读工作流 JSON**（那是用户给你的产物），但**不要读 `scripts/` 源码**。
 6. **不猜坐标**：先 `page show --summary`，再基于现有 bbox 改。
-7. **不跳过 compile**：有 error 就渲染不了，浪费一次排队。
-8. **一次只问一个问题**，配置阶段尤其如此。
+7. **不问「哪些能改」**：所有内容都能改，没有权限开关。
+8. **配置阶段一次问一件事**，但项目默认值那四项可以一次问完。
 9. **用户没说「开始」就不要渲染**。
 10. 生成失败先看错误信息：`连不上 ComfyUI` 是环境问题，`节点错误` 是工作流问题，`这一页还有错误` 是内容问题。
 

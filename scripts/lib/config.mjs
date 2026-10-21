@@ -47,6 +47,9 @@ export function defaultConfig(configDir = DEFAULT_CONFIG_DIR) {
       lora: '',
       seed: '',
       canvas: [768, 1280],
+      reading: 'rtl',
+      style: 'mono',
+      vertical: true,
     },
     editable: {
       layout: true,

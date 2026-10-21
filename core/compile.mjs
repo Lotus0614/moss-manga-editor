@@ -100,7 +100,14 @@ function buildSummary(page, panels, bubbles, style, ctx) {
 
   if (bubbles.length > 0) {
     parts.push(
-      'Dialogue is set in white speech bubbles with tails, thoughts in white cloud bubbles with no tail, and narration is bare lettering printed directly on the artwork with no bubble, no box and no background.'
+      `This page has exactly ${panels.length} panel${panels.length === 1 ? '' : 's'} and exactly ${bubbles.length} text element${bubbles.length === 1 ? '' : 's'}. Render ONLY the text listed below, with the exact wording given. Do NOT invent any additional dialogue, speech bubble, caption, sound effect or lettering, and do not fill empty space with text — any text that is not listed is an error.`
+    );
+    parts.push(
+      'Dialogue uses white speech bubbles with tails, thoughts use white cloud bubbles with no tail, and narration is bare lettering printed directly on the artwork with no bubble, no box and no background.'
+    );
+  } else {
+    parts.push(
+      'This page contains NO lettering at all: no speech bubbles, no captions, no sound effects, no text of any kind.'
     );
   }
 

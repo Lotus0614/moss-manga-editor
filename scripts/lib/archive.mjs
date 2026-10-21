@@ -85,7 +85,7 @@ export async function saveProject(dir, project) {
   return project;
 }
 
-export async function createProject(dir, { name, size = 'page', bible, canvas } = {}) {
+export async function createProject(dir, { name, size = 'page', bible, canvas, defaults } = {}) {
   const base = slugify(name);
   let slug = base;
   let n = 2;
@@ -96,6 +96,7 @@ export async function createProject(dir, { name, size = 'page', bible, canvas } 
     name: String(name || slug),
     size,
     canvas: Array.isArray(canvas) ? canvas : [768, 1280],
+    defaults: defaults || { reading: 'rtl', style: 'mono', vertical: true },
     pages: [],
     bible: bible || { characters: [], scene: '' },
     createdAt: now(),

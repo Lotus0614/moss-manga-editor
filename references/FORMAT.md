@@ -60,9 +60,18 @@ v3 起不再分 `panels` / `bubbles`，所有东西都在同一个数组里，�
 | `shape` | `rect` `slant-top` `slant-side` `bleed-top` `bleed-bottom` `bleed-left` `bleed-right` `bleed-all` `circle` |
 | `frame` | `border` 描边（默认） `none` 无边 `thick` 粗边 |
 | `camera` | `eye` `high` `low` `wide` `medium` `close` `xclose` `ots` `dutch` |
-| `caption` | 这一格**看得见**的东西：谁 + 在哪 + 做什么 |
+| `caption` | 这一格**看得见**的东西：谁 + 在哪 + 做什么，**开头带编号和位置** |
 
 出血格（`bleed-*`）可以超出画布；其它形状超出只会被裁。
+
+**caption 开头固定写编号和位置**，编号全大写、按阅读顺序从 1 开始：
+
+```
+PANEL 3, LEFT TALL PANEL — a pitch black void with one point of pure white light…
+PANEL 1, the wide band across the top — a crowded platform at dusk
+```
+
+位置不套格式，`LEFT TALL PANEL`、`the small inset at the bottom right`、`the huge panel bleeding off the bottom` 都行；编号要连续、不重复，增删格子后重排。
 
 ## bubble
 
@@ -73,6 +82,8 @@ v3 起不再分 `panels` / `bubbles`，所有东西都在同一个数组里，�
 | `size` | 字号，默认 22 |
 | `tail` | `down-left` `down` `down-right` `left` `right` `up-left` `up` `up-right` `none`；`none` = 说话者不在画面 |
 | `vertical` | 不写就跟随页面 `vertical`；写 `true`/`false` 单独覆盖 |
+
+**caption 里必须点明这条文字在哪个 PANEL 上**，编号大写：`right side of PANEL 5`、`in the edge of PANEL 5`、`over the wide band of PANEL 3`。
 
 ## native
 

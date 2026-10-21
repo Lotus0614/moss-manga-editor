@@ -65,6 +65,12 @@ function diffItems(before = [], after = [], ops) {
         to: clip(now[key]),
       });
     }
+    // 被删掉的可选字段（tags / palette 等）也要算一次改动
+    for (const key of Object.keys(prev)) {
+      if (key === 'id' || key === 'bbox' || key === 'type') continue;
+      if (key in now) continue;
+      ops.push({ op: 'field', target: now.type, id, field: key, from: clip(prev[key]), to: undefined });
+    }
   }
 }
 

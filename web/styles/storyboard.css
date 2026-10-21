@@ -706,3 +706,7 @@ a { color: inherit; }
 }
 .rowitem:hover { border-left-color: var(--ink); background: var(--grey); }
 .ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 设置弹窗：按工作流占位符生成的参数网格 */
+.param-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+.param-grid .full { grid-column: 1 / -1; }
+.panel-box label .mono { color: var(--mid); font-size: 9px; letter-spacing: 0; margin-left: 4px; }

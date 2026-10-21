@@ -31,7 +31,7 @@ import {
   changes,
   ack,
 } from './scripts/lib/archive.mjs';
-import { listWorkflows, readWorkflow, saveWorkflow } from './scripts/lib/workflow.mjs';
+import { listWorkflows, readWorkflow, saveWorkflow, checkWorkflow } from './scripts/lib/workflow.mjs';
 import { renderPage } from './scripts/lib/render.mjs';
 import { compilePage } from './core/compile.mjs';
 import { compileContext } from './core/bible.mjs';
@@ -159,7 +159,8 @@ async function route(req, res, url) {
     const name = safe(wfMatch[1]);
     if (method === 'GET') {
       const wf = await readWorkflow(CONFIG_DIR, name);
-      return json(res, 200, wf);
+      // 带上占位符清单：设置弹窗要按它决定显示哪些参数
+      return json(res, 200, { ...wf, ...checkWorkflow(wf.raw) });
     }
     if (method === 'PUT') {
       const payload = await body(req);

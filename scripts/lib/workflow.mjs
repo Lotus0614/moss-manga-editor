@@ -112,6 +112,7 @@ export function buildValues({ page, project, config, opts = {} }) {
     seed,
     steps: num(opts.steps, defaults.steps, 28),
     cfg: num(opts.cfg, defaults.cfg, 5),
+    denoise: num(opts.denoise, defaults.denoise, 1),
     sampler: opts.sampler ?? defaults.sampler,
     scheduler: opts.scheduler ?? defaults.scheduler,
     ckpt: opts.ckpt ?? defaults.ckpt ?? '',

@@ -38,7 +38,7 @@ export async function prepareRender({ dir, configDir = dir, project, page, confi
     ...config,
     defaults: { ...config.defaults, ...Object.fromEntries(Object.entries(generation).filter(([, v]) => v !== '' && v !== undefined && v !== null)) },
   };
-  const values = buildValues({ page, project, config: effective, opts });
+  const values = { ...(config.params || {}), ...buildValues({ page, project, config: effective, opts }) };
   values.prompt = compiled.json;
 
   // 工作流用到哪些参数，就必须填哪些；没用到的一个都不要求

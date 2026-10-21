@@ -12,7 +12,6 @@ const FIELDS = {
   cfg: { label: 'CFG', type: 'number', key: 'cfg', step: '0.1' },
   sampler: { label: '采样器', type: 'text', key: 'sampler', placeholder: 'euler' },
   scheduler: { label: '调度器', type: 'text', key: 'scheduler', placeholder: 'simple' },
-  seed: { label: '默认 seed', type: 'number', key: 'seed', hint: '留空或 -1 = 每张随机' },
   ckpt: { label: '检查点', type: 'ckpt', key: 'ckpt' },
   lora_name: { label: 'LoRA', type: 'text', key: 'lora', placeholder: '<lora:moss\\xxx:0.7>' },
   denoise: { label: '重绘幅度', type: 'number', key: 'denoise', step: '0.05' },

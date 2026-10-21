@@ -89,7 +89,7 @@ node scripts/manga.mjs workflow check
 node scripts/manga.mjs config set defaults.reading=rtl defaults.style=mono defaults.vertical=true "defaults.canvas=[768,1280]"
 ```
 
-**不要问「哪些内容允许我改」——全部都能改。** 也没有子 Agent、没有锁定开关。
+**不要问「哪些内容允许我改」——全部都能改。** 也没有子 Agent、没有锁定开关。`n`n工作流里的占位符是**任意**的：写 `{{lora_data}}`、`{{my_style}}` 都行，值用 `manga config set params.lora_data="<lora:x:0.8>"` 提供，渲染时一起填进去。
 
 **1.4 检查点（只有工作流用到时才需要）**
 
@@ -123,7 +123,13 @@ node scripts/manga.mjs doctor
 
 `configured: true` 才算完成。**有 workflow 但 name 为空、或文件不存在，都算没配好**——这种情况下 `render` 会直接报错（这是故意的：以前它静默回退到内置工作流，结果用错模型出图还以为成功了）。
 
-然后告诉用户：「配置好了，随时可以开始画。」
+然后**直接把网页跑起来**，别等用户问：
+
+```bash
+node scripts/manga.mjs serve --open
+```
+
+告诉用户：「配置好了，网页已经起来了（http://127.0.0.1:5123）。你可以自己建项目、拖版面、写台词，也可以完全交给我构思跑图；跑出来的图随时能在页面上自己改，改完告诉我重出。」
 
 ---
 

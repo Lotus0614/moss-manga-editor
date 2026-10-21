@@ -100,7 +100,8 @@ export async function saveWorkflow(configDir, source, name = 'default.json') {
 export function buildValues({ page, project, config, opts = {} }) {
   const defaults = config.defaults || {};
   const [width, height] = page.size;
-  const seed = pickSeed(opts.seed, defaults.seed);
+  // seed 永远由代码出：显式 --seed 才固定，否则每次随机（配置里的 seed 不参与）
+  const seed = pickSeed(opts.seed, '');
   const loras = parseLoras(opts.lora ?? defaults.lora);
   const lora = loras[0] || { name: '', weight: 0 };
 
@@ -126,11 +127,13 @@ export function buildValues({ page, project, config, opts = {} }) {
 const numberOrEmpty = (value) => {
   if (value === '' || value === undefined || value === null) return '';
   const n = Number(value);
+  if (Number.isFinite(n) && n >= 0) return n;
   return Number.isFinite(n) ? n : '';
 };
 
-function pickSeed(value, fallback) {
-  const n = Number(value ?? fallback);
+function pickSeed(value) {
+  if (value === '' || value === undefined || value === null) return Math.floor(Math.random() * 2 ** 31);
+  const n = Number(value);
   if (Number.isFinite(n) && n >= 0) return n;
   return Math.floor(Math.random() * 2 ** 31);
 }

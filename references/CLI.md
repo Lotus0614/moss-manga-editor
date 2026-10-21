@@ -201,3 +201,13 @@ manga open [--port 5123]
 | 0 | 成功 |
 | 1 | 业务错误（看 `error`） |
 | 2 | 命令不存在（打印帮助） |
+
+## 自定义占位符（任意）
+
+工作流里的 `{{名字}}` 是**任意**的，没有白名单。除了内置那批（prompt/width/height/seed/steps/cfg/sampler/scheduler/ckpt/negative/denoise/lora_name/lora_strength/batch_size），你自己加的键会从 `config.params` 取值：
+
+```bash
+manga config set 'params.lora_data=<lora:moss\xxx:0.8>'
+```
+
+渲染时把它填进工作流。没配值又用了占位符，才会报「未提供的占位符」。

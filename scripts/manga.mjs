@@ -37,7 +37,7 @@ import {
   currentRev,
   readJournal,
 } from './lib/archive.mjs';
-import { listWorkflows, importWorkflow, readWorkflow } from './lib/workflow.mjs';
+import { listWorkflows, importWorkflow, readWorkflow, exposeParams } from './lib/workflow.mjs';
 import { ComfyClient } from './lib/comfy.mjs';
 import { prepareRender, renderPage } from './lib/render.mjs';
 import { compilePage } from '../core/compile.mjs';
@@ -273,17 +273,37 @@ async function cmdWorkflow() {
   }
   if (action === 'import') {
     const file = positional[2] || flags.file;
-    if (!file) fail('用法：manga workflow import <API JSON 文件> [--name default.json]');
+    if (!file) fail('用法：manga workflow import <API JSON 文件> [--name default.json] [--expose seed=3.seed,steps=3.steps]');
     const raw = await readFile(resolve(String(file)), 'utf8');
     const name = String(flags.name || 'default.json');
-    const imported = await importWorkflow(DIR, raw, name);
+    const expose = flags.expose ? String(flags.expose).split(',').filter(Boolean) : [];
+    const imported = await importWorkflow(DIR, raw, name, { expose });
     await writeConfig(DIR, { workflow: { name: imported.name, exposed: imported.params.map((p) => p.name) } });
+    const lines = [`已导入 ${imported.name}（${imported.nodeCount} 个节点）`];
+    lines.push(
+      imported.applied.length
+        ? `已自动绑定：${imported.applied.map((b) => `${b.param}（节点 ${b.node}.${b.input}）`).join('、')}`
+        : '没有需要自动绑定的字段（可能已经带占位符）'
+    );
+    if (imported.candidates.length) {
+      lines.push(`还可以暴露（问用户要不要）：${imported.candidates.map((c) => `${c.param}${c.note ? ` ${c.note}` : ''}`).join('、')}`);
+      lines.push(`  命令：manga workflow expose ${imported.candidates.slice(0, 3).map((c) => `${c.param}=${c.node}.${c.input}`).join(' ')}`);
+    }
+    for (const w of imported.warnings || []) lines.push(`  注意：${w}`);
+    return out({ ok: true, workflow: imported }, lines.join('\n'));
+  }
+  if (action === 'expose') {
+    const config = await readConfig(DIR);
+    const name = String(flags.name || config.workflow.name);
+    const pairs = positional.slice(2);
+    if (!pairs.length) fail('用法：manga workflow expose seed=3.seed steps=3.steps [--name default.json]');
+    const result = await exposeParams(DIR, name, pairs);
+    await writeConfig(DIR, { workflow: { name: config.workflow.name, exposed: result.params.map((p) => p.name) } });
     return out(
-      { ok: true, workflow: imported },
+      { ok: true, ...result },
       [
-        `已导入 ${imported.name}（${imported.nodeCount} 个节点）`,
-        `识别到参数：${imported.params.map((p) => `{{${p.name}}}:${p.type}`).join(', ') || '（没有占位符）'}`,
-        '已设为当前工作流。',
+        `已暴露：${result.applied.map((b) => `{{${b.param}}}（节点 ${b.node}.${b.input}）`).join('、')}`,
+        `当前参数：${result.params.map((p) => p.name).join(', ')}`,
       ].join('\n')
     );
   }

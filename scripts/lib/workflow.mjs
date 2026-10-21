@@ -4,6 +4,7 @@
 import { readFile, readdir, mkdir, writeFile, access } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { describeWorkflow, fillGraph, MissingParam } from '../../core/placeholders.mjs';
+import { detectBindings, applyBindings, parseExpose } from './bind.mjs';
 
 export const BUILTIN_DIR = resolve(import.meta.dirname, '..', '..', 'workflows');
 
@@ -56,15 +57,58 @@ export async function readWorkflow(archiveDir, name) {
   throw new Error(`找不到工作流 ${safe}（存档 workflows/ 与内置 workflows/ 都没有）`);
 }
 
-/** 导入用户从 ComfyUI 导出的 API JSON */
-export async function importWorkflow(archiveDir, raw, name = 'default.json') {
-  const desc = describeWorkflow(raw);
+/**
+ * 导入用户从 ComfyUI 导出的 API JSON。
+ * 默认自动绑定 prompt / width / height（用户不需要自己写占位符），
+ * 其余可暴露的参数作为 candidates 返回，由 Agent 问用户要不要开。
+ */
+export async function importWorkflow(archiveDir, raw, name = 'default.json', { bind = true, expose = [] } = {}) {
+  let text = typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2);
+  let graph;
+  try {
+    graph = JSON.parse(text);
+  } catch (err) {
+    throw new Error(`工作流 JSON 解析失败：${err.message}`);
+  }
+
+  const detected = detectBindings(graph);
+  const bindings = [...detected.required, ...parseExpose(expose)];
+  let applied = [];
+  if (bind) {
+    const result = applyBindings(graph, bindings);
+    graph = result.graph;
+    applied = result.applied;
+    text = JSON.stringify(graph, null, 2);
+  }
+
+  const desc = describeWorkflow(graph);
   if (!desc.ok) throw new Error(desc.error);
+
   const safe = basename(String(name).endsWith('.json') ? name : `${name}.json`);
   const dir = join(archiveDir, 'workflows');
   await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, safe), raw.endsWith('\n') ? raw : `${raw}\n`, 'utf8');
-  return { name: safe, ...desc };
+  await writeFile(join(dir, safe), `${text.endsWith('\n') ? text : `${text}\n`}`, 'utf8');
+
+  return {
+    name: safe,
+    ...desc,
+    applied,
+    required: detected.required,
+    candidates: detected.candidates.filter((c) => !applied.some((a) => a.param === c.param)),
+    warnings: detected.warnings,
+  };
+}
+
+/** 给已有工作流追加绑定（改占位符），不重新导入 */
+export async function exposeParams(archiveDir, name, expressions) {
+  const wf = await readWorkflow(archiveDir, name);
+  const graph = JSON.parse(wf.raw);
+  const result = applyBindings(graph, parseExpose(expressions));
+  if (!result.applied.length) throw new Error('没有任何字段被替换（可能已经是占位符，或节点/输入名不对）');
+  const text = JSON.stringify(result.graph, null, 2);
+  await writeFile(join(archiveDir, 'workflows', wf.name), `${text}\n`, 'utf8');
+  const desc = describeWorkflow(text);
+  return { name: wf.name, applied: result.applied, params: desc.params || [] };
 }
 
 /**

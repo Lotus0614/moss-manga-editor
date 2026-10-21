@@ -41,9 +41,14 @@ manga init [--comfy URL] [--ckpt 文件名] [--workflow 文件]
 manga config get [点号路径]
 manga config set 键=值 [键=值...]
 manga workflow list
-manga workflow import <文件> [--name default.json]
+manga workflow import <文件> [--name default.json] [--expose seed=5.seed]
+manga workflow expose seed=5.seed steps=5.steps [--name default.json]
 manga workflow show [--name default.json]
 ```
+
+`workflow import` 会自动把 `prompt` / `width` / `height` 换成占位符，并打印其余可暴露的参数。用户不需要手写占位符。
+
+`workflow expose` 用 `参数=节点id.输入名` 的形式追加；节点号从导入输出里取。
 
 `config set` 的值会先尝试当 JSON 解析，所以 `editable.layout=true` 是布尔、`defaults.steps=30` 是数字。
 

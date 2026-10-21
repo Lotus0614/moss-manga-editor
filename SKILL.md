@@ -40,15 +40,29 @@ node scripts/manga.mjs init --comfy <地址>
 
 **1.2 要 Moss 的工作流**
 
-> 「这个工具需要 MOSS 模型的工作流。如果你已经有，请在 ComfyUI 里打开它，点『工作流 → 导出 (API)』，把生成的 JSON 发给我（贴文本或者给文件路径都行）。」
+> 「这个工具需要 MOSS 模型的工作流。如果你已经有，请在 ComfyUI 里打开它，点『工作流 → 导出 (API)』，把生成的 JSON 原样发我（贴文本或者给文件路径都行），**不用改任何东西**。」
 
-收到后：
+收到后直接导入，占位符由你负责加：
 
 ```bash
 node scripts/manga.mjs workflow import <文件路径> --name default.json
 ```
 
-导入后会打印识别到的参数（`prompt`、`seed`、`width`…）。如果**没有** `{{prompt}}`，说明用户导出的是普通工作流或没写占位符——让他在正向文本编码器的 `text` 里改成 `{{prompt}}` 再来。
+它会自动把 `prompt`（正向提示词节点的 text）、`width` / `height`（latent 节点的尺寸）换成占位符，并列出其余**可以**暴露的参数。
+
+然后问用户：
+
+> 「这几项我默认可以改：提示词、尺寸。另外还能开放：随机种子、步数、CFG、采样器、负面提示词、检查点——要放开哪些？不确定就保持默认，只开种子。」
+
+按回答追加：
+
+```bash
+node scripts/manga.mjs workflow expose seed=5.seed steps=5.steps
+```
+
+（节点号用导入时打印出来的那个，别自己编。）
+
+如果导入报「没有找到采样器节点 / 没有找到带 width/height 的 latent 节点」，说明不是标准文生图工作流，直接把报错原文告诉用户，让他确认导出的是不是画图那条链路。
 
 **1.3 哪些部分允许你改**
 
@@ -178,7 +192,8 @@ node scripts/manga.mjs ack
 |---|---|
 | 检查配置 | `manga doctor` |
 | 初始化 | `manga init --comfy URL [--ckpt 名] [--workflow 文件]` |
-| 导入工作流 | `manga workflow import <文件> --name default.json` |
+| 导入工作流 | `manga workflow import <文件>`（自动绑定 prompt/width/height） |
+| 开更多参数 | `manga workflow expose seed=5.seed steps=5.steps` |
 | 改配置 | `manga config set defaults.ckpt=xxx editable.text=true` |
 | 看配置 | `manga config get defaults` |
 | 建项目 | `manga project new --name "名字" [--size page]` |
@@ -202,12 +217,14 @@ node scripts/manga.mjs ack
 ## 纪律
 
 1. **不读 `scripts/` 源码**，要细节读 `references/`。
-2. **不手写 Moss JSON**，那是 `compile` 的产物；你只写页面文档。
-3. **不猜坐标**：先 `page show --summary`，再基于现有 bbox 改。
-4. **不跳过 compile**：有 error 就渲染不了，浪费一次排队。
-5. **一次只问一个问题**，配置阶段尤其如此。
-6. **用户没说「开始」就不要渲染**。
-7. 生成失败先看错误信息：`连不上 ComfyUI` 是环境问题，`节点错误` 是工作流问题，`这一页还有错误` 是内容问题。
+2. **不改 `scripts/` 代码**——只有用户明确要求「修 bug」或「加功能」时才动，改完要跑 `npm test`。
+3. **不手写 Moss JSON**，那是 `compile` 的产物；你只写页面文档。
+4. **不让用户手写占位符**：工作流 import 会自动绑定 `prompt` / `width` / `height`，其余用 `workflow expose` 加。
+5. **不猜坐标**：先 `page show --summary`，再基于现有 bbox 改。
+6. **不跳过 compile**：有 error 就渲染不了，浪费一次排队。
+7. **一次只问一个问题**，配置阶段尤其如此。
+8. **用户没说「开始」就不要渲染**。
+9. 生成失败先看错误信息：`连不上 ComfyUI` 是环境问题，`节点错误` 是工作流问题，`这一页还有错误` 是内容问题。
 
 ---
 

@@ -10,7 +10,7 @@
   "scripts": {
     "manga": "node scripts/manga.mjs",
     "serve": "node server.mjs",
-    "test": "node core/self-test.mjs && node tools/test-export.mjs && node scripts/dev/test-archive.mjs",
+    "test": "node core/self-test.mjs && node tools/test-export.mjs && node scripts/dev/test-archive.mjs && node scripts/dev/test-bind.mjs",
     "check": "node tools/check.mjs",
     "vendor": "node tools/vendor.mjs"
   }

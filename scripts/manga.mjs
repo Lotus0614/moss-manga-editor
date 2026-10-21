@@ -39,7 +39,7 @@ import {
   currentRev,
   readJournal,
 } from './lib/archive.mjs';
-import { listWorkflows, readWorkflow, saveWorkflow, checkWorkflow, installBuiltin } from './lib/workflow.mjs';
+import { listWorkflows, readWorkflow, saveWorkflow, checkWorkflow } from './lib/workflow.mjs';
 import { ComfyClient } from './lib/comfy.mjs';
 import { prepareRender, renderPage } from './lib/render.mjs';
 import { compilePage } from '../core/compile.mjs';
@@ -158,40 +158,46 @@ async function cmdDoctor() {
   result.workflow.name = config.workflow.name;
 
   const client = new ComfyClient({ url: config.comfy.url });
+  let checkpoints = [];
   try {
     const stats = await client.stats();
     const info = await client.objectInfo();
     result.comfy.reachable = true;
     result.comfy.version = stats.system?.comfyui_version || '';
-    result.comfy.checkpoints = info.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0]?.length || 0;
+    checkpoints = info.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
+    result.comfy.checkpoints = checkpoints.length;
     result.comfy.loras = info.LoraLoader?.input?.required?.lora_name?.[0]?.length || 0;
-    const checkpoints = info.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
-    if (!result.ckpt) {
-      result.problems.push('还没有设置 ckpt：manga config set defaults.ckpt <文件名>');
-    } else if (checkpoints.length && !checkpoints.includes(result.ckpt)) {
-      result.problems.push(`ckpt「${result.ckpt}」在 ComfyUI 里找不到`);
-    }
   } catch (err) {
     result.comfy.error = err.message;
     result.problems.push(`连不上 ComfyUI：${err.message}`);
   }
 
+  let checked = null;
   try {
     const workflows = await listWorkflows(CONFIG_DIR);
-    const picked = workflows.find((w) => w.name === config.workflow.name) || workflows[0];
-    if (picked) {
-      result.workflow = { name: picked.name, ok: picked.ok, params: picked.params.map((p) => p.name), error: picked.error };
-      if (!picked.ok) result.problems.push(`工作流有问题：${picked.error}`);
-      else {
-        const wf = await readWorkflow(CONFIG_DIR, picked.name).catch(() => null);
-        if (wf) {
-          const checked = checkWorkflow(wf.raw);
-          if (!checked.ok) result.problems.push(`工作流缺占位符：${checked.missing.map((m) => `{{${m}}}`).join('、')}（manga workflow check）`);
-        }
-      }
+    if (!config.workflow.name) {
+      result.problems.push('还没有工作流：把你的「导出 (API)」JSON 发我，改好后用 `manga workflow save` 存进去');
     } else {
-      result.workflow.ok = false;
-      result.problems.push('没有可用的工作流文件');
+      const wf = await readWorkflow(CONFIG_DIR, config.workflow.name).catch((err) => {
+        result.problems.push(err.message);
+        return null;
+      });
+      if (wf) {
+        checked = checkWorkflow(wf.raw);
+        result.workflow = {
+          name: wf.name,
+          ok: checked.ok,
+          params: checked.params.map((p) => p.name),
+          error: checked.error || '',
+        };
+        if (checked.error) result.problems.push(`工作流解析失败：${checked.error}`);
+        else if (!checked.ok) result.problems.push(`工作流缺占位符：${checked.missing.map((m) => `{{${m}}}`).join('、')}（manga workflow check）`);
+      }
+    }
+    // 只在工作流真的用到 ckpt 时才要求
+    if (checked?.params?.some((p) => p.name === 'ckpt')) {
+      if (!result.ckpt) result.problems.push('这个工作流用了 {{ckpt}}，但还没选检查点：manga config set defaults.ckpt <文件名>');
+      else if (checkpoints.length && !checkpoints.includes(result.ckpt)) result.problems.push(`ckpt「${result.ckpt}」在 ComfyUI 里找不到`);
     }
   } catch (err) {
     result.problems.push(`读取工作流失败：${err.message}`);
@@ -200,7 +206,7 @@ async function cmdDoctor() {
   const projects = await listProjects(DIR).catch(() => []);
   result.projects = projects.length;
   if (!archiveExists) result.problems.push(`存档还没建立：${DIR}（运行 manga init 会自动建）`);
-  result.configured = result.comfy.reachable && Boolean(result.ckpt) && result.workflow.ok && result.problems.length === 0;
+  result.configured = result.comfy.reachable && Boolean(result.workflow.name) && result.workflow.ok && result.problems.length === 0;
 
   out(
     result,
@@ -208,8 +214,8 @@ async function cmdDoctor() {
       `配置根：${CONFIG_DIR}`,
       `存档：${DIR}`,
       `ComfyUI：${config.comfy.url} ${result.comfy.reachable ? `✓ ${result.comfy.version}` : '✗ 连不上'}`,
-      `检查点：${result.ckpt || '（未设置）'}`,
-      `工作流：${result.workflow.name} ${result.workflow.ok ? `✓ ${result.workflow.params.length} 个参数` : '✗'}`,
+      `工作流：${result.workflow.name || '（未设置）'} ${result.workflow.ok ? `✓ ${result.workflow.params.length} 个参数` : '✗'}`,
+      `检查点：${result.ckpt || '（不需要）'}`,
       `项目：${projects.length} 个`,
       result.configured ? '状态：已配置，可以直接开始画' : `状况：${result.problems.length} 个问题`,
       ...result.problems.map((p) => `  - ${p}`),
@@ -227,10 +233,6 @@ async function cmdInit() {
   if (flags.workflow) {
     const saved = await saveWorkflow(CONFIG_DIR, String(flags.workflow), 'default.json');
     patch.workflow = { name: saved.name };
-  } else if (!existsSync(join(CONFIG_DIR, 'workflows', 'default.json'))) {
-    // 没指定就把内置通用工作流放进配置根，保证开箱能跑通链路
-    const installed = await installBuiltin(CONFIG_DIR, 'default.json');
-    patch.workflow = { name: installed.name };
   }
   const config = Object.keys(patch).length ? await writeConfig(CONFIG_DIR, patch) : await readConfig(CONFIG_DIR);
   out(
@@ -507,7 +509,7 @@ async function cmdRender() {
   const config = await readConfig(CONFIG_DIR);
 
   if (flags['dry-run']) {
-    const prepared = await prepareRender({ dir: DIR, project, page, config, opts: flags });
+    const prepared = await prepareRender({ dir: DIR, configDir: CONFIG_DIR, project, page, config, opts: flags });
     if (!prepared.ok) return fail(prepared.error, 'render');
     return out(
       { ok: true, dryRun: true, workflow: prepared.workflow, values: prepared.values, graph: prepared.graph },
@@ -519,6 +521,7 @@ async function cmdRender() {
   try {
     const result = await renderPage({
       dir: DIR,
+      configDir: CONFIG_DIR,
       slug: project.slug,
       project,
       page,

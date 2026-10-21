@@ -1,4 +1,4 @@
-// 编辑页：左页序 / 中画布 + 工作台 / 右栏取消（不再有 Agent）。
+// 编辑页：左页序 / 中画布 + 工作台 / 右属性面板。
 // 页面文档是唯一可编辑真源，编译预览在浏览器里现算（core/compile.mjs 由服务端托管）。
 
 import {
@@ -43,7 +43,7 @@ export default function EditorPage({ projectId, pageId }) {
   const [versions, setVersions] = useState([]);
   const [current, setCurrent] = useState('');
   const [selection, setSelection] = useState(null);
-  const [tab, setTab] = useState('props');
+  const [tab, setTab] = useState('prompt');
   const [gen, setGen] = useState(null);
   const [scale, setScale] = useState(0.55);
   const [changes, setChanges] = useState(null);
@@ -114,9 +114,9 @@ export default function EditorPage({ projectId, pageId }) {
     const el = stageRef.current;
     if (!el || !page) return;
     const fit = () => {
-      const w = el.clientWidth - 44;
-      const h = el.clientHeight - 44;
-      setScale(Math.max(0.18, Math.min(w / page.size[0], h / page.size[1])));
+      const w = el.clientWidth - 48;
+      const h = el.clientHeight - 48;
+      setScale(Math.max(0.16, Math.min(w / page.size[0], h / page.size[1])));
     };
     fit();
     const ro = new ResizeObserver(fit);
@@ -263,12 +263,21 @@ export default function EditorPage({ projectId, pageId }) {
     }
   }
 
+  async function pickVersion(id) {
+    setCurrent(id);
+    try {
+      await apiPost(`/api/projects/${projectId}/versions/current`, { id, pageId: page.id });
+    } catch (err) {
+      toast(err.message, 'bad');
+    }
+  }
+
   async function collectExportItems() {
     const items = [];
     for (const p of pages) {
       const data = await api(`/api/projects/${projectId}/pages/${p.id}`);
-      const list = data.versions || [];
-      const picked = list.find((v) => v.id === data.current && v.page === p.id) || list.filter((v) => v.page === p.id).slice(-1)[0];
+      const list = (data.versions || []).filter((v) => v.page === p.id);
+      const picked = list.find((v) => v.id === data.current) || list.slice(-1)[0];
       if (picked) items.push({ image: picked.image, index: p.index, title: p.title });
     }
     return items;
@@ -295,9 +304,8 @@ export default function EditorPage({ projectId, pageId }) {
   const warns = warnings.filter((w) => w.level === 'warn');
   const selectedPanel = selection?.kind === 'panel' ? page.panels.find((p) => p.id === selection.id) : null;
   const selectedBubble = selection?.kind === 'bubble' ? page.bubbles.find((b) => b.id === selection.id) : null;
-  const currentVersion = versions.find((v) => v.id === current) || versions.slice(-1)[0];
-  const image = currentVersion?.image || '';
-  const genProgress = gen?.progress || 0;
+  const version = versions.find((v) => v.id === current) || versions.slice(-1)[0];
+  const image = version?.image || '';
 
   return html`<div class="editor">
     <aside class="rail">
@@ -334,7 +342,7 @@ export default function EditorPage({ projectId, pageId }) {
             ? html`<span class="tag">${warns.length} 个提醒</span>`
             : null}
         <div class="spacer"></div>
-        ${gen && gen.status !== 'done' && gen.status !== 'error' ? html`<span class="meta">生成 ${genProgress}%</span>` : null}
+        ${gen && gen.status !== 'done' && gen.status !== 'error' ? html`<span class="meta">生成 ${gen.progress || 0}%</span>` : null}
         <button class="btn ghost" onClick=${() => setShowExport(true)}>导出</button>
         <button class="btn inv" disabled=${errors.length > 0} onClick=${generate}>生成</button>
       </div>
@@ -353,7 +361,6 @@ export default function EditorPage({ projectId, pageId }) {
 
       <div class="dock">
         <div class="dock-head">
-          <div class=${cls('tab', tab === 'props' && 'on')} onClick=${() => setTab('props')}>属性</div>
           <div class=${cls('tab', tab === 'prompt' && 'on')} onClick=${() => setTab('prompt')}>
             提示词${errors.length
               ? html`<span class="badge">${errors.length}</span>`
@@ -364,15 +371,22 @@ export default function EditorPage({ projectId, pageId }) {
           <div class=${cls('tab', tab === 'history' && 'on')} onClick=${() => setTab('history')}>
             历史<span class="badge warn">${versions.length}</span>
           </div>
-          <div class=${cls('tab', tab === 'changes' && 'on')} onClick=${() => { setTab('changes'); loadChanges(); }}>
-            变更
-          </div>
+          <div class=${cls('tab', tab === 'changes' && 'on')} onClick=${() => { setTab('changes'); loadChanges(); }}>变更</div>
+          <div class="spacer"></div>
+          <span class="meta">${version ? `${version.id} · seed ${version.seed}` : '还没有生成过'}</span>
         </div>
         <div class="dock-body">
-          ${tab === 'props' ? renderProps() : tab === 'prompt' ? renderPrompt() : tab === 'history' ? renderHistory() : renderChanges()}
+          ${tab === 'prompt' ? renderPrompt() : tab === 'history' ? renderHistory() : renderChanges()}
         </div>
       </div>
     </section>
+
+    <aside class="inspect">
+      <div class="inspect-head">属性${selection ? ' · 选中项' : ''}</div>
+      <div class="inspect-body">
+        ${selectedPanel ? panelForm(selectedPanel) : selectedBubble ? bubbleForm(selectedBubble) : pageForm()}
+      </div>
+    </aside>
 
     ${showExport
       ? html`<div class="modal-mask" onClick=${(e) => e.target === e.currentTarget && setShowExport(false)}>
@@ -393,82 +407,93 @@ export default function EditorPage({ projectId, pageId }) {
       : null}
   </div>`;
 
-  // ---------------------------------------------------------------- 属性
+  // ---------------------------------------------------------------- 右栏：页面
 
-  function renderProps() {
-    return html`<div class="inspector">
-      <div class="props">
-        <div class="field full">
-          <label>页面补充说明（追加到 summary 末尾）</label>
-          <textarea
-            class="textarea"
-            style="min-height:44px"
-            value=${page.note || ''}
-            placeholder="这一段整体要传达什么"
-            onInput=${(e) => updatePage({ note: e.currentTarget.value })}
-          ></textarea>
-        </div>
-        <div class="field">
-          <label>阅读顺序</label>
-          <select class="select" value=${page.reading} onChange=${(e) => updatePage({ reading: e.currentTarget.value })}>
-            <option value="rtl">右 → 左</option>
-            <option value="ltr">左 → 右</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>画风</label>
-          <select class="select" value=${page.style} onChange=${(e) => updatePage({ style: e.currentTarget.value })}>
-            ${STYLE_LABELS.map(([v, n]) => html`<option value=${v}>${n}</option>`)}
-          </select>
-        </div>
-        <div class="field full">
-          <label>场景（写进 SETTING）</label>
-          <input
-            class="input"
-            value=${page.scene || ''}
-            placeholder="a half-empty train carriage, fluorescent light"
-            onInput=${(e) => updatePage({ scene: e.currentTarget.value })}
-          />
-        </div>
+  function pageForm() {
+    return html`<div class="col">
+      <div class="field">
+        <label>阅读顺序</label>
+        <select class="select" value=${page.reading} onChange=${(e) => updatePage({ reading: e.currentTarget.value })}>
+          <option value="rtl">右 → 左</option>
+          <option value="ltr">左 → 右</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>画风</label>
+        <select class="select" value=${page.style} onChange=${(e) => updatePage({ style: e.currentTarget.value })}>
+          ${STYLE_LABELS.map(([v, n]) => html`<option value=${v}>${n}</option>`)}
+        </select>
+      </div>
+      <div class="field">
+        <label>场景（写进 SETTING）</label>
+        <textarea
+          class="textarea"
+          style="min-height:52px"
+          value=${page.scene || ''}
+          placeholder="a half-empty train carriage, fluorescent light"
+          onInput=${(e) => updatePage({ scene: e.currentTarget.value })}
+        ></textarea>
+      </div>
+      <div class="field">
+        <label>补充说明（追加在 summary 末尾）</label>
+        <textarea
+          class="textarea"
+          style="min-height:52px"
+          value=${page.note || ''}
+          onInput=${(e) => updatePage({ note: e.currentTarget.value })}
+        ></textarea>
       </div>
 
-      <div class="side">
-        ${selectedPanel || selectedBubble
-          ? selectedPanel
-            ? panelInspector(selectedPanel)
-            : bubbleInspector(selectedBubble)
-          : html`<div class="col">
-              <span class="hint">点画布上的格子或文字来编辑；也可以直接用下面的版式重排。</span>
-              <div class="row wrap">
-                ${PRESET_LABELS.map(
-                  ([id, name]) => html`<button class="chip ghost" onClick=${() => {
-                    updatePage((prev) => applyPreset(prev, id));
-                    setTimeout(saveNow, 60);
-                  }}>${name}</button>`
-                )}
-                <button class="chip" onClick=${() => {
-                  updatePage({ panels: [...page.panels, createPanel()] });
-                  setTimeout(saveNow, 60);
-                }}>＋格</button>
-                <button class="chip" onClick=${() => {
-                  updatePage({ bubbles: [...page.bubbles, createBubble({ text: '新台词' })] });
-                  setTimeout(saveNow, 60);
-                }}>＋文字</button>
-              </div>
-            </div>`}
+      <div class="divider"></div>
+      <span class="label">版式</span>
+      <div class="row wrap">
+        ${PRESET_LABELS.map(
+          ([id, name]) => html`<button class="chip ghost" onClick=${() => {
+            updatePage((prev) => applyPreset(prev, id));
+            setTimeout(saveNow, 60);
+          }}>${name}</button>`
+        )}
+      </div>
+      <div class="row wrap">
+        <button class="chip" onClick=${() => { setSelection(null); updatePage({ panels: [...page.panels, createPanel()] }); setTimeout(saveNow, 60); }}>＋格</button>
+        <button class="chip" onClick=${() => { updatePage({ bubbles: [...page.bubbles, createBubble({ text: '新台词' })] }); setTimeout(saveNow, 60); }}>＋文字</button>
+      </div>
+
+      <div class="divider"></div>
+      <span class="label">这一页</span>
+      <div class="col" style="gap:4px">
+        ${page.panels.map(
+          (p, i) => html`<div class="rowitem" onClick=${() => setSelection({ kind: 'panel', id: p.id })}>
+            <span class="mono small">格${i + 1}</span>
+            <span class="grow ellipsis">${p.caption || '（未写描述）'}</span>
+          </div>`
+        )}
+        ${page.bubbles.map(
+          (b, i) => html`<div class="rowitem" onClick=${() => setSelection({ kind: 'bubble', id: b.id })}>
+            <span class="mono small">字${i + 1}</span>
+            <span class="grow ellipsis">${b.text || '（空）'}</span>
+          </div>`
+        )}
       </div>
     </div>`;
   }
 
-  function panelInspector(panel) {
-    return html`<div class="props">
-      <div class="field full">
+  // ---------------------------------------------------------------- 右栏：分格
+
+  function panelForm(panel) {
+    return html`<div class="col">
+      <div class="row">
+        <button class="btn sm ghost" onClick=${() => setSelection(null)}>← 返回</button>
+        <div class="spacer"></div>
+        <button class="btn sm ghost" onClick=${() => removePanel(panel.id)}>删除</button>
+      </div>
+      <div class="field">
         <label>这一格画什么</label>
         <textarea
           class="textarea"
-          style="min-height:56px"
+          style="min-height:96px"
           value=${panel.caption || ''}
-          placeholder="只写画面：谁、在哪、什么动作、什么景别"
+          placeholder="谁 + 在哪 + 做什么，只写画面"
           onInput=${(e) => updatePanel(panel.id, { caption: e.currentTarget.value })}
         ></textarea>
       </div>
@@ -490,7 +515,7 @@ export default function EditorPage({ projectId, pageId }) {
           ${FRAME_LABELS.map(([v, n]) => html`<option value=${v}>${n}</option>`)}
         </select>
       </div>
-      <div class="field full">
+      <div class="field">
         <label>坐标 x1 / y1 / x2 / y2</label>
         <div class="row">
           ${panel.bbox.map(
@@ -508,17 +533,21 @@ export default function EditorPage({ projectId, pageId }) {
           )}
         </div>
       </div>
-      <div class="row full">
-        <button class="btn sm ghost" onClick=${() => removePanel(panel.id)}>删除这一格</button>
-      </div>
     </div>`;
   }
 
-  function bubbleInspector(bubble) {
-    return html`<div class="props">
-      <div class="field full">
+  // ---------------------------------------------------------------- 右栏：文字
+
+  function bubbleForm(bubble) {
+    return html`<div class="col">
+      <div class="row">
+        <button class="btn sm ghost" onClick=${() => setSelection(null)}>← 返回</button>
+        <div class="spacer"></div>
+        <button class="btn sm ghost" onClick=${() => removeBubble(bubble.id)}>删除</button>
+      </div>
+      <div class="field">
         <label>文字内容</label>
-        <textarea class="textarea" style="min-height:56px" value=${bubble.text || ''} onInput=${(e) => updateBubble(bubble.id, { text: e.currentTarget.value })}></textarea>
+        <textarea class="textarea" style="min-height:80px" value=${bubble.text || ''} onInput=${(e) => updateBubble(bubble.id, { text: e.currentTarget.value })}></textarea>
       </div>
       <div class="field">
         <label>类型</label>
@@ -526,9 +555,18 @@ export default function EditorPage({ projectId, pageId }) {
           ${BUBBLE_LABELS.map((b) => html`<option value=${b.key}>${b.name}</option>`)}
         </select>
       </div>
-      <div class="field">
-        <label>字号</label>
-        <input class="input" type="number" value=${bubble.size} onInput=${(e) => updateBubble(bubble.id, { size: Number(e.currentTarget.value) || 22 })} />
+      <div class="row2">
+        <div class="field">
+          <label>字号</label>
+          <input class="input" type="number" value=${bubble.size} onInput=${(e) => updateBubble(bubble.id, { size: Number(e.currentTarget.value) || 22 })} />
+        </div>
+        <div class="field">
+          <label>排布</label>
+          <select class="select" value=${bubble.vertical === false ? 'h' : 'v'} onChange=${(e) => updateBubble(bubble.id, { vertical: e.currentTarget.value === 'v' })}>
+            <option value="v">竖排</option>
+            <option value="h">横排</option>
+          </select>
+        </div>
       </div>
       <div class="field">
         <label>尾巴</label>
@@ -538,13 +576,6 @@ export default function EditorPage({ projectId, pageId }) {
         </select>
       </div>
       <div class="field">
-        <label>排布</label>
-        <select class="select" value=${bubble.vertical === false ? 'h' : 'v'} onChange=${(e) => updateBubble(bubble.id, { vertical: e.currentTarget.value === 'v' })}>
-          <option value="v">竖排</option>
-          <option value="h">横排</option>
-        </select>
-      </div>
-      <div class="field full">
         <label>坐标 x1 / y1 / x2 / y2</label>
         <div class="row">
           ${bubble.bbox.map(
@@ -561,9 +592,6 @@ export default function EditorPage({ projectId, pageId }) {
             />`
           )}
         </div>
-      </div>
-      <div class="row full">
-        <button class="btn sm ghost" onClick=${() => removeBubble(bubble.id)}>删除这条</button>
       </div>
     </div>`;
   }
@@ -588,7 +616,7 @@ export default function EditorPage({ projectId, pageId }) {
     setTimeout(saveNow, 60);
   }
 
-  // ---------------------------------------------------------------- 提示词
+  // ---------------------------------------------------------------- 工作台
 
   function renderPrompt() {
     return html`<div class="row" style="align-items:flex-start;gap:16px">
@@ -619,40 +647,25 @@ export default function EditorPage({ projectId, pageId }) {
     </div>`;
   }
 
-  // ---------------------------------------------------------------- 历史
-
   function renderHistory() {
     const list = [...versions].reverse();
     if (!list.length) return html`<div class="hint">这一页还没有生成过图片。点右上角「生成」。</div>`;
     return html`<div class="col" style="gap:10px">
       <div class="history-strip">
         ${list.map(
-          (v) => html`<div
-            class=${cls('version', v.id === current && 'on')}
-            key=${v.id}
-            onClick=${() => {
-              setCurrent(v.id);
-              apiPost(`/api/projects/${projectId}/versions/current`, { id: v.id }).catch(() => {});
-            }}
-          >
+          (v) => html`<div class=${cls('version', v.id === (current || list[0]?.id) && 'on')} key=${v.id} onClick=${() => pickVersion(v.id)}>
             <img src=${v.image} alt="" loading="lazy" />
             <div class="vmeta"><b>${v.seed}</b>${formatTime(v.at).slice(5)}</div>
           </div>`
         )}
       </div>
-      <span class="hint">历史只读：切换只影响预览用哪一版，不会改布局。</span>
+      <span class="hint">点缩略图切换当前采用版；历史只读，不会改布局。</span>
     </div>`;
   }
 
-  // ---------------------------------------------------------------- 变更
-
   function renderChanges() {
     if (!changes) return html`<div class="hint">读取中…</div>`;
-    if (!changes.pages.length) {
-      return html`<div class="row">
-        <span class="hint">自 rev ${changes.since} 以来没有改动（当前 rev ${changes.to}）。</span>
-      </div>`;
-    }
+    if (!changes.pages.length) return html`<div class="hint">自 rev ${changes.since} 以来没有改动（当前 rev ${changes.to}）。</div>`;
     return html`<div class="col" style="gap:8px">
       <div class="row">
         <span class="mono small muted">rev ${changes.since} → ${changes.to}</span>

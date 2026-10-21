@@ -1,17 +1,16 @@
 // 工作流文件管理：读写、校验、参数清单。
 //
-// 工作流是**全局配置**，放在 <配置根>/workflows/（默认 ~/.moss-manga/workflows），
-// 跟存档无关；技能自带的 workflows/ 作为兜底模板。
+// 工作流是**全局配置**，放在 <配置根>/workflows/，跟存档无关。
+// 这里没有内置工作流、也没有回退：找不到就是找不到，直接报错。
+// 静默回退会让「渲染成功」变成用错工作流的假象，比失败更糟。
 //
-// 这里不做任何「猜哪个节点是提示词」的自动替换：工作流可能很复杂，
-// 由调用方（AI）读懂 JSON 后自己写好占位符，再用 workflow save 落盘 + check 校验。
+// 自动替换也不做：工作流可能很复杂，由调用方（AI）读懂 JSON 后自己写好占位符，
+// 再用 workflow save 落盘 + check 校验。
 
-import { readFile, readdir, mkdir, writeFile, access, copyFile } from 'node:fs/promises';
+import { readFile, readdir, mkdir, writeFile, access } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { describeWorkflow, fillGraph, MissingParam } from '../../core/placeholders.mjs';
 import { workflowsDir, stripBom } from './config.mjs';
-
-export const BUILTIN_DIR = resolve(import.meta.dirname, '..', '..', 'workflows');
 
 const exists = async (file) => {
   try {
@@ -22,51 +21,49 @@ const exists = async (file) => {
   }
 };
 
-async function listDir(dir) {
+/** 列出配置根里的工作流（没有内置、没有兜底） */
+export async function listWorkflows(configDir) {
+  const dir = workflowsDir(configDir);
+  let files = [];
   try {
-    return (await readdir(dir)).filter((f) => f.endsWith('.json'));
+    files = (await readdir(dir)).filter((f) => f.endsWith('.json'));
   } catch {
     return [];
   }
-}
-
-/** 列出所有可用工作流（配置根优先，重名时配置根胜出） */
-export async function listWorkflows(configDir) {
-  const seen = new Set();
   const out = [];
-  for (const [dir, source] of [
-    [workflowsDir(configDir), 'config'],
-    [BUILTIN_DIR, 'builtin'],
-  ]) {
-    for (const file of await listDir(dir)) {
-      if (seen.has(file)) continue;
-      seen.add(file);
-      const raw = await readFile(join(dir, file), 'utf8');
-      const desc = describeWorkflow(raw);
-      out.push({ name: file, source, ok: desc.ok, error: desc.error || '', params: desc.params || [], nodeCount: desc.nodeCount || 0 });
-    }
+  for (const file of files) {
+    const raw = await readFile(join(dir, file), 'utf8');
+    const desc = describeWorkflow(stripBom(raw));
+    out.push({
+      name: file,
+      source: 'config',
+      ok: desc.ok,
+      error: desc.error || '',
+      params: desc.params || [],
+      nodeCount: desc.nodeCount || 0,
+    });
   }
   return out;
 }
 
-/** 读工作流文本；先找配置根，再找内置；都没有就用内置通用模板兜底 */
+/** 读工作流文本；找不到就抛错，绝不回退 */
 export async function readWorkflow(configDir, name) {
-  const safe = basename(String(name || 'default.json'));
-  for (const candidate of [safe, 'moss-image.api.json']) {
-    for (const dir of [workflowsDir(configDir), BUILTIN_DIR]) {
-      const file = join(dir, candidate);
-      if (await exists(file)) return { name: basename(candidate), raw: await readFile(file, 'utf8'), file };
-    }
+  const safe = basename(String(name || ''));
+  if (!safe) throw new Error('还没有设置工作流：先用 `manga workflow save <你的 API JSON>` 导入一份');
+  const file = join(workflowsDir(configDir), safe);
+  if (!(await exists(file))) {
+    const available = (await listWorkflows(configDir)).map((w) => w.name);
+    throw new Error(
+      `找不到工作流 ${safe}（找的是 ${file}）` +
+        (available.length ? `；现有：${available.join(', ')}` : '；配置根里还没有任何工作流')
+    );
   }
-  throw new Error(`找不到工作流 ${safe}（配置根 workflows/ 与内置 workflows/ 都没有）`);
+  return { name: safe, raw: await readFile(file, 'utf8'), file };
 }
 
-/**
- * 校验一份工作流文本，报告它是否满足生成的最低要求。
- * 不做替换，只诊断。
- */
+/** 校验一份工作流文本，报告它是否满足生成的最低要求。不做替换，只诊断 */
 export function checkWorkflow(raw) {
-  const desc = describeWorkflow(raw);
+  const desc = describeWorkflow(stripBom(String(raw)));
   if (!desc.ok) return { ok: false, error: desc.error, nodeCount: 0, params: [], missing: [], warnings: [] };
 
   const names = new Set(desc.params.map((p) => p.name));
@@ -77,23 +74,10 @@ export function checkWorkflow(raw) {
   if (missing.includes('height')) warnings.push('没有 {{height}}：高度写死在文件里，改不了画布');
   if (!names.has('seed')) warnings.push('没有 {{seed}}：每次出图不可复现，也没法换 seed 重出');
 
-  const text = JSON.stringify(desc.params.map((p) => p.name));
-  if (!/ckpt/.test(text)) warnings.push('没有 {{ckpt}}：检查点写死在文件里，设置页选 ckpt 不会生效');
-
-  return {
-    ok: missing.length === 0,
-    error: '',
-    nodeCount: desc.nodeCount,
-    params: desc.params,
-    missing,
-    warnings,
-  };
+  return { ok: missing.length === 0, error: '', nodeCount: desc.nodeCount, params: desc.params, missing, warnings };
 }
 
-/**
- * 保存工作流：校验格式后写到 <配置根>/workflows/<name>。
- * source 可以是文件路径或 JSON 文本。
- */
+/** 保存工作流：校验格式后写到 <配置根>/workflows/<name>。source 可以是文件路径或 JSON 文本 */
 export async function saveWorkflow(configDir, source, name = 'default.json') {
   const rawText =
     typeof source === 'string' && source.trim().startsWith('{') ? source : await readFile(resolve(String(source)), 'utf8');
@@ -104,25 +88,14 @@ export async function saveWorkflow(configDir, source, name = 'default.json') {
   const safe = basename(String(name).endsWith('.json') ? name : `${name}.json`);
   const dir = workflowsDir(configDir);
   await mkdir(dir, { recursive: true });
-  const text = `${raw.trim()}\n`;
+  const text = `${raw}\n`;
   await writeFile(join(dir, safe), text, 'utf8');
   return { name: safe, ...checkWorkflow(text), raw: text, desc };
 }
 
-/** 把内置模板复制到配置根，保证开箱有可用工作流 */
-export async function installBuiltin(configDir, name = 'default.json') {
-  const builtin = join(BUILTIN_DIR, 'moss-image.api.json');
-  if (!(await exists(builtin))) throw new Error('内置工作流缺失');
-  const dir = workflowsDir(configDir);
-  await mkdir(dir, { recursive: true });
-  const target = join(dir, name);
-  await copyFile(builtin, target);
-  return { name, file: target };
-}
-
 /**
  * 组装一次渲染要填进工作流的值。
- * @param {{page:object, project:object, config:object, opts:object}} input
+ * ckpt 不强制：只有工作流真的写了 {{ckpt}} 才需要（由 render 判断）。
  */
 export function buildValues({ page, project, config, opts = {} }) {
   const defaults = config.defaults || {};
@@ -132,7 +105,7 @@ export function buildValues({ page, project, config, opts = {} }) {
   const lora = loras[0] || { name: '', weight: 0 };
 
   return {
-    prompt: '', // 由调用方编译后填入
+    prompt: '',
     negative: opts.negative ?? defaults.negative,
     width,
     height,
@@ -141,7 +114,7 @@ export function buildValues({ page, project, config, opts = {} }) {
     cfg: num(opts.cfg, defaults.cfg, 5),
     sampler: opts.sampler ?? defaults.sampler,
     scheduler: opts.scheduler ?? defaults.scheduler,
-    ckpt: opts.ckpt ?? defaults.ckpt,
+    ckpt: opts.ckpt ?? defaults.ckpt ?? '',
     lora_name: lora.name,
     lora_strength: lora.weight,
     batch_size: 1,
@@ -171,7 +144,7 @@ export function parseLoras(text = '') {
 export function fillWorkflow(raw, values) {
   let graph;
   try {
-    graph = JSON.parse(raw);
+    graph = JSON.parse(stripBom(String(raw)));
   } catch (err) {
     throw new Error(`工作流 JSON 解析失败：${err.message}`);
   }

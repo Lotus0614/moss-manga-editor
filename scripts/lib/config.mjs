@@ -34,7 +34,7 @@ export function defaultConfig(configDir = DEFAULT_CONFIG_DIR) {
     version: 3,
     archive: '', // 空 = <配置根>/archive
     comfy: { url: 'http://127.0.0.1:8188', timeoutMs: 180000 },
-    workflow: { name: 'default.json' },
+    workflow: { name: '' },
     defaults: {
       ckpt: '',
       steps: 28,

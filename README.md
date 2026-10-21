@@ -18,7 +18,7 @@
 ├── scripts/          ← CLI 与实现
 ├── core/             ← 编译/校验纯函数
 ├── web/              ← 预览编辑器
-└── workflows/        ← 内置工作流模板（兜底）
+└── workflows/        ← 空的：工作流放配置根，不随技能分发
 ```
 
 装好后跑一次自检：
@@ -57,7 +57,7 @@ node scripts/manga.mjs doctor
 manga doctor                                  # 配置体检
 manga init --comfy http://127.0.0.1:8188      # 初始化配置 + 存档
 manga workflow path                           # 工作流该放哪
-manga workflow save moss.json                 # 校验并保存（不改内容）
+manga workflow save moss.json                 # 校验并保存（没有内置工作流，必须先给一份）
 manga workflow check                          # 看占位符齐不齐
 manga project new --name "雨中的便利店"
 manga page new --preset band-3
@@ -98,4 +98,4 @@ npm run vendor  # 把前端依赖抓到本地，之后断网可用
 - 单用户本机，没有账号体系，别直接暴露公网。
 - Moss 一次成像，没有局部重绘：改一格也是整页重跑。
 - 中文文字渲染不稳定，编辑器给的是位置 + 字数预算，不是保证。
-- 内置工作流只是通用 SD 图，要出真正的漫画必须换成你的 Moss 工作流。
+- 技能**不带**默认工作流：必须用你自己的 Moss 工作流，否则 `render` 直接报错。

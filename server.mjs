@@ -26,6 +26,7 @@ import {
   removePage,
   saveImage,
   getVersions,
+  currentOf,
   setCurrentVersion,
   changes,
   ack,
@@ -261,7 +262,7 @@ async function route(req, res, url) {
 
     if (rest === 'versions/current' && method === 'POST') {
       const payload = await body(req);
-      const store = await setCurrentVersion(ARCHIVE, slug, String(payload.id || ''));
+      const store = await setCurrentVersion(ARCHIVE, slug, String(payload.pageId || ''), String(payload.id || ''));
       return json(res, 200, store);
     }
 
@@ -308,9 +309,9 @@ async function route(req, res, url) {
       }
 
       if (method === 'GET') {
-        const versions = await getVersions(ARCHIVE, slug);
-        const items = versions.items.filter((v) => v.page === page.id);
-        return json(res, 200, { page, versions: items, current: versions.current });
+        const store = await getVersions(ARCHIVE, slug);
+        const items = store.items.filter((v) => v.page === page.id);
+        return json(res, 200, { page, versions: items, current: currentOf(store, page.id) });
       }
       if (method === 'PUT') {
         const payload = await body(req);

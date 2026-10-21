@@ -10,25 +10,40 @@ import { saveImage, addVersion } from './archive.mjs';
 /**
  * 只准备不提交，用于 --dry-run 与错误定位。
  */
-export async function prepareRender({ dir, project, page, config, opts = {} }) {
+export async function prepareRender({ dir, configDir = dir, project, page, config, opts = {} }) {
   const compiled = compilePage(page, compileContext(project, page));
   const errors = blocking(compiled.warnings);
   if (errors.length) {
     return { ok: false, error: `这一页还有错误：${errors[0].message}`, warnings: compiled.warnings };
   }
 
-  const values = buildValues({ page, project, config, opts });
-  values.prompt = compiled.json;
-
-  if (!values.ckpt) {
+  if (!config.workflow?.name) {
     return {
       ok: false,
-      error: '还没有设置检查点 ckpt：用 `manga config set defaults.ckpt <文件名>`，或在设置页里选一个',
+      error: '还没有工作流：把你的 ComfyUI「导出 (API)」JSON 发我，我改好占位符后用 `manga workflow save` 存进去',
       warnings: compiled.warnings,
     };
   }
 
-  const workflow = await readWorkflow(dir, config.workflow?.name || 'default.json');
+  let workflow;
+  try {
+    workflow = await readWorkflow(configDir, config.workflow.name);
+  } catch (err) {
+    return { ok: false, error: err.message, warnings: compiled.warnings };
+  }
+
+  const values = buildValues({ page, project, config, opts });
+  values.prompt = compiled.json;
+
+  // ckpt 只在工作流真的用到时才要求
+  if (/\{\{\s*ckpt\s*\}\}/.test(workflow.raw) && !values.ckpt) {
+    return {
+      ok: false,
+      error: '这个工作流用了 {{ckpt}} 但还没设置检查点：`manga config set defaults.ckpt <文件名>`',
+      warnings: compiled.warnings,
+    };
+  }
+
   const warnings = [...compiled.warnings];
   const loras = parseLoras(opts.lora ?? config.defaults?.lora);
   if (loras.length && !String(workflow.raw).includes('{{lora_name}}')) {
@@ -51,10 +66,9 @@ export async function prepareRender({ dir, project, page, config, opts = {} }) {
 
 /**
  * 真正出图。会写图片与版本记录。
- * @param {{dir:string, slug:string, project:object, page:object, config:object, opts?:object, onProgress?:Function}} input
  */
-export async function renderPage({ dir, slug, project, page, config, opts = {}, onProgress }) {
-  const prepared = await prepareRender({ dir, project, page, config, opts });
+export async function renderPage({ dir, configDir, slug, project, page, config, opts = {}, onProgress }) {
+  const prepared = await prepareRender({ dir, configDir, project, page, config, opts });
   if (!prepared.ok) throw Object.assign(new Error(prepared.error), { warnings: prepared.warnings });
 
   const client = comfyFromSettings(config);
@@ -64,7 +78,7 @@ export async function renderPage({ dir, slug, project, page, config, opts = {}, 
   });
 
   const image = result.images[0];
-  if (!image) throw new Error('ComfyUI 没有返回任何图片');
+  if (!image) throw new Error('ComfyUI 没有返回任何图片（工作流里需要一个 SaveImage / PreviewImage 类节点）');
 
   const buffer = await client.view({ filename: image.filename, subfolder: image.subfolder, type: image.type });
   const ext = (image.filename.split('.').pop() || 'png').toLowerCase();

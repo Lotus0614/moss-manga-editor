@@ -143,7 +143,7 @@
 
 ```jsonc
 {
-  "current": "v003",
+  "currentByPage": { "p01": "v003", "p02": "v005" },   // 每页各自记住采用哪一版
   "items": [
     {
       "id": "v003", "at": "2025-...", "page": "p01", "pageIndex": 1,

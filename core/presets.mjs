@@ -122,23 +122,27 @@ function autoCamera(presetId, index, total) {
   return 'medium';
 }
 
-/** 新建页的默认内容：套版式 + 两条示例文字 */
+/** 新建页的默认内容：套版式 + 两条示例文字（面板少于两格时也能用） */
 export function seedPage(page, presetId = 'band-3') {
   const withPanels = applyPreset(page, presetId);
   const { width: w } = pageSize(withPanels);
-  const [p1, p2] = withPanels.panels;
+  const panels = withPanels.panels;
+  if (!panels.length) return withPanels;
+
+  const first = panels[0];
+  const second = panels[1] || panels[0];
   const bubbles = [
     createBubble({
       type: 'narration',
       text: '每天早上八点十七分，我在同一节车厢里。',
-      bbox: [Math.round(w * 0.08), p1.bbox[1] + 22, Math.round(w * 0.66), p1.bbox[1] + 88],
+      bbox: [Math.round(w * 0.08), first.bbox[1] + 22, Math.round(w * 0.66), first.bbox[1] + 88],
       size: 20,
       vertical: false,
     }),
     createBubble({
       type: 'speech',
       text: '……今天也要，撑过去。',
-      bbox: [Math.round(w * 0.46), p2.bbox[1] + 56, Math.round(w * 0.88), p2.bbox[1] + 196],
+      bbox: [Math.round(w * 0.46), second.bbox[1] + 56, Math.round(w * 0.88), second.bbox[1] + 196],
       tail: 'down-left',
       size: 22,
     }),

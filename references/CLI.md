@@ -73,7 +73,7 @@ manga workflow show [--name default.json]
 | `archive` | 存档路径（留空 = `<配置根>/archive`） |
 | `comfy.url` | ComfyUI 地址 |
 | `comfy.timeoutMs` | 单张超时 |
-| `defaults.ckpt` | 检查点文件名 |
+| `defaults.ckpt` | 检查点文件名（只有工作流里写了 `{{ckpt}}` 才需要） |
 | `defaults.steps` `defaults.cfg` `defaults.sampler` `defaults.scheduler` | 出图参数 |
 | `defaults.negative` | 负面提示词 |
 | `defaults.lora` | 默认 LoRA，形如 `<lora:名字:0.7>` |

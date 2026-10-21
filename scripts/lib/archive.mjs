@@ -256,7 +256,20 @@ export async function reorderPages(dir, slug, order) {
 // ---------------------------------------------------------------- 版本
 
 export async function getVersions(dir, slug) {
-  return (await readJson(versionsFile(dir, slug), null)) || { current: '', items: [] };
+  const raw = (await readJson(versionsFile(dir, slug), null)) || {};
+  const items = Array.isArray(raw.items) ? raw.items : [];
+  const currentByPage = { ...(raw.currentByPage || {}) };
+  // 兼容旧格式：单个 current 字符串，归到它所属的那一页
+  if (raw.current && !Object.keys(currentByPage).length) {
+    const picked = items.find((v) => v.id === raw.current);
+    if (picked) currentByPage[picked.page] = picked.id;
+  }
+  return { currentByPage, items };
+}
+
+/** 某一页当前采用的版本 id */
+export function currentOf(store, pageId) {
+  return store?.currentByPage?.[pageId] || '';
 }
 
 export async function addVersion(dir, slug, version) {
@@ -264,7 +277,7 @@ export async function addVersion(dir, slug, version) {
   const id = `v${String(store.items.length + 1).padStart(3, '0')}`;
   const item = { id, at: now(), ...version };
   store.items.push(item);
-  store.current = id;
+  store.currentByPage[item.page] = id;
   await writeJson(versionsFile(dir, slug), store);
   if (version.promptJson) {
     await writeJson(join(projectDir(dir, slug), 'versions', `${id}.json`), {
@@ -277,10 +290,12 @@ export async function addVersion(dir, slug, version) {
   return item;
 }
 
-export async function setCurrentVersion(dir, slug, versionId) {
+export async function setCurrentVersion(dir, slug, pageId, versionId) {
   const store = await getVersions(dir, slug);
-  if (!store.items.some((v) => v.id === versionId)) throw new Error(`版本不存在：${versionId}`);
-  store.current = versionId;
+  const picked = store.items.find((v) => v.id === versionId);
+  if (!picked) throw new Error(`版本不存在：${versionId}`);
+  if (pageId && picked.page !== pageId) throw new Error(`版本 ${versionId} 不属于第 ${pageId} 页`);
+  store.currentByPage[picked.page] = versionId;
   await writeJson(versionsFile(dir, slug), store);
   return store;
 }

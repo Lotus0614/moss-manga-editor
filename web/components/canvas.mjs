@@ -97,7 +97,8 @@ function ItemBox({ item, page, index, selected, onSelect, onDragStart, onBegin }
   const fs = isBubble ? Math.max(16, Math.min(Number(item.size) || 22, Math.min(w, h) / 2)) : Math.max(13, Math.min(w / 16, h / 5, 22));
   const body = isBubble ? item.text : isNative ? item.text || item.caption : item.caption;
 
-  const vertical = isBubble && isVertical(page, item);
+  // 画布只做排版预览：文字一律横排显示，竖排设置只影响生成的提示词
+  const vertical = false;
   const cols = vertical ? verticalColumns(body, item.bbox, fs) : [];
   const rows = !vertical ? horizontalLines(body, item.bbox, fs) : [];
 

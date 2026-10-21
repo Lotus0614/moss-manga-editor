@@ -111,7 +111,7 @@ export function PageInspector({ page, mutate, setSelection, addItem }) {
             }))}
         >全部横排</button>
       </div>
-      <span class="hint">单条文字可以在它的属性里单独覆盖。</span>
+      <span class="hint">只影响生成的提示词；画布上一律横排显示，方便阅读。</span>
     </div>
 
     <div class="field">

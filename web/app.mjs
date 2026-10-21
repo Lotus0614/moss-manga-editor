@@ -4,6 +4,7 @@ import { html, render, useEffect, useState, useRoute, useApp, setApp, useToasts,
 import ProjectsPage from './pages/projects.mjs';
 import EditorPage from './pages/editor.mjs';
 import SettingsModal from './components/settings-modal.mjs';
+import ProjectSettings from './components/project-settings.mjs';
 
 function Toasts() {
   const items = useToasts();
@@ -12,7 +13,7 @@ function Toasts() {
   </div>`;
 }
 
-function Topbar({ route, onOpenSettings }) {
+function Topbar({ route, onOpenSettings, onOpenProjectSettings }) {
   const app = useApp();
   const project = app.project;
   const page = app.page;
@@ -24,6 +25,7 @@ function Topbar({ route, onOpenSettings }) {
       : html`<div class="crumb">项目</div>`}
     <div class="spacer"></div>
     ${route.name === 'editor' ? html`<button class="btn ghost" onClick=${() => go('/projects')}>项目列表</button>` : null}
+    ${route.name === 'editor' ? html`<button class="btn ghost" onClick=${onOpenProjectSettings}>项目设置</button>` : null}
     <button class="btn" onClick=${onOpenSettings}>设置</button>
   </div>`;
 }
@@ -32,6 +34,7 @@ function App() {
   const route = useRoute();
   const [config, setConfig] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [projectSettingsOpen, setProjectSettingsOpen] = useState(false);
 
   useEffect(() => {
     Promise.all([api('/api/config'), api('/api/health')])
@@ -64,8 +67,15 @@ function App() {
   }
 
   return html`<div>
-    <${Topbar} route=${route} onOpenSettings=${() => setSettingsOpen(true)} />
+    <${Topbar} route=${route} onOpenSettings=${() => setSettingsOpen(true)} onOpenProjectSettings=${() => setProjectSettingsOpen(true)} />
     ${body}
+    <${ProjectSettings}
+      slug=${route.params.projectId}
+      open=${projectSettingsOpen}
+      onClose=${() => setProjectSettingsOpen(false)}
+      onSaved=${(p) => setApp({ project: p })}
+      onOpenGlobal=${() => { setProjectSettingsOpen(false); setSettingsOpen(true); }}
+    />
     <${SettingsModal} open=${settingsOpen} config=${config} onClose=${() => setSettingsOpen(false)} onSaved=${applyConfig} />
     <${Toasts} />
   </div>`;

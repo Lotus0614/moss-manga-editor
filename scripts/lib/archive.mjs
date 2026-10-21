@@ -175,6 +175,7 @@ export async function createPage(dir, slug, { title = '', size, items } = {}) {
     [
       { type: 'panel', bbox: [8, 8, pageSize[0] - 8, pageSize[1] - 8] },
     ];
+  const defaults = project.defaults || {};
   const page = normalizePage(
     makePage({
       id,
@@ -182,6 +183,9 @@ export async function createPage(dir, slug, { title = '', size, items } = {}) {
       title,
       size: pageSize,
       items: initialItems,
+      ...(defaults.reading ? { reading: defaults.reading } : {}),
+      ...(defaults.style ? { style: defaults.style } : {}),
+      ...(typeof defaults.vertical === 'boolean' ? { vertical: defaults.vertical } : {}),
     })
   );
   const saved = await writePageFile(dir, slug, page, { actor: 'cli', op: 'create' });

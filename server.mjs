@@ -250,6 +250,7 @@ async function route(req, res, url) {
         const payload = await body(req);
         if (payload.name) project.name = String(payload.name);
         if (payload.bible) project.bible = { ...project.bible, ...payload.bible };
+        if (payload.defaults) project.defaults = { ...(project.defaults || {}), ...payload.defaults };
         await saveProject(ARCHIVE, project);
         return json(res, 200, project);
       }

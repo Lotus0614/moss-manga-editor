@@ -15,6 +15,7 @@ import {
   STYLE_PRESETS,
   READING_ORDERS,
   isVertical,
+  readingOrderOf,
   panelsOf,
   bubblesOf,
   bboxCenter,
@@ -37,6 +38,8 @@ export function compilePage(page, ctx = {}) {
   const bubbles = bubblesOf(page);
 
   const caption = buildSummary(page, panels, bubbles, style, ctx);
+  // 每页从 1 开始、按阅读顺序给 panel 编号（只用于 caption 里的引用）
+  const no = new Map(readingOrderOf(page).map((p, i) => [p.id, i + 1]));
   const items = [];
 
   for (const item of page.items || []) {
@@ -46,9 +49,9 @@ export function compilePage(page, ctx = {}) {
     if (Array.isArray(item.palette) && item.palette.length) extra.palette = item.palette;
 
     if (item.type === 'panel') {
-      items.push({ label: 'object', caption: panelCaption(item, guard), ...base, ...extra });
+      items.push({ label: 'object', caption: panelCaption(item, guard, no.get(item.id)), ...base, ...extra });
     } else if (item.type === 'bubble') {
-      items.push({ label: 'text', caption: bubbleCaption(item, page, size, guard), ...base, ...extra, ...(item.text ? { text: item.text } : {}) });
+      items.push({ label: 'text', caption: bubbleCaption(item, page, size, guard, panels, no), ...base, ...extra, ...(item.text ? { text: item.text } : {}) });
     } else if (item.type === 'native') {
       items.push({
         label: item.label || 'object',
@@ -127,7 +130,7 @@ function buildSummary(page, panels, bubbles, style, ctx) {
 
 // ---------------------------------------------------------------- 各类 item
 
-function panelCaption(panel, guard) {
+function panelCaption(panel, guard, number) {
   const shape = PANEL_SHAPES[panel.shape] || PANEL_SHAPES.rect;
   const frame = FRAME_STYLES[panel.frame] || FRAME_STYLES.border;
   const camera = CAMERAS[panel.camera];
@@ -137,17 +140,48 @@ function panelCaption(panel, guard) {
   if (camera) parts.push(camera.phrase);
 
   const body = (panel.caption || '').trim();
-  if (body) parts.push(`This box contains only: ${body}`);
-  if (guard) parts.push(guard);
+  const tag = number ? `PANEL ${number}` : '';
+  if (body || tag) parts.push(`This box contains only: ${[tag, body].filter(Boolean).join(', ')}`);
   return parts.join(', ');
 }
 
-function bubbleCaption(bubble, page, size, guard) {
+function bubbleCaption(bubble, page, size, guard, panels = [], no = new Map()) {
   const parts = [bubblePhrase(bubble)];
+  const where = locateInPanel(bubble, panels, no);
+  if (where) parts.push(where);
+  if (bubble.caption) parts.push(String(bubble.caption));
   parts.push(`placed in the ${placementWord(bubble.bbox, size)}`);
   parts.push(textLayout(bubble, isVertical(page, bubble)));
   if (guard) parts.push(guard);
   return parts.join(', ');
+}
+
+/** 文字落在哪个 PANEL：完全在里面 / 压到边缘，两种说法 */
+function locateInPanel(item, panels, no) {
+  const [bx1, by1, bx2, by2] = item.bbox;
+  const cx = (bx1 + bx2) / 2;
+  const cy = (by1 + by2) / 2;
+  let chosen = null;
+  let bestArea = 0;
+  for (const p of panels) {
+    const [x1, y1, x2, y2] = p.bbox;
+    const inside = cx >= x1 && cx <= x2 && cy >= y1 && cy <= y2;
+    const ix = Math.min(bx2, x2) - Math.max(bx1, x1);
+    const iy = Math.min(by2, y2) - Math.max(by1, y1);
+    const area = ix > 0 && iy > 0 ? ix * iy : 0;
+    if (inside) {
+      chosen = p;
+      break;
+    }
+    if (area > bestArea) {
+      bestArea = area;
+      chosen = p;
+    }
+  }
+  if (!chosen) return '';
+  const [x1, y1, x2, y2] = chosen.bbox;
+  const fully = bx1 >= x1 - 2 && bx2 <= x2 + 2 && by1 >= y1 - 2 && by2 <= y2 + 2;
+  return `${fully ? 'inside' : 'at the edge of'} PANEL ${no.get(chosen.id) || '?'}`;
 }
 
 function placementWord(bbox, size) {

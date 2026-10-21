@@ -64,7 +64,7 @@ v3 起不再分 `panels` / `bubbles`，所有东西都在同一个数组里，�
 
 出血格（`bleed-*`）可以超出画布；其它形状超出只会被裁。
 
-**caption 开头固定写编号和位置**，编号全大写、按阅读顺序从 1 开始：
+**caption 开头写位置**（编号由编译器自动加，不写）：
 
 ```
 PANEL 3, LEFT TALL PANEL — a pitch black void with one point of pure white light…
@@ -81,9 +81,9 @@ PANEL 1, the wide band across the top — a crowded platform at dusk
 | `text` | 要渲染的字，原样；换行用 `\n` |
 | `size` | 字号，默认 22 |
 | `tail` | `down-left` `down` `down-right` `left` `right` `up-left` `up` `up-right` `none`；`none` = 说话者不在画面 |
-| `vertical` | 不写就跟随页面 `vertical`；写 `true`/`false` 单独覆盖 |
+| `caption` | 选填，给枚举覆盖不到的特殊文字补充说明 |`n| `vertical` | 不写就跟随页面 `vertical`；写 `true`/`false` 单独覆盖 |
 
-**caption 里必须点明这条文字在哪个 PANEL 上**，编号大写：`right side of PANEL 5`、`in the edge of PANEL 5`、`over the wide band of PANEL 3`。
+**文字不用写在哪一格**：编译器按 bbox 自动加 `inside PANEL N` 或 `at the edge of PANEL N`。
 
 ## native
 

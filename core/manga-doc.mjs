@@ -169,6 +169,7 @@ function normalizeBubbleItem(b) {
     size: Number(b.size || b.fontSize) || 22,
     tail: b.tail || (b.tailOff ? 'none' : b.tailDir) || 'down-left',
     ...(typeof b.vertical === 'boolean' ? { vertical: b.vertical } : {}),
+    ...(b.caption ? { caption: String(b.caption) } : {}),
     ...extras(b),
   };
 }

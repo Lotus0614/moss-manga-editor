@@ -180,28 +180,21 @@ node scripts/manga.mjs page show --page 1 --summary    # 看这一页现在长�
 }
 ```
 
-### 面板编号与位置（每条都要写）
+### 面板编号与位置
 
-模型靠「编号 + 位置」定位格子，写清楚准确率高很多。
-
-- **panel 的 caption 开头写编号和位置**，编号全大写、按阅读顺序从 1 开始（右→左，上→下）：
-
-```
-PANEL 3, LEFT TALL PANEL — a pitch black void with one point of pure white light, the goddess floating inside it
-PANEL 1, the wide band across the top — a crowded platform at dusk
-```
-
-- **位置不用套格式**，读着顺就行：`LEFT TALL PANEL`、`the wide band across the top`、`the small inset at the bottom right`、`the huge panel bleeding off the bottom and both sides` 都可以
-- 编号大写（`PANEL 5`，不是 `panel 5`），它是给模型看的标签
-- **每条文字的 caption 里必须写出它在哪个 PANEL**，同样大写：
+- **编号不用你写**：编译器按阅读顺序（右→左、上→下）自动给每格编 `PANEL 1, PANEL 2…`，你只写位置。
+- **panel 的 caption 开头写位置**，全大写、读着顺就行：
 
 ```
-…, right side of PANEL 5
-…, in the edge of PANEL 5
-…, over the wide band of PANEL 3
+LEFT TALL PANEL — a pitch black void with one point of pure white light
+the wide band across the top — a crowded platform at dusk
+the small inset at the bottom right — her hand on the door
 ```
 
-- 编号是自己数出来的：增删格子后要重排，同一个号不能指两个格子；一页里编号连续不缺号
+  编译器会拼成 `This box contains only: PANEL 3, LEFT TALL PANEL — …`
+
+- **文字不用写在哪一格**：编译器按 bbox 判断，自动加 `inside PANEL 3` 或 `at the edge of PANEL 3`。
+- 枚举覆盖不到的特殊文字（招牌、手写标语、界面 UI 等），加一个 `caption` 字段补充说明，会接在形态描述后面。
 
 ```bash
 node scripts/manga.mjs page set --page 1 --file /tmp/p1.json

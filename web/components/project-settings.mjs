@@ -1,5 +1,5 @@
-// 项目设置：新建页面的默认值 + 项目级生图参数（留空则跟随全局）。
-// 只影响这个项目；新建页继承排版默认值，生图参数在渲染时覆盖全局。
+// 项目设置：新建页默认值 + 项目级工作流参数（留空 = 跟随全局）。
+// 参数列表同样由工作流占位符生成，代码不认识具体名字。
 
 import { html, api, apiPut, useState, useEffect, toast } from '../lib.mjs';
 
@@ -9,59 +9,54 @@ const STYLE_LABELS = [
   ['sketch', '线稿'],
 ];
 
-const GEN_FIELDS = [
-  ['steps', '步数', 'number'],
-  ['cfg', 'CFG', 'number'],
-  ['sampler', '采样器', 'text'],
-  ['scheduler', '调度器', 'text'],
-  ['ckpt', '检查点', 'text'],
-  ['lora', 'LoRA', 'text'],
-];
+const AUTO = ['prompt', 'width', 'height', 'seed'];
 
 export default function ProjectSettings({ slug, open, onClose, onSaved, onOpenGlobal }) {
   const [form, setForm] = useState(null);
-  const [global, setGlobal] = useState({});
+  const [globalParams, setGlobalParams] = useState({});
+  const [params, setParams] = useState([]);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!open || !slug) return;
     Promise.all([api(`/api/projects/${slug}`), api('/api/config')])
-      .then(([p, cfg]) => {
-        const d = p.defaults || {};
-        setGlobal(cfg.defaults || {});
+      .then(async ([p, cfg]) => {
+        setGlobalParams(cfg.params || {});
         setForm({
           name: p.name,
-          reading: d.reading || 'rtl',
-          style: d.style || 'mono',
-          vertical: d.vertical !== false,
+          reading: (p.defaults || {}).reading || 'rtl',
+          style: (p.defaults || {}).style || 'mono',
+          vertical: (p.defaults || {}).vertical !== false,
           canvas: p.canvas || [768, 1280],
-          generation: {
-            steps: '',
-            cfg: '',
-            sampler: '',
-            scheduler: '',
-            ckpt: '',
-            lora: '',
-            negative: '',
-            ...(p.generation || {}),
-          },
+          params: { ...(p.params || {}) },
         });
+        const name = cfg.workflow?.name;
+        if (name) {
+          const wf = await api(`/api/workflows/${encodeURIComponent(name)}`);
+          setParams((wf.params || []).filter((x) => !AUTO.includes(x.name)));
+        }
       })
       .catch((err) => toast(err.message, 'bad'));
   }, [open, slug]);
 
   if (!open || !form) return null;
 
-  const setGen = (patch) => setForm({ ...form, generation: { ...form.generation, ...patch } });
+  const setParam = (name, value) =>
+    setForm((prev) => {
+      const next = { ...prev, params: { ...prev.params } };
+      if (value === undefined) delete next.params[name];
+      else next.params[name] = value;
+      return next;
+    });
 
   async function save() {
     setBusy(true);
     try {
       const saved = await apiPut(`/api/projects/${slug}`, {
         name: form.name,
-        defaults: { reading: form.reading, style: form.style, vertical: form.vertical },
-        generation: form.generation,
         canvas: form.canvas,
+        defaults: { reading: form.reading, style: form.style, vertical: form.vertical },
+        params: form.params,
       });
       onSaved?.(saved);
       toast('已保存');
@@ -108,10 +103,8 @@ export default function ProjectSettings({ slug, open, onClose, onSaved, onOpenGl
             <button class=${`chip ${form.vertical ? 'on' : 'ghost'}`} onClick=${() => setForm({ ...form, vertical: true })}>全部竖排</button>
             <button class=${`chip ${form.vertical ? 'ghost' : 'on'}`} onClick=${() => setForm({ ...form, vertical: false })}>全部横排</button>
           </div>
-          <span class="hint">只作用于新建的页面；已有页面在页面属性里单独改。</span>
         </div>
 
-        <div class="divider"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div class="field">
             <label>画布宽（16 的倍数）</label>
@@ -125,36 +118,35 @@ export default function ProjectSettings({ slug, open, onClose, onSaved, onOpenGl
         <span class="hint">只影响之后新建的页面；已有页面尺寸不变。</span>
 
         <div class="divider"></div>
-        <span class="label">生图参数（留空 = 跟随全局）</span>
-        <div class="param-grid">
-          ${GEN_FIELDS.map(([key, label, type]) => {
-            const globalValue = global[key];
-            return html`<div class="field" key=${key}>
-              <label>${label}</label>
-              <input
-                class="input"
-                type=${type}
-                value=${form.generation[key] ?? ''}
-                placeholder=${globalValue === undefined || globalValue === '' ? '跟随全局（未设置）' : `跟随全局：${globalValue}`}
-                onInput=${(e) => setGen({ [key]: type === 'number' ? (e.currentTarget.value === '' ? '' : Number(e.currentTarget.value)) : e.currentTarget.value })}
-              />
-            </div>`;
-          })}
-        </div>
-        <div class="field">
-          <label>负面提示词</label>
-          <textarea
-            class="textarea"
-            style="min-height:48px"
-            value=${form.generation.negative ?? ''}
-            placeholder=${global.negative ? `跟随全局：${String(global.negative).slice(0, 40)}…` : '跟随全局（未设置）'}
-            onInput=${(e) => setGen({ negative: e.currentTarget.value })}
-          ></textarea>
-        </div>
+        <span class="label">项目级工作流参数（留空 = 跟随全局）</span>
+        ${params.length
+          ? html`<div class="param-grid">
+              ${params.map((p) => {
+                const own = form.params[p.name];
+                const fallback = globalParams[p.name] ?? (p.hasDefault ? p.defaultValue : '');
+                return html`<div class="field" key=${p.name}>
+                  <label>${p.name} <span class="mono">{{${p.name}}}</span></label>
+                  <input
+                    class="input"
+                    type=${p.type === 'number' ? 'number' : 'text'}
+                    value=${own !== undefined ? own : ''}
+                    placeholder=${fallback === '' || fallback === undefined ? '未设置' : `全局：${fallback}`}
+                    onInput=${(e) => {
+                      const raw = e.currentTarget.value;
+                      if (raw === '') return setParam(p.name, undefined);
+                      if (p.type === 'number') return setParam(p.name, Number(raw));
+                      if (p.type === 'boolean') return setParam(p.name, raw === 'true');
+                      return setParam(p.name, raw);
+                    }}
+                  />
+                </div>`;
+              })}
+            </div>`
+          : html`<span class="hint">当前工作流没有可填参数。</span>`}
 
         <div class="divider"></div>
         <div class="row">
-          <span class="hint">工作流是全局的；这里只覆盖生图参数。</span>
+          <span class="hint">工作流本身是全局的，这里只覆盖参数值。</span>
           <div class="spacer"></div>
           <button class="btn ghost" onClick=${onOpenGlobal}>打开全局设置</button>
         </div>

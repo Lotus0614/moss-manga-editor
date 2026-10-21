@@ -1,26 +1,10 @@
-// 设置弹窗：ComfyUI / 工作流 / 出图参数。
-//
-// 出图参数不是写死的表单——只渲染工作流里**真实存在**的占位符。
-// 工作流没有 {{steps}} 就不显示步数，没有 {{ckpt}} 就不显示检查点。
+// 全局设置弹窗：ComfyUI + 工作流 + **由占位符生成**的参数表单。
+// 代码不认识 steps/cfg/lora 这些名字——工作流里有什么占位符，就渲染什么输入框。
 
 import { html, api, apiPut, useState, useEffect, toast } from '../lib.mjs';
 
-/** 占位符 → 表单字段。没在表里的（prompt/width/height…）由页面自动填，不给输入框 */
-const FIELDS = {
-  negative: { label: '负面提示词', type: 'textarea', key: 'negative', placeholder: 'nsfw, worst quality, bad anatomy' },
-  steps: { label: '步数', type: 'number', key: 'steps' },
-  cfg: { label: 'CFG', type: 'number', key: 'cfg', step: '0.1' },
-  sampler: { label: '采样器', type: 'text', key: 'sampler', placeholder: 'euler' },
-  scheduler: { label: '调度器', type: 'text', key: 'scheduler', placeholder: 'simple' },
-  ckpt: { label: '检查点', type: 'ckpt', key: 'ckpt' },
-  lora_name: { label: 'LoRA', type: 'text', key: 'lora', placeholder: '<lora:moss\\xxx:0.7>' },
-  denoise: { label: '重绘幅度', type: 'number', key: 'denoise', step: '0.05' },
-};
-
-/** 这些由页面/编译器自动填，只展示不给输入框 */
-const AUTO = ['prompt', 'width', 'height', 'batch_size', 'lora_strength'];
-
-const ORDER = ['negative', 'steps', 'cfg', 'sampler', 'scheduler', 'denoise', 'seed', 'ckpt', 'lora_name'];
+/** 这几个永远由代码填，不进表单 */
+const AUTO = ['prompt', 'width', 'height', 'seed'];
 
 export default function SettingsModal({ open, config, onClose, onSaved }) {
   const [form, setForm] = useState(null);
@@ -37,7 +21,9 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
 
   useEffect(() => {
     if (!open) return;
-    loadWorkflows();
+    api('/api/workflows')
+      .then((data) => setWorkflows(data.workflows || []))
+      .catch(() => {});
   }, [open]);
 
   useEffect(() => {
@@ -48,42 +34,42 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
       return;
     }
     api(`/api/workflows/${encodeURIComponent(name)}`)
-      .then((data) => setWf({ raw: data.raw || '', params: data.params || [], ok: Boolean(data.ok), missing: data.missing || [] }))
+      .then((data) => {
+        const params = data.params || [];
+        setWf({ raw: data.raw || '', params, ok: Boolean(data.ok), missing: data.missing || [] });
+        setForm((prev) => {
+          if (!prev) return prev;
+          const next = { ...prev, params: { ...(prev.params || {}) } };
+          for (const p of params) {
+            if (p.hasDefault && next.params[p.name] === undefined) next.params[p.name] = p.defaultValue;
+          }
+          return next;
+        });
+      })
       .catch(() => setWf({ raw: '', params: [], ok: false, missing: [] }));
   }, [open, form?.workflow?.name]);
-
-
-  async function loadWorkflows() {
-    try {
-      const data = await api('/api/workflows');
-      setWorkflows(data.workflows || []);
-    } catch {
-      /* 忽略 */
-    }
-  }
 
   if (!open || !form) return null;
 
   const patchComfy = (patch) => setForm({ ...form, comfy: { ...form.comfy, ...patch } });
-  const patchDefaults = (patch) => setForm({ ...form, defaults: { ...form.defaults, ...patch } });
-  const setDefault = (key, value) => patchDefaults({ [key]: value });
+  const setParam = (name, value) =>
+    setForm((prev) => {
+      const next = { ...prev, params: { ...prev.params } };
+      if (value === undefined) delete next.params[name];
+      else next.params[name] = value;
+      return next;
+    });
 
-  const params = wf.params || [];
-  const paramNames = params.map((p) => p.name);
-  const visible = ORDER.filter((name) => paramNames.includes(name) && FIELDS[name]);
-  const autoFilled = paramNames.filter((name) => AUTO.includes(name));
-  const custom = paramNames.filter((name) => !FIELDS[name] && !AUTO.includes(name));
+  const editable = (wf.params || []).filter((p) => !AUTO.includes(p.name));
+  const autoParams = (wf.params || []).filter((p) => AUTO.includes(p.name));
+  const valueOf = (p) => (form.params && form.params[p.name] !== undefined ? form.params[p.name] : '');
 
   async function testComfy() {
     setBusy('comfy');
     setStatus(null);
     try {
       const res = await api('/api/comfy/models');
-      if (res.ok) {
-        setStatus({ ok: true, message: '连接正常' });
-      } else {
-        setStatus({ ok: false, message: res.message || '连不上' });
-      }
+      setStatus(res.ok ? { ok: true, message: '连接正常' } : { ok: false, message: res.message || '连不上' });
     } catch (err) {
       setStatus({ ok: false, message: err.message });
     } finally {
@@ -96,8 +82,8 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
     try {
       const saved = await apiPut('/api/config', {
         comfy: form.comfy,
-        defaults: form.defaults,
         workflow: form.workflow,
+        params: form.params || {},
       });
       onSaved?.(saved);
       toast('已保存');
@@ -117,7 +103,6 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
       const savedCfg = await apiPut('/api/config', { workflow: { name: res.name } });
       onSaved?.(savedCfg);
       toast(`已保存 ${res.name}（${res.params?.length || 0} 个占位符）`);
-      loadWorkflows();
     } catch (err) {
       toast(err.message, 'bad');
     } finally {
@@ -133,7 +118,6 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
         <button class="btn sm ghost" onClick=${onClose}>关闭</button>
       </header>
       <div class="body">
-        <!-- ComfyUI -->
         <section class="panel-box">
           <header>ComfyUI</header>
           <div class="body">
@@ -154,13 +138,10 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
           </div>
         </section>
 
-        <!-- 工作流 -->
         <section class="panel-box">
           <header>
             工作流
-            ${form.workflow.name
-              ? html`<span class="tag">${form.workflow.name}</span>`
-              : html`<span class="tag" style="background:#000;color:#fff">未设置</span>`}
+            ${form.workflow.name ? html`<span class="tag">${form.workflow.name}</span>` : html`<span class="tag" style="background:#000;color:#fff">未设置</span>`}
           </header>
           <div class="body">
             <div class="row">
@@ -172,23 +153,19 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
                 <option value="">（未选择）</option>
                 ${workflows.map((w) => html`<option value=${w.name}>${w.name}${w.ok ? '' : '（缺占位符）'}</option>`)}
               </select>
-              <button class="btn ghost" onClick=${loadWorkflows}>刷新</button>
             </div>
-            ${wf.missing?.length
-              ? html`<div class="status bad">缺占位符：${wf.missing.map((m) => `{{${m}}}`).join('、')}</div>`
-              : null}
+            ${wf.missing?.length ? html`<div class="status bad">缺占位符：${wf.missing.map((m) => `{{${m}}}`).join('、')}</div>` : null}
             <div class="row wrap">
-              ${params.length
-                ? params.map((p) => html`<span class="chip ghost">{{${p.name}}}</span>`)
-                : html`<span class="hint">还没有占位符。</span>`}
+              ${(wf.params || []).map((p) => html`<span class="chip ghost">{{${p.name}}}</span>`)}
+              ${(wf.params || []).length ? null : html`<span class="hint">还没有占位符。</span>`}
             </div>
             <details>
               <summary class="hint" style="cursor:pointer">查看 / 替换工作流 JSON（一般由 Agent 改）</summary>
               <textarea
                 class="textarea"
-                style="min-height:150px;margin-top:8px;font-family:var(--mono);font-size:11px"
+                style="min-height:140px;margin-top:8px;font-family:var(--mono);font-size:11px"
                 value=${wf.raw}
-                placeholder="粘贴 ComfyUI「导出 (API)」的 JSON"
+                placeholder="粘贴 ComfyUI「导出 (API)」的 JSON；要暴露的参数写成 {{名字:默认值}}"
                 onInput=${(e) => setWf({ ...wf, raw: e.currentTarget.value })}
               ></textarea>
               <div class="row">
@@ -199,64 +176,35 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
           </div>
         </section>
 
-        <!-- 出图参数：只显示工作流里真实存在的占位符 -->
         <section class="panel-box">
-          <header>出图参数</header>
+          <header>工作流参数</header>
           <div class="body">
-            ${visible.length
+            ${editable.length
               ? html`<div class="param-grid">
-                  ${visible.map((name) => {
-                    const spec = FIELDS[name];
-                    const value = form.defaults[spec.key];
-                    if (spec.type === 'ckpt') {
-                      return html`<div class="field" key=${name}>
-                        <label>${spec.label} <span class="mono">{{${name}}}</span></label>
-                        <input
-                          class="input"
-                          value=${value ?? ''}
-                          placeholder="照抄 ComfyUI checkpoints 里的文件名"
-                          onInput=${(e) => setDefault(spec.key, e.currentTarget.value)}
-                        />
-                      </div>`;
-                    }
-                    if (spec.type === 'textarea') {
-                      return html`<div class="field full" key=${name}>
-                        <label>${spec.label} <span class="mono">{{${name}}}</span></label>
-                        <textarea
-                          class="textarea"
-                          style="min-height:44px"
-                          value=${value ?? ''}
-                          placeholder=${spec.placeholder || ''}
-                          onInput=${(e) => setDefault(spec.key, e.currentTarget.value)}
-                        ></textarea>
-                      </div>`;
-                    }
-                    return html`<div class="field" key=${name}>
-                      <label>${spec.label} <span class="mono">{{${name}}}</span></label>
+                  ${editable.map(
+                    (p) => html`<div class="field" key=${p.name}>
+                      <label>${p.name} <span class="mono">{{${p.name}}}</span></label>
                       <input
                         class="input"
-                        type=${spec.type}
-                        step=${spec.step || null}
-                        value=${value ?? ''}
-                        placeholder=${spec.placeholder || ''}
-                        onInput=${(e) =>
-                          setDefault(spec.key, spec.type === 'number' ? (e.currentTarget.value === '' ? '' : Number(e.currentTarget.value)) : e.currentTarget.value)}
+                        type=${p.type === 'number' ? 'number' : 'text'}
+                        value=${valueOf(p)}
+                        placeholder=${p.hasDefault ? `默认：${p.defaultValue}` : '没有默认值，必填'}
+                        onInput=${(e) => {
+                          const raw = e.currentTarget.value;
+                          if (raw === '') return setParam(p.name, undefined);
+                          if (p.type === 'number') return setParam(p.name, Number(raw));
+                          if (p.type === 'boolean') return setParam(p.name, raw === 'true');
+                          return setParam(p.name, raw);
+                        }}
                       />
-                      ${spec.hint ? html`<span class="hint">${spec.hint}</span>` : null}
-                    </div>`;
-                  })}
+                    </div>`
+                  )}
                 </div>`
-              : html`<span class="hint">${form.workflow.name ? '这个工作流没有可调参数。' : '先选工作流，这里只显示它实际用到的参数。'}</span>`}
-            ${custom.length
+              : html`<span class="hint">${form.workflow.name ? '这个工作流没有需要填的参数。' : '先选工作流。'}</span>`}
+            ${autoParams.length
               ? html`<div class="row wrap">
-                  <span class="hint">工作流里的自定义占位符（用 manga config set params.名字=值 提供）：</span>
-                  ${custom.map((name) => html`<span class="chip ghost">{{${name}}}</span>`)}
-                </div>`
-              : null}
-            ${autoFilled.length
-              ? html`<div class="row wrap">
-                  <span class="hint">自动填：</span>
-                  ${autoFilled.map((name) => html`<span class="chip ghost">{{${name}}}</span>`)}
+                  <span class="hint">代码自动填：</span>
+                  ${autoParams.map((p) => html`<span class="chip ghost">{{${p.name}}}</span>`)}
                 </div>`
               : null}
           </div>

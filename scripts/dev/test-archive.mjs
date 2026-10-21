@@ -86,7 +86,7 @@ await test('配置根与存档是两棵树', async () => {
   await ensureConfig(configDir);
   await ensureArchive(dir);
   const config = await readConfig(configDir);
-  assert.equal(config.version, 3);
+  assert.equal(config.version, 4);
   assert.ok(config.comfy.url.startsWith('http'));
   const state = await readState(dir);
   assert.equal(state.rev, 0);
@@ -140,9 +140,9 @@ await test('changes 按页聚合，ack 之后清空', async () => {
 await test('配置写入是深合并且不丢其它键', async () => {
   const saved = await writeConfig(configDir, { defaults: { ckpt: 'x.safetensors' } });
   assert.equal(saved.defaults.ckpt, 'x.safetensors');
-  // 没有预设值：没填就是空，等用户按自己的工作流填
-  assert.equal(saved.defaults.steps, '');
-  assert.equal(saved.defaults.sampler, '');
+  // 出图参数现在全在 params 里，defaults 只剩页面级默认值
+  assert.deepEqual(saved.defaults.canvas, [768, 1280]);
+  assert.equal(typeof saved.params, 'object');
   assert.equal(typeof saved.comfy.url, 'string');
 });
 

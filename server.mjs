@@ -133,7 +133,10 @@ async function route(req, res, url) {
 
   if (path === '/api/config') {
     if (method === 'GET') return json(res, 200, await readConfig(CONFIG_DIR));
-    if (method === 'PUT') return json(res, 200, await writeConfig(CONFIG_DIR, await body(req)));
+    if (method === 'PUT') {
+      const patch = await body(req);
+      return json(res, 200, await writeConfig(CONFIG_DIR, { ...patch, params: patch.params }));
+    }
   }
 
   if (path === '/api/comfy/models' && method === 'GET') {
@@ -259,6 +262,7 @@ async function route(req, res, url) {
         if (payload.defaults) project.defaults = { ...(project.defaults || {}), ...payload.defaults };
         if (payload.generation) project.generation = { ...(project.generation || {}), ...payload.generation };
         if (Array.isArray(payload.canvas)) project.canvas = payload.canvas;
+        if (payload.params) project.params = { ...(project.params || {}), ...payload.params };
         await saveProject(ARCHIVE, project);
         return json(res, 200, project);
       }
@@ -427,7 +431,7 @@ server.listen(PORT, HOST, async () => {
   console.log(`  MOSS 漫画预览  http://${HOST}:${PORT}`);
   console.log(`  配置 ${CONFIG_DIR}`);
   console.log(`  存档 ${ARCHIVE}（rev ${state.rev}）`);
-  console.log(`  ComfyUI ${config.comfy.url} · 工作流 ${config.workflow.name} · ckpt ${config.defaults.ckpt || '未设置'}`);
+  console.log(`  ComfyUI ${config.comfy.url} · 工作流 ${config.workflow.name || '（未设置）'} · 参数 ${Object.keys(config.params || {}).length} 个`);
   console.log('');
 });
 

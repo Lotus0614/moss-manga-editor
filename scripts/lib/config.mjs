@@ -1,9 +1,7 @@
-// 全局配置：只放「跟项目无关」的东西——ComfyUI 地址、当前工作流、默认参数、编辑范围。
+// 全局配置：ComfyUI 地址、当前工作流、页面级默认值、任意工作流参数。
 //
-// 位置固定在 <配置根>，默认 ~/.moss-manga（MOSS_CONFIG 可覆盖）；
-// 工作流文件也在配置根下的 workflows/，跟存档没有任何关系。
-//
-// 存档（项目、图片、state、journal）是另一棵树，默认 <配置根>/archive，可自定义。
+// 位置固定（默认 ~/.moss-manga，MOSS_CONFIG 可覆盖），工作流也在配置根下。
+// 存档（项目/图片/state/journal）是另一棵树，默认 <配置根>/archive。
 
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -12,16 +10,11 @@ import { now } from '../../core/manga-doc.mjs';
 
 export const DEFAULT_CONFIG_DIR = join(homedir(), '.moss-manga');
 
-/** 配置根：--config > MOSS_CONFIG > ~/.moss-manga */
 export function resolveConfigDir(dir) {
   const picked = dir || process.env.MOSS_CONFIG || DEFAULT_CONFIG_DIR;
   return resolve(picked);
 }
 
-/**
- * 存档根：--dir > MOSS_ARCHIVE > config.archive > <配置根>/archive
- * 存档路径属于配置的一部分，所以换存档不会丢配置，换配置也不会搬数据。
- */
 export function resolveArchiveDir(config, override) {
   if (override) return resolve(override);
   if (process.env.MOSS_ARCHIVE) return resolve(process.env.MOSS_ARCHIVE);
@@ -29,35 +22,16 @@ export function resolveArchiveDir(config, override) {
   return join(resolveConfigDir(process.env.MOSS_CONFIG), 'archive');
 }
 
-export function defaultConfig(configDir = DEFAULT_CONFIG_DIR) {
+export function defaultConfig() {
   return {
-    version: 3,
-    archive: '', // 空 = <配置根>/archive
+    version: 4,
+    archive: '',
     comfy: { url: 'http://127.0.0.1:8188', timeoutMs: 180000 },
     workflow: { name: '' },
-    // 全部留空：这些值没有「合理默认」，必须由用户按自己的工作流填
-    defaults: {
-      ckpt: '',
-      steps: '',
-      cfg: '',
-      sampler: '',
-      scheduler: '',
-      denoise: '',
-      negative: '',
-      lora: '',
-      seed: '',
-      canvas: [768, 1280],
-      reading: 'rtl',
-      style: 'mono',
-      vertical: true,
-    },
-    editable: {
-      layout: true,
-      text: true,
-      bubbleType: true,
-      style: true,
-      params: { seed: true, steps: false, cfg: false },
-    },
+    // 页面级默认值：新建项目/页面时继承
+    defaults: { canvas: [768, 1280], reading: 'rtl', style: 'mono', vertical: true },
+    // 工作流参数：键就是占位符名，值就是用户填的内容（代码里没有白名单）
+    params: {},
     createdAt: now(),
   };
 }
@@ -65,7 +39,7 @@ export function defaultConfig(configDir = DEFAULT_CONFIG_DIR) {
 export const configPath = (configDir) => join(configDir, 'config.json');
 export const workflowsDir = (configDir) => join(configDir, 'workflows');
 
-/** 去 BOM：Windows 下用记事本/PowerShell 存的 JSON 常带 BOM，JSON.parse 会直接失败 */
+/** 去 BOM：Windows 存的 JSON 常带 BOM，JSON.parse 会直接失败 */
 export function stripBom(text) {
   return typeof text === 'string' && text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 }
@@ -88,53 +62,51 @@ export async function writeJson(file, value) {
 
 export async function ensureConfig(configDir) {
   await mkdir(workflowsDir(configDir), { recursive: true });
-  if (!(await readJson(configPath(configDir), null))) {
-    await writeJson(configPath(configDir), defaultConfig(configDir));
-  }
+  if (!(await readJson(configPath(configDir), null))) await writeJson(configPath(configDir), defaultConfig());
   return configDir;
 }
 
 export async function readConfig(configDir) {
   const saved = (await readJson(configPath(configDir), null)) || {};
-  const base = defaultConfig(configDir);
+  const base = defaultConfig();
+
+  const defaults = { ...base.defaults, ...(saved.defaults || {}) };
+  const params = { ...(saved.params || {}) };
+  // 迁移：v3 及更早把出图参数塞在 defaults 里，现在归到 params
+  for (const key of ['ckpt', 'steps', 'cfg', 'sampler', 'scheduler', 'denoise', 'negative', 'lora', 'seed']) {
+    const value = defaults[key];
+    if (value !== undefined && value !== '' && params[key] === undefined) params[key] = value;
+    delete defaults[key];
+  }
+
   return {
     ...base,
     ...saved,
+    defaults,
+    params,
     comfy: { ...base.comfy, ...(saved.comfy || {}) },
     workflow: { ...base.workflow, ...(saved.workflow || {}) },
-    defaults: { ...base.defaults, ...(saved.defaults || {}) },
-    editable: {
-      ...base.editable,
-      ...(saved.editable || {}),
-      params: { ...base.editable.params, ...(saved.editable?.params || {}) },
-    },
   };
 }
 
-export async function writeConfig(configDir, patch) {
+export async function writeConfig(configDir, patch = {}) {
   const current = await readConfig(configDir);
   const next = {
     ...current,
     ...patch,
+    defaults: { ...current.defaults, ...(patch.defaults || {}) },
+    params: { ...current.params, ...(patch.params || {}) },
     comfy: { ...current.comfy, ...(patch.comfy || {}) },
     workflow: { ...current.workflow, ...(patch.workflow || {}) },
-    defaults: { ...current.defaults, ...(patch.defaults || {}) },
-    editable: {
-      ...current.editable,
-      ...(patch.editable || {}),
-      params: { ...current.editable.params, ...(patch.editable?.params || {}) },
-    },
   };
   await writeJson(configPath(configDir), next);
   return next;
 }
 
-/** 点号路径取值：config set comfy.url xxx */
 export function getPath(object, path) {
   return path.split('.').reduce((acc, key) => (acc == null ? acc : acc[key]), object);
 }
 
-/** 点号路径写值，返回新对象（不改原对象） */
 export function setPath(object, path, value) {
   const keys = path.split('.');
   const clone = JSON.parse(JSON.stringify(object));

@@ -153,7 +153,7 @@ async function cmdDoctor() {
 
   const config = await readConfig(CONFIG_DIR);
   result.comfy.url = config.comfy.url;
-  result.ckpt = config.defaults.ckpt;
+  result.ckpt = (config.params && config.params.ckpt) || '';
   result.workflow.name = config.workflow.name;
 
   const client = new ComfyClient({ url: config.comfy.url });
@@ -195,7 +195,7 @@ async function cmdDoctor() {
     }
     // 只在工作流真的用到 ckpt 时才要求
     if (checked?.params?.some((p) => p.name === 'ckpt')) {
-      if (!result.ckpt) result.problems.push('这个工作流用了 {{ckpt}}，但还没选检查点：manga config set defaults.ckpt <文件名>');
+    if (!result.ckpt) result.problems.push('这个工作流用了 {{ckpt}}，但还没填：manga config set params.ckpt=<文件名>');
       else if (checkpoints.length && !checkpoints.includes(result.ckpt)) result.problems.push(`ckpt「${result.ckpt}」在 ComfyUI 里找不到`);
     }
   } catch (err) {
@@ -241,7 +241,7 @@ async function cmdInit() {
       `存档：${DIR}`,
       `ComfyUI：${config.comfy.url}`,
       `工作流：${config.workflow.name}`,
-      config.defaults.ckpt ? `检查点：${config.defaults.ckpt}` : '检查点：还没选（manga config set defaults.ckpt <文件名>）',
+      config.params && Object.keys(config.params).length ? `工作流参数：${Object.keys(config.params).join(', ')}` : '工作流参数：还没填（manga config set params.名字=值）',
     ].join('\n')
   );
 }

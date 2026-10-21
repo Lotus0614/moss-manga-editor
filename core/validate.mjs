@@ -3,7 +3,7 @@
 
 import { pageSize, PANEL_SHAPES, ITEM_TYPES, bboxArea, panelsOf, bubblesOf } from './manga-doc.mjs';
 
-const ALLOWED_TOP = new Set(['summary', 'items']);
+const ALLOWED_TOP = new Set(['summary', 'items', 'bbox_coord_space', 'bbox_format']);
 const ALLOWED_ITEM = new Set(['label', 'caption', 'bbox', 'text', 'tags', 'palette']);
 const ALLOWED_SUMMARY = new Set(['meta', 'canvas', 'caption', 'palette']);
 const FORBIDDEN = ['children', 'parent', 'id', 'elements', 'boxes', 'layout'];
@@ -99,6 +99,8 @@ function checkDocShape(doc, add) {
     if (!ALLOWED_SUMMARY.has(key)) add('error', 'doc.summary.key', `summary 多出了字段「${key}」`);
   }
   if (!doc.summary?.caption?.trim()) add('error', 'doc.caption', 'summary.caption 为空');
+  if (doc.bbox_coord_space !== 'abs_centralized') add('error', 'doc.coord', 'bbox_coord_space 必须是 abs_centralized');
+  if (doc.bbox_format !== 'yxyx') add('error', 'doc.format', 'bbox_format 必须是 yxyx');
   if (!Array.isArray(doc.items) || doc.items.length === 0) {
     add('error', 'doc.items', 'items 不能为空');
     return;
@@ -117,6 +119,13 @@ function checkDocShape(doc, add) {
       add('error', 'doc.item.bbox.order', `items[${i}].bbox 的 y_min<y_max 且 x_min<x_max 不成立`);
     }
     if (item.label === 'text' && !item.text) add('error', 'doc.item.text', `items[${i}] 是文字项但缺少 text`);
+    if (item.tags !== undefined && (!Array.isArray(item.tags) || item.tags.some((t) => typeof t !== 'string'))) {
+      add('error', 'doc.item.tags', `items[${i}].tags 必须是字符串数组`);
+    }
+    if (item.palette !== undefined) {
+      const bad = !Array.isArray(item.palette) || item.palette.some((c) => !/^#[0-9A-F]{6}$/i.test(String(c)));
+      if (bad) add('error', 'doc.item.palette', `items[${i}].palette 必须是 #RRGGBB 数组`);
+    }
     if (!item.caption?.trim()) add('error', 'doc.item.caption', `items[${i}].caption 为空`);
   });
 }

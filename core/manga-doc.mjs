@@ -20,66 +20,9 @@ export const SIZE_PRESETS = {
 
 export const ITEM_TYPES = ['panel', 'bubble', 'native'];
 
-/** 面板形状 */
-export const PANEL_SHAPES = {
-  rect: { name: '矩形', phrase: 'rectangular panel with straight edges' },
-  'slant-top': { name: '斜切上边', phrase: 'trapezoid panel with a slanted top edge cutting diagonally' },
-  'slant-side': { name: '斜切侧边', phrase: 'panel with a sharply angled slanted side edge' },
-  'bleed-top': { name: '出血·上', phrase: 'panel bleeding off the TOP edge of the page, no border' },
-  'bleed-bottom': { name: '出血·下', phrase: 'panel bleeding off the BOTTOM edge of the page, no border' },
-  'bleed-left': { name: '出血·左', phrase: 'panel bleeding off the LEFT edge of the page, no border' },
-  'bleed-right': { name: '出血·右', phrase: 'panel bleeding off the RIGHT edge of the page, no border' },
-  'bleed-all': { name: '满版', phrase: 'full-bleed panel covering the whole page, no border, artwork running off all four edges' },
-  circle: { name: '圆形', phrase: 'circular panel with a clean round border' },
-};
-
-export const FRAME_STYLES = {
-  border: { name: '描边', phrase: 'crisp black panel border with a white gutter around it' },
-  none: { name: '无边', phrase: 'no border, artwork fills the panel edge to edge' },
-  thick: { name: '粗边', phrase: 'heavy black panel border' },
-};
-
-export const CAMERAS = {
-  eye: { name: '平视', phrase: 'eye-level shot' },
-  high: { name: '俯视', phrase: 'high-angle shot looking down' },
-  low: { name: '仰视', phrase: 'low-angle shot looking up' },
-  wide: { name: '全景', phrase: 'wide establishing shot' },
-  medium: { name: '中景', phrase: 'medium shot' },
-  close: { name: '特写', phrase: 'close-up' },
-  xclose: { name: '大特写', phrase: 'extreme close-up' },
-  ots: { name: '过肩', phrase: 'over-the-shoulder shot' },
-  dutch: { name: '荷兰角', phrase: 'dutch angle with a tilted horizon' },
-};
-
-export const STYLE_PRESETS = {
-  mono: {
-    name: '黑白网点',
-    meta: ['japanese manga page', 'monochrome'],
-    phrase:
-      'STRICTLY BLACK AND WHITE MANGA PAGE, monochrome ink with grey screentone only. Black ink lines on bare white paper, grey screentone dot patterns only. ZERO COLOUR: no flesh colour, no skin tone, no blue, no cyan, no yellow, no brown, no colour wash. Skin is flat pale GREY halftone with black line shading. Shadows are dense black crosshatching, highlights are untouched white paper.',
-    guard: 'Black ink, white paper and grey screentone only, zero colour.',
-  },
-  color: {
-    name: '彩色',
-    meta: ['japanese manga page', 'full color'],
-    phrase:
-      'FULL COLOUR JAPANESE MANGA PAGE: clean ink lineart with soft muted digital colouring, pale skin tones, desaturated palette, consistent light direction across all panels.',
-    guard: '',
-  },
-  sketch: {
-    name: '线稿',
-    meta: ['manga lineart', 'monochrome'],
-    phrase:
-      'MANGA LINEART ONLY, clean black ink lines on pure white, no screentone, no shading fills, no colour at all.',
-    guard: 'Black ink on white only, zero tone, zero colour.',
-  },
-};
-
-export const READING_ORDERS = {
-  rtl: { name: '右 → 左（日式）', phrase: 'Panels are read RIGHT to LEFT, top to bottom.' },
-  ltr: { name: '左 → 右（西式）', phrase: 'Panels are read LEFT to RIGHT, top to bottom.' },
-};
-
+// 提示词措辞全部来自 prompt-templates.mjs —— 改生成效果去改那个文件
+import { PANEL_SHAPES, FRAME_STYLES, CAMERAS, STYLE_PRESETS, READING_ORDERS } from './prompt-templates.mjs';
+export { PANEL_SHAPES, FRAME_STYLES, CAMERAS, STYLE_PRESETS, READING_ORDERS };
 // ---------------------------------------------------------------- 基础工具
 
 let seq = 0;
@@ -226,6 +169,7 @@ function normalizeBubbleItem(b) {
     size: Number(b.size || b.fontSize) || 22,
     tail: b.tail || (b.tailOff ? 'none' : b.tailDir) || 'down-left',
     ...(typeof b.vertical === 'boolean' ? { vertical: b.vertical } : {}),
+    ...extras(b),
   };
 }
 
@@ -290,6 +234,14 @@ export function normalizePage(raw = {}) {
   return page;
 }
 
+/** 可选字段：tags / palette（模板里 item 级才有） */
+function extras(raw) {
+  const out = {};
+  if (Array.isArray(raw?.tags) && raw.tags.length) out.tags = raw.tags.map(String);
+  if (Array.isArray(raw?.palette) && raw.palette.length) out.palette = raw.palette.map(String);
+  return out;
+}
+
 function normalizeItem(raw = {}, size) {
   const type = ITEM_TYPES.includes(raw.type) ? raw.type : 'panel';
   const bbox = normalizeBbox(raw.bbox, size);
@@ -302,6 +254,7 @@ function normalizeItem(raw = {}, size) {
       label: ['object', 'text', 'character'].includes(raw.label) ? raw.label : 'object',
       caption: String(raw.caption || ''),
       ...(raw.text ? { text: String(raw.text) } : {}),
+      ...extras(raw),
     };
   }
   return {
@@ -312,6 +265,7 @@ function normalizeItem(raw = {}, size) {
     frame: raw.frame || 'border',
     camera: raw.camera || 'medium',
     caption: String(raw.caption || ''),
+    ...extras(raw),
   };
 }
 

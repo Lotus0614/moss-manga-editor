@@ -40,24 +40,23 @@ export function compilePage(page, ctx = {}) {
   const items = [];
 
   for (const item of page.items || []) {
+    const base = { bbox: toMoss(item.bbox, size) };
+    const extra = {};
+    if (Array.isArray(item.tags) && item.tags.length) extra.tags = item.tags;
+    if (Array.isArray(item.palette) && item.palette.length) extra.palette = item.palette;
+
     if (item.type === 'panel') {
-      items.push({ label: 'object', caption: panelCaption(item, guard), bbox: toMoss(item.bbox, size) });
+      items.push({ label: 'object', caption: panelCaption(item, guard), ...base, ...extra });
     } else if (item.type === 'bubble') {
-      const out = {
-        label: 'text',
-        caption: bubbleCaption(item, page, size, guard),
-        bbox: toMoss(item.bbox, size),
-      };
-      if (item.text) out.text = item.text;
-      items.push(out);
+      items.push({ label: 'text', caption: bubbleCaption(item, page, size, guard), ...base, ...extra, ...(item.text ? { text: item.text } : {}) });
     } else if (item.type === 'native') {
-      const out = {
+      items.push({
         label: item.label || 'object',
         caption: [item.caption, guard].filter(Boolean).join(', '),
-        bbox: toMoss(item.bbox, size),
-      };
-      if (item.text) out.text = item.text;
-      items.push(out);
+        ...base,
+        ...extra,
+        ...(item.text ? { text: item.text } : {}),
+      });
     }
   }
 
@@ -68,6 +67,8 @@ export function compilePage(page, ctx = {}) {
       caption,
     },
     items,
+    bbox_coord_space: 'abs_centralized',
+    bbox_format: 'yxyx',
   };
 
   const json = JSON.stringify(doc);

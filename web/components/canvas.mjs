@@ -94,7 +94,7 @@ function ItemBox({ item, page, index, selected, onSelect, onDragStart, onBegin }
       ? `原生 · ${item.label}`
       : `格${index + 1} · ${CAMERA_LABEL[item.camera] || ''}${SHAPE_LABEL[item.shape] ? ` / ${SHAPE_LABEL[item.shape]}` : ''}`;
 
-  const fs = isBubble ? Math.max(10, Math.min(Number(item.size) || 22, Math.min(w, h) / 2)) : Math.max(9, Math.min(w / 18, h / 6, 16));
+  const fs = isBubble ? Math.max(16, Math.min(Number(item.size) || 22, Math.min(w, h) / 2)) : Math.max(13, Math.min(w / 16, h / 5, 22));
   const body = isBubble ? item.text : isNative ? item.text || item.caption : item.caption;
 
   const vertical = isBubble && isVertical(page, item);
@@ -136,7 +136,7 @@ function ItemBox({ item, page, index, selected, onSelect, onDragStart, onBegin }
   </g>`;
 }
 
-export default function Canvas({ page, image, imageOpacity = 1, scale, selection, onSelect, onBegin, onChange, onCommit }) {
+export default function Canvas({ page, image, imageOpacity = 1, showBoxes = true, scale, selection, onSelect, onBegin, onChange, onCommit }) {
   const [W, H] = page.size;
   const svgRef = useRef(null);
   const dragRef = useRef(null);
@@ -264,7 +264,7 @@ export default function Canvas({ page, image, imageOpacity = 1, scale, selection
         <rect x="0" y="0" width=${W} height=${H} fill="#ffffff" />
         ${image ? html`<image href=${image} x="0" y="0" width=${W} height=${H} preserveAspectRatio="xMidYMid slice" opacity=${imageOpacity} />` : null}
 
-        ${page.items.map((item, i) => html`<${ItemBox}
+        ${showBoxes ? page.items.map((item, i) => html`<${ItemBox}
           key=${item.id}
           item=${item}
           page=${page}
@@ -273,7 +273,7 @@ export default function Canvas({ page, image, imageOpacity = 1, scale, selection
           onSelect=${onSelect}
           onBegin=${onBegin}
           onDragStart=${startDrag}
-        />`)}
+        />`) : null}
 
         ${guides.map((g) =>
           g.x !== undefined
@@ -281,7 +281,7 @@ export default function Canvas({ page, image, imageOpacity = 1, scale, selection
             : html`<line class="guide" x1=${g.x1} y1=${g.y} x2=${g.x2} y2=${g.y} />`
         )}
 
-        ${selectedItem
+        ${showBoxes && selectedItem
           ? handles(selectedItem.bbox).map(
               ([mode, x, y]) =>
                 html`<rect

@@ -46,7 +46,9 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const [tab, setTab] = useState('prompt');
   const [gen, setGen] = useState(null);
   const [busyGen, setBusyGen] = useState(false);
-  const [scale, setScale] = useState(0.55);
+  const [fitScale, setFitScale] = useState(0.55);
+  const [zoom, setZoom] = useState(1);
+  const [showBoxes, setShowBoxes] = useState(true);
   const [opacity, setOpacity] = useState(0.55);
   const [changes, setChanges] = useState(null);
   const [showExport, setShowExport] = useState(false);
@@ -122,7 +124,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     const fit = () => {
       const w = el.clientWidth - 48;
       const h = el.clientHeight - 48;
-      setScale(Math.max(0.16, Math.min(w / page.size[0], h / page.size[1])));
+      setFitScale(Math.max(0.16, Math.min(w / page.size[0], h / page.size[1])));
     };
     fit();
     const ro = new ResizeObserver(fit);
@@ -399,6 +401,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const version = versions.find((v) => v.id === current) || versions.slice(-1)[0];
   const image = version?.image || '';
   const generating = busyGen || Boolean(gen && (gen.status === 'queued' || gen.status === 'running'));
+  const scale = fitScale * zoom;
 
   function addItem(type) {
     const item =
@@ -461,6 +464,10 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
               <input type="range" min="0" max="1" step="0.05" value=${opacity} style="width:70px" onInput=${(e) => setOpacity(Number(e.currentTarget.value))} />
             </label>`
           : null}
+        <button class=${cls('btn ghost', !showBoxes && 'inv')} onClick=${() => setShowBoxes((v) => !v)}>${showBoxes ? '隐藏框' : '显示框'}</button>
+        <button class="btn ghost" onClick=${() => setZoom((z) => Math.max(0.5, Number((z - 0.15).toFixed(2))))}>－</button>
+        <button class="btn ghost" onClick=${() => setZoom(1)}>适应</button>
+        <button class="btn ghost" onClick=${() => setZoom((z) => Math.min(3, Number((z + 0.15).toFixed(2))))}>＋</button>
         <button class="btn ghost" onClick=${undo} title="Ctrl+Z">撤销</button>
         <button class="btn ghost" onClick=${() => setShowExport(true)}>导出</button>
         <button class="btn inv" disabled=${errors.length > 0 || generating} onClick=${generate}>
@@ -468,11 +475,35 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         </button>
       </div>
 
-      <div class="stage" ref=${stageRef}>
+      <div
+        class="stage"
+        ref=${stageRef}
+        onWheel=${(e) => {
+          if (!e.ctrlKey && !e.metaKey) return;
+          e.preventDefault();
+          setZoom((z) => Math.min(3, Math.max(0.5, Number((z - Math.sign(e.deltaY) * 0.1).toFixed(2)))));
+        }}
+        onPointerDown=${(e) => {
+          if (e.target !== e.currentTarget) return;
+          const el = e.currentTarget;
+          const start = { x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop };
+          const move = (ev) => {
+            el.scrollLeft = start.left - (ev.clientX - start.x);
+            el.scrollTop = start.top - (ev.clientY - start.y);
+          };
+          const up = () => {
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', up);
+          };
+          window.addEventListener('pointermove', move);
+          window.addEventListener('pointerup', up);
+        }}
+      >
         <${Canvas}
           page=${page}
           image=${image}
           imageOpacity=${opacity}
+          showBoxes=${showBoxes}
           scale=${scale}
           selection=${selection}
           onSelect=${setSelection}
@@ -625,6 +656,27 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
       </div>
     </div>`;
 
+    const metaInputs = html`<div class="field">
+      <label>tags（3–6 个英文短词，选填）</label>
+      <input
+        class="input"
+        value=${(item.tags || []).join(' ')}
+        placeholder="ceramic_cup speckled_glaze"
+        onInput=${(e) => patchItem(item.id, { tags: e.currentTarget.value.split(/[\s,]+/).filter(Boolean) })}
+      />
+    </div>
+    <div class="field">
+      <label>palette（#RRGGBB，选填）</label>
+      <input
+        class="input"
+        value=${(item.palette || []).join(' ')}
+        placeholder="#1F3D2B #F2E8DA"
+        onInput=${(e) =>
+          patchItem(item.id, {
+            palette: e.currentTarget.value.split(/[\s,]+/).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c)),
+          })}
+      />
+    </div>`;
     const header = html`<div class="row">
       <button class="btn sm ghost" onClick=${() => setSelection(null)}>← 返回</button>
       <div class="spacer"></div>
@@ -676,6 +728,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
           </div>
         </div>
         ${bboxInputs}
+        ${metaInputs}
       </div>`;
     }
 
@@ -699,6 +752,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
             </div>`
           : null}
         ${bboxInputs}
+        ${metaInputs}
       </div>`;
     }
 
@@ -729,6 +783,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         </select>
       </div>
       ${bboxInputs}
+      ${metaInputs}
     </div>`;
   }
 

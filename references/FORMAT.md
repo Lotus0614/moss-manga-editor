@@ -39,7 +39,8 @@ v3 起不再分 `panels` / `bubbles`，所有东西都在同一个数组里，�
   "items": [
     { "type": "panel", "id": "pn_a", "bbox": [8, 8, 760, 424],
       "shape": "rect", "frame": "border", "camera": "wide",
-      "caption": "wide shot of a crowded platform, grey silhouettes" },
+      "caption": "wide shot of a crowded platform, grey silhouettes",
+      "tags": ["crowded_platform", "grey_silhouettes"] },
 
     { "type": "bubble", "id": "bb_b", "bbox": [60, 30, 500, 96],
       "kind": "narration", "text": "每天早上八点十七分，我在同一节车厢里。",
@@ -82,6 +83,36 @@ v3 起不再分 `panels` / `bubbles`，所有东西都在同一个数组里，�
 - `text`：`label = text` 时必填
 
 编辑器里它显示为虚线框，提醒你这是「手写的原始项」。
+
+## tags / palette（三种 item 都能用）
+
+两个可选字段，直接透传进 Moss JSON 的同名位置。
+
+**tags** —— 只在这个元素容易被画错时写，3~6 个全小写英文短词，多词用下划线：
+
+```jsonc
+"tags": ["convenience_store", "fluorescent_light"]
+```
+
+text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「这是什么」，不重复 caption。
+
+**palette** —— 只在颜色是硬要求时写，`#RRGGBB` 3~5 个，按面积从大到小：
+
+```jsonc
+"palette": ["#1F3D2B", "#F2E8DA"]     // 文字项固定两个：文字色 + 底色
+```
+
+普通题材省略。写了 palette 也仍要在 caption 里描述色彩关系。
+
+## 输出形态
+
+发给 ComfyUI 的顶层只有四个字段：
+
+```jsonc
+{ "summary": {...}, "items": [...], "bbox_coord_space": "abs_centralized", "bbox_format": "yxyx" }
+```
+
+`width` / `height` 不进产物（只用于换算）；`items` 里每个元素可选带 `tags` / `palette`。
 
 ## 坐标
 

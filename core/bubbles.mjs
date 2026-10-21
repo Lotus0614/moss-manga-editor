@@ -12,87 +12,12 @@
  * @property {boolean} inline 是否为浮字（无气泡，允许出血跨格）
  */
 
-/** @type {BubbleType[]} */
-export const BUBBLE_TYPES = [
-  {
-    id: '01',
-    key: 'speech',
-    name: '对话',
-    phrase: 'WHITE OVAL speech bubble, smooth even outline, thin black line',
-    tail: true,
-    inline: false,
-  },
-  {
-    id: '02',
-    key: 'shout',
-    name: '喊叫',
-    phrase: 'JAGGED EXPLOSIVE speech bubble with sharp spiky edges',
-    tail: true,
-    inline: false,
-  },
-  {
-    id: '03',
-    key: 'whisper',
-    name: '小声',
-    phrase: 'small round WHITE OVAL speech bubble, its tail made of three tiny circles trailing away in a line',
-    tail: true,
-    inline: false,
-  },
-  {
-    id: '04',
-    key: 'tremble',
-    name: '颤抖',
-    phrase: 'WHITE speech bubble with a SHAKY WAVY outline',
-    tail: true,
-    inline: false,
-  },
-  {
-    id: '05',
-    key: 'thought',
-    name: '内心',
-    phrase: 'WHITE CLOUD-shaped thought bubble, scalloped edge, thin black outline, NO tail',
-    tail: false,
-    inline: false,
-  },
-  {
-    id: '06',
-    key: 'heart',
-    name: '心之声',
-    phrase: 'speech bubble with a DASHED black outline, white interior, NO tail',
-    tail: false,
-    inline: false,
-  },
-  {
-    id: '07',
-    key: 'narration',
-    name: '旁白',
-    phrase:
-      'narration lettering printed DIRECTLY on the artwork, floating freely, no bubble, no box, no background, thin white outline only',
-    tail: false,
-    inline: true,
-  },
-  {
-    id: '08',
-    key: 'sfx',
-    name: '拟声词',
-    phrase: 'hand-lettered sound effect, bold brush strokes, slightly rotated, thin white outline, no bubble',
-    tail: false,
-    inline: true,
-  },
-];
+import { BUBBLE_TYPES, TAIL_DIRECTIONS } from './prompt-templates.mjs';
 
+export { BUBBLE_TYPES, TAIL_DIRECTIONS };
 export const BUBBLE_BY_KEY = Object.fromEntries(BUBBLE_TYPES.map((b) => [b.key, b]));
 
-export const TAIL_DIRECTIONS = {
-  'down-left': 'pointing down-left',
-  down: 'pointing straight down',
-  'down-right': 'pointing down-right',
-  left: 'pointing left',
-  right: 'pointing right',
-  'up-left': 'pointing up-left',
-  up: 'pointing straight up',
-  'up-right': 'pointing up-right',
-};
+
 
 export function bubbleType(key) {
   return BUBBLE_BY_KEY[key] || BUBBLE_BY_KEY.speech;

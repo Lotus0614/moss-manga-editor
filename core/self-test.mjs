@@ -94,13 +94,15 @@ test('四条文字的 bbox 与文档示例完全一致', () => {
   assert.deepEqual(got, want);
 });
 
-test('产物只含 summary / items', () => {
-  assert.deepEqual(Object.keys(compiled.doc).sort(), ['items', 'summary']);
+test('产物顶层字段与模板规范一致', () => {
+  assert.deepEqual(Object.keys(compiled.doc).sort(), ['bbox_coord_space', 'bbox_format', 'items', 'summary']);
+  assert.equal(compiled.doc.bbox_coord_space, 'abs_centralized');
+  assert.equal(compiled.doc.bbox_format, 'yxyx');
 });
 
-test('已经去掉 width / height / 坐标声明', () => {
+test('已经去掉 width / height', () => {
   const raw = compiled.json;
-  for (const key of ['bbox_coord_space', 'bbox_format', '"width"', '"height"']) {
+  for (const key of ['"width"', '"height"']) {
     assert.ok(!raw.includes(key), `产物里不该出现 ${key}`);
   }
 });

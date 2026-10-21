@@ -719,11 +719,11 @@ a { color: inherit; }
 .item-tag {
   font-family: var(--mono);
   font-size: 11px;
-  fill: var(--ink);
+  font-size: 15px;
   opacity: 0.75;
   pointer-events: none;
   user-select: none;
 }
-.item-tag.bubble { font-weight: 700; opacity: 0.9; }
+.item-tag.bubble { font-weight: 700; opacity: 1; font-size: 16px; }
 .item-text { fill: var(--ink); pointer-events: none; user-select: none; }
 .handle { fill: var(--paper); stroke: var(--ink); stroke-width: 2; }

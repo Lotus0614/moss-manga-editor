@@ -130,10 +130,12 @@ await test('changes 按页聚合，ack 之后清空', async () => {
   assert.equal(after.pages.length, 0);
 });
 
-await test('配置写入是深合并且不丢默认值', async () => {
+await test('配置写入是深合并且不丢其它键', async () => {
   const saved = await writeConfig(configDir, { defaults: { ckpt: 'x.safetensors' } });
   assert.equal(saved.defaults.ckpt, 'x.safetensors');
-  assert.equal(saved.defaults.steps, 28);
+  // 没有预设值：没填就是空，等用户按自己的工作流填
+  assert.equal(saved.defaults.steps, '');
+  assert.equal(saved.defaults.sampler, '');
   assert.equal(typeof saved.comfy.url, 'string');
 });
 

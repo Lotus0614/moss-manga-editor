@@ -106,15 +106,15 @@ export function buildValues({ page, project, config, opts = {} }) {
 
   return {
     prompt: '',
-    negative: opts.negative ?? defaults.negative,
+    negative: opts.negative ?? defaults.negative ?? '',
     width,
     height,
     seed,
-    steps: num(opts.steps, defaults.steps, 28),
-    cfg: num(opts.cfg, defaults.cfg, 5),
-    denoise: num(opts.denoise, defaults.denoise, 1),
-    sampler: opts.sampler ?? defaults.sampler,
-    scheduler: opts.scheduler ?? defaults.scheduler,
+    steps: numberOrEmpty(opts.steps ?? defaults.steps),
+    cfg: numberOrEmpty(opts.cfg ?? defaults.cfg),
+    denoise: numberOrEmpty(opts.denoise ?? defaults.denoise),
+    sampler: opts.sampler ?? defaults.sampler ?? '',
+    scheduler: opts.scheduler ?? defaults.scheduler ?? '',
     ckpt: opts.ckpt ?? defaults.ckpt ?? '',
     lora_name: lora.name,
     lora_strength: lora.weight,
@@ -122,9 +122,11 @@ export function buildValues({ page, project, config, opts = {} }) {
   };
 }
 
-const num = (value, fallback, dflt) => {
-  const n = Number(value ?? fallback);
-  return Number.isFinite(n) ? n : dflt;
+/** 空就是空，不要替用户猜一个数字 */
+const numberOrEmpty = (value) => {
+  if (value === '' || value === undefined || value === null) return '';
+  const n = Number(value);
+  return Number.isFinite(n) ? n : '';
 };
 
 function pickSeed(value, fallback) {

@@ -35,11 +35,22 @@ export async function prepareRender({ dir, configDir = dir, project, page, confi
   const values = buildValues({ page, project, config, opts });
   values.prompt = compiled.json;
 
-  // ckpt 只在工作流真的用到时才要求
-  if (/\{\{\s*ckpt\s*\}\}/.test(workflow.raw) && !values.ckpt) {
+  // 工作流用到哪些参数，就必须填哪些；没用到的一个都不要求
+  const REQUIRED = [
+    ['ckpt', '检查点'],
+    ['steps', '步数'],
+    ['cfg', 'CFG'],
+    ['sampler', '采样器'],
+    ['scheduler', '调度器'],
+    ['denoise', '重绘幅度'],
+  ];
+  const missing = REQUIRED.filter(([key]) => new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`).test(workflow.raw))
+    .filter(([key]) => values[key] === '' || values[key] === undefined || values[key] === null)
+    .map(([key, label]) => `{{${key}}}（${label}）`);
+  if (missing.length) {
     return {
       ok: false,
-      error: '这个工作流用了 {{ckpt}} 但还没设置检查点：`manga config set defaults.ckpt <文件名>`',
+      error: `工作流需要这些参数，但还没填：${missing.join('、')}。在设置里填一下。`,
       warnings: compiled.warnings,
     };
   }

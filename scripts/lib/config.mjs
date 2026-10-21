@@ -35,14 +35,17 @@ export function defaultConfig(configDir = DEFAULT_CONFIG_DIR) {
     archive: '', // 空 = <配置根>/archive
     comfy: { url: 'http://127.0.0.1:8188', timeoutMs: 180000 },
     workflow: { name: '' },
+    // 全部留空：这些值没有「合理默认」，必须由用户按自己的工作流填
     defaults: {
       ckpt: '',
-      steps: 28,
-      cfg: 5,
-      sampler: 'euler',
-      scheduler: 'simple',
-      negative: 'nsfw, worst quality, bad anatomy, watermark, jpeg artifact',
+      steps: '',
+      cfg: '',
+      sampler: '',
+      scheduler: '',
+      denoise: '',
+      negative: '',
       lora: '',
+      seed: '',
     },
     editable: {
       layout: true,

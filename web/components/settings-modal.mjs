@@ -13,7 +13,7 @@ const FIELDS = {
   sampler: { label: '采样器', type: 'text', key: 'sampler', placeholder: 'euler' },
   scheduler: { label: '调度器', type: 'text', key: 'scheduler', placeholder: 'simple' },
   seed: { label: '默认 seed', type: 'number', key: 'seed', hint: '留空或 -1 = 每张随机' },
-  ckpt: { label: '检查点', type: 'checkpoint', key: 'ckpt' },
+  ckpt: { label: '检查点', type: 'ckpt', key: 'ckpt' },
   lora_name: { label: 'LoRA', type: 'text', key: 'lora', placeholder: '<lora:moss\\xxx:0.7>' },
   denoise: { label: '重绘幅度', type: 'number', key: 'denoise', step: '0.05' },
 };
@@ -27,7 +27,6 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
   const [form, setForm] = useState(null);
   const [busy, setBusy] = useState('');
   const [status, setStatus] = useState(null);
-  const [models, setModels] = useState({ checkpoints: [] });
   const [workflows, setWorkflows] = useState([]);
   const [wf, setWf] = useState({ raw: '', params: [], ok: false, missing: [] });
 
@@ -39,7 +38,6 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
 
   useEffect(() => {
     if (!open) return;
-    loadModels();
     loadWorkflows();
   }, [open]);
 
@@ -55,13 +53,6 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
       .catch(() => setWf({ raw: '', params: [], ok: false, missing: [] }));
   }, [open, form?.workflow?.name]);
 
-  async function loadModels() {
-    try {
-      setModels(await api('/api/comfy/models'));
-    } catch {
-      /* ComfyUI 没开就静默 */
-    }
-  }
 
   async function loadWorkflows() {
     try {
@@ -89,8 +80,7 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
     try {
       const res = await api('/api/comfy/models');
       if (res.ok) {
-        setStatus({ ok: true, message: `连接正常 · ${res.checkpoints.length} 个检查点` });
-        setModels(res);
+        setStatus({ ok: true, message: '连接正常' });
       } else {
         setStatus({ ok: false, message: res.message || '连不上' });
       }
@@ -218,14 +208,15 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
                   ${visible.map((name) => {
                     const spec = FIELDS[name];
                     const value = form.defaults[spec.key];
-                    if (spec.type === 'checkpoint') {
+                    if (spec.type === 'ckpt') {
                       return html`<div class="field" key=${name}>
                         <label>${spec.label} <span class="mono">{{${name}}}</span></label>
-                        <select class="select" value=${value || ''} onChange=${(e) => setDefault(spec.key, e.currentTarget.value)}>
-                          <option value="">（未选择）</option>
-                          ${models.checkpoints.map((m) => html`<option value=${m}>${m}</option>`)}
-                          ${value && !models.checkpoints.includes(value) ? html`<option value=${value}>${value}</option>` : null}
-                        </select>
+                        <input
+                          class="input"
+                          value=${value ?? ''}
+                          placeholder="照抄 ComfyUI checkpoints 里的文件名"
+                          onInput=${(e) => setDefault(spec.key, e.currentTarget.value)}
+                        />
                       </div>`;
                     }
                     if (spec.type === 'textarea') {
@@ -248,7 +239,8 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
                         step=${spec.step || null}
                         value=${value ?? ''}
                         placeholder=${spec.placeholder || ''}
-                        onInput=${(e) => setDefault(spec.key, spec.type === 'number' ? Number(e.currentTarget.value) : e.currentTarget.value)}
+                        onInput=${(e) =>
+                          setDefault(spec.key, spec.type === 'number' ? (e.currentTarget.value === '' ? '' : Number(e.currentTarget.value)) : e.currentTarget.value)}
                       />
                       ${spec.hint ? html`<span class="hint">${spec.hint}</span>` : null}
                     </div>`;

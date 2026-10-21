@@ -142,6 +142,7 @@ function panelCaption(panel, guard, number) {
   const body = (panel.caption || '').trim();
   const tag = number ? `PANEL ${number}` : '';
   if (body || tag) parts.push(`This box contains only: ${[tag, body].filter(Boolean).join(', ')}`);
+  if (guard) parts.push(guard);
   return parts.join(', ');
 }
 

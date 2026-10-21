@@ -727,3 +727,27 @@ a { color: inherit; }
 .item-tag.bubble { font-weight: 700; opacity: 1; font-size: 16px; }
 .item-text { fill: var(--ink); pointer-events: none; user-select: none; }
 .handle { fill: var(--paper); stroke: var(--ink); stroke-width: 2; }
+
+/* palette 颜色选择器 */
+.swatch { position: relative; display: inline-flex; }
+.swatch input[type="color"] {
+  width: 36px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--ink);
+  background: none;
+  cursor: pointer;
+}
+.swatch-x {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  font-size: 10px;
+  line-height: 1;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  cursor: pointer;
+}

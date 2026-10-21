@@ -329,7 +329,18 @@ async function route(req, res, url) {
       }
       if (method === 'PUT') {
         const payload = await body(req);
-        const saved = await savePage(ARCHIVE, slug, { ...page, ...payload, id: page.id }, { actor: 'web' });
+        const next = { ...page, ...payload, id: page.id };
+        if (!payload.replaceItems) {
+          // 局部更新：按 id 合并，避免把没提到的 item 删掉
+          const map = new Map(page.items.map((it) => [it.id, it]));
+          for (const item of payload.items || []) {
+            if (item?.id && map.has(item.id)) map.set(item.id, { ...map.get(item.id), ...item });
+            else map.set(item?.id || `tmp_${Math.random().toString(36).slice(2, 8)}`, item);
+          }
+          for (const id of payload.removeItems || []) map.delete(id);
+          next.items = [...map.values()];
+        }
+        const saved = await savePage(ARCHIVE, slug, next, { actor: 'web' });
         return json(res, 200, saved.page);
       }
       if (method === 'DELETE') {

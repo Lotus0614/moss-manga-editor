@@ -82,6 +82,13 @@ function guessBubbleType(caption = '') {
 
 function stripMeta(caption) {
   const m = caption.match(/This box contains only:\s*(.+)$/i);
-  if (m) return m[1].replace(/\s*,\s*Black ink[^,]*$/i, '').replace(/\s*,\s*$/, '').trim();
+  if (m) {
+    return m[1]
+      .replace(/\s*,\s*Black ink[\s\S]*$/i, '')
+      .replace(/\s*,\s*$/, '')
+      .trim();
+  }
+  // 编译产物里若不是作者内容，就是「形状 + 边框 + 机位」这类套话，直接清空
+  if (/rectangular panel|trapezoid panel|panel bleeding|circular panel|panel border|no border, artwork/i.test(caption)) return '';
   return caption.replace(/Black ink, white paper and grey screentone only, zero colour\.?/gi, '').replace(/\s*,\s*$/, '').trim();
 }

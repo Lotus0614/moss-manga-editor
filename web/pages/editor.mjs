@@ -25,7 +25,7 @@ import Canvas from '../components/canvas.mjs';
 import { exportLongImage, exportPdf } from '../components/export.mjs';
 import { compilePage } from '../../core/compile.mjs';
 import { compileContext } from '../../core/bible.mjs';
-import { createPanelItem, createBubbleItem } from '../../core/manga-doc.mjs';
+import { createPanelItem, createBubbleItem, createNativeItem } from '../../core/manga-doc.mjs';
 
 const STYLE_LABELS = [
   ['mono', '黑白网点'],
@@ -282,7 +282,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     const cur = pageRef.current;
     if (!cur) return;
     try {
-      const saved = await apiPut(`/api/projects/${projectId}/pages/${cur.id}`, cur);
+      const saved = await apiPut(`/api/projects/${projectId}/pages/${cur.id}`, { ...cur, replaceItems: true });
       pageRef.current = saved;
       setPage((prev) => (prev && prev.id === saved.id ? { ...prev, rev: saved.rev } : prev));
       refreshPages();
@@ -407,7 +407,9 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     const item =
       type === 'bubble'
         ? createBubbleItem({ bbox: [420, 120, 700, 320], text: '新台词' })
-        : createPanelItem({ bbox: [40, 420, 728, 780], caption: '' });
+        : type === 'native'
+          ? createNativeItem({ bbox: [40, 40, 400, 160], label: 'character', caption: '原生 item：直接写 label/caption' })
+          : createPanelItem({ bbox: [40, 420, 728, 780], caption: '' });
     mutate((cur) => ({ ...cur, items: [...cur.items, item] }));
     setSelection({ kind: item.type, id: item.id });
     setTimeout(saveNow, 60);
@@ -464,6 +466,9 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
               <input type="range" min="0" max="1" step="0.05" value=${opacity} style="width:70px" onInput=${(e) => setOpacity(Number(e.currentTarget.value))} />
             </label>`
           : null}
+        <button class="btn" onClick=${() => addItem('panel')}>＋ 分格</button>
+        <button class="btn" onClick=${() => addItem('bubble')}>＋ 文字</button>
+        <button class="btn" onClick=${() => addItem('native')}>＋ 原生</button>
         <button class=${cls('btn ghost', !showBoxes && 'inv')} onClick=${() => setShowBoxes((v) => !v)}>${showBoxes ? '隐藏框' : '显示框'}</button>
         <button class="btn ghost" onClick=${() => setZoom((z) => Math.max(0.5, Number((z - 0.15).toFixed(2))))}>－</button>
         <button class="btn ghost" onClick=${() => setZoom(1)}>适应</button>
@@ -614,10 +619,6 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
       </div>
 
       <div class="divider"></div>
-      <div class="row wrap">
-        <button class="chip" onClick=${() => addItem('panel')}>＋ 分格</button>
-        <button class="chip" onClick=${() => addItem('bubble')}>＋ 文字</button>
-      </div>
 
       <div class="divider"></div>
       <span class="label">本页内容（点选编辑）</span>
@@ -666,16 +667,31 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
       />
     </div>
     <div class="field">
-      <label>palette（#RRGGBB，选填）</label>
-      <input
-        class="input"
-        value=${(item.palette || []).join(' ')}
-        placeholder="#1F3D2B #F2E8DA"
-        onInput=${(e) =>
-          patchItem(item.id, {
-            palette: e.currentTarget.value.split(/[\s,]+/).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c)),
-          })}
-      />
+      <label>palette（最多 5 个，按面积从大到小）</label>
+      <div class="row wrap">
+        ${(item.palette || []).map(
+          (hex, i) => html`<span class="swatch" key=${`${hex}-${i}`}>
+            <input
+              type="color"
+              value=${hex}
+              title=${hex}
+              onInput=${(e) => {
+                const next = [...(item.palette || [])];
+                next[i] = e.currentTarget.value.toUpperCase();
+                patchItem(item.id, { palette: next });
+              }}
+            />
+            <button
+              class="swatch-x"
+              title="移除"
+              onClick=${() => patchItem(item.id, { palette: (item.palette || []).filter((_, j) => j !== i) })}
+            >×</button>
+          </span>`
+        )}
+        ${(item.palette || []).length < 5
+          ? html`<button class="chip" onClick=${() => patchItem(item.id, { palette: [...(item.palette || []), '#000000'] })}>＋ 颜色</button>`
+          : null}
+      </div>
     </div>`;
     const header = html`<div class="row">
       <button class="btn sm ghost" onClick=${() => setSelection(null)}>← 返回</button>

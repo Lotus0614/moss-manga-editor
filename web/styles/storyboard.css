@@ -711,10 +711,10 @@ a { color: inherit; }
 .param-grid .full { grid-column: 1 / -1; }
 .panel-box label .mono { color: var(--mid); font-size: 9px; letter-spacing: 0; margin-left: 4px; }
 /* 画布 item：带标签的半透明框 */
-.item-box { fill: rgba(120,120,120,0.10); stroke: var(--ink); stroke-width: 2.5; }
-.item-box.panel { fill: rgba(120,120,120,0.06); }
-.item-box.bubble { fill: rgba(255,255,255,0.55); }
-.item-box.native { stroke-dasharray: 7 4; fill: rgba(120,120,120,0.04); }
+.item-box { fill: rgba(120,120,120,0.06); stroke: var(--ink); stroke-width: 2.5; }
+.item-box.panel { fill: rgba(198,54,48,0.14); }
+.item-box.bubble { fill: rgba(226,178,38,0.24); }
+.item-box.native { stroke-dasharray: 7 4; fill: rgba(48,104,196,0.16); }
 .item-box.sel { stroke-width: 4; }
 .item-tag {
   font-family: var(--mono);

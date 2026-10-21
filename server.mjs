@@ -35,7 +35,7 @@ import { listWorkflows, readWorkflow, saveWorkflow, checkWorkflow } from './scri
 import { renderPage } from './scripts/lib/render.mjs';
 import { compilePage } from './core/compile.mjs';
 import { compileContext } from './core/bible.mjs';
-import { applyPreset, seedPage, PRESET_IDS } from './core/presets.mjs';
+import { createPanelItem } from './core/manga-doc.mjs';
 import { ComfyClient } from './scripts/lib/comfy.mjs';
 
 const PORT = Number(process.env.PORT || 5123);
@@ -231,8 +231,7 @@ async function route(req, res, url) {
       const payload = await body(req);
       const project = await createProject(ARCHIVE, { name: payload.name, size: payload.size });
       if (payload.withSamplePage) {
-        const page = await createPage(ARCHIVE, project.slug, {});
-        await savePage(ARCHIVE, project.slug, seedPage(page.page), { actor: 'web' });
+        await createPage(ARCHIVE, project.slug, {});
       }
       return json(res, 201, project);
     }
@@ -270,13 +269,7 @@ async function route(req, res, url) {
       if (method === 'POST') {
         const payload = await body(req);
         const created = await createPage(ARCHIVE, slug, { title: payload.title || '' });
-        let page = created.page;
-        if (!payload.blank) {
-          const preset = PRESET_IDS.includes(payload.preset) ? payload.preset : 'band-3';
-          const saved = await savePage(ARCHIVE, slug, seedPage(page, preset), { actor: 'web' });
-          page = saved.page;
-        }
-        return json(res, 201, page);
+        return json(res, 201, created.page);
       }
     }
 

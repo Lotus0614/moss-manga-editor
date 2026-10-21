@@ -41,13 +41,21 @@ manga page show --page 1 --summary
 
 ---
 
-## 整页重排（换版式）
+## 整页重排
 
-```bash
-manga page apply --page 2 --preset band-4
+没有版式预设，直接写 items。比如把两格改成三格：
+
+```json
+{
+  "items": [
+    { "type": "panel", "id": "pn_a", "bbox": [8, 8, 760, 420] },
+    { "type": "panel", "id": "pn_b", "bbox": [8, 428, 380, 848] },
+    { "type": "panel", "id": "pn_c", "bbox": [388, 428, 760, 848] }
+  ]
+}
 ```
 
-会替换分格，气泡保留原坐标——换完要 `page show --summary` 看一眼气泡有没有压到新格线上。
+`items` 按 id 合并：能对上 id 的改坐标，对不上的当作新项追加。要删项用 `removeItems`。
 
 ---
 
@@ -74,12 +82,14 @@ manga page apply --page 2 --preset band-4
 
 ---
 
-## 加一页并套版式
+## 加一页
 
 ```bash
-manga page new --preset daily-5 --title "站台"
+manga page new --title "站台"
 manga page show --page 3 --summary
 ```
+
+新页只有一个占满整页的框，再按需要切成多格。
 
 ---
 

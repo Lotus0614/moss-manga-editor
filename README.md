@@ -45,7 +45,7 @@ node scripts/manga.mjs doctor
 1. `manga doctor --json` → 没配置就依次问：ComfyUI 地址 → 要 Moss 工作流 → 允许改哪些部分 → 存档位置。
 2. 工作流：用户原样发 API JSON，**Agent 自己读、自己改成带占位符的完整文件**，`manga workflow save` + `check`。脚本不做任何猜测式替换。
 3. 构思剧情、人物、分页脚本，**发给用户确认**。
-4. `project new` → `page new --preset` → `page set --file patch.json` → `compile` → `render`。
+4. `project new` → `page new` → `page set --file patch.json` → `compile` → `render`。
 5. `serve --open` 让用户看。
 6. 用户改完 → `manga changes --json` 只看差异 → 重出 → `ack`。
 
@@ -60,7 +60,7 @@ manga workflow path                           # 工作流该放哪
 manga workflow save moss.json                 # 校验并保存（没有内置工作流，必须先给一份）
 manga workflow check                          # 看占位符齐不齐
 manga project new --name "雨中的便利店"
-manga page new --preset band-3
+manga page new
 manga page show --page 1 --summary            # 紧凑大纲，省上下文
 manga page set --page 1 --file patch.json     # 数组按 id 合并，只改你写的
 manga compile --page 1                        # 看 Moss JSON 与校验

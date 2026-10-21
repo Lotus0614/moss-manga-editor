@@ -1,178 +1,128 @@
 # 存档格式
 
-**配置和存档是两棵树**：配置（含工作流）放在固定的配置根，存档只放项目数据。换存档不会丢配置，换机器只要拷配置根。
+配置和存档是两棵树：配置（含工作流）在固定的配置根，存档只放项目数据。
 
 ```
 <配置根>  默认 ~/.moss-manga（MOSS_CONFIG 可覆盖）
-├── config.json                 # ComfyUI 地址、当前工作流、默认参数、编辑范围
+├── config.json                 # ComfyUI 地址、当前工作流、出图参数
 └── workflows/                  # 全局工作流（跟存档无关）
 
 <存档>    默认 <配置根>/archive（config.archive 或 --dir 可改）
-├── state.json                  # { rev, ackedRev } 变更版本号
-├── journal.jsonl               # 变更日志，一行一条
+├── state.json  journal.jsonl
 └── projects/<slug>/
     ├── project.json            # 项目 + 人物设定 + 页序
-    ├── pages/p01.json          # 一页一个文件，唯一可编辑真源
-    ├── versions.json           # 渲染历史（图片、seed、参数）
-    ├── versions/<id>.json      # 每次渲染喂进去的 Moss JSON 快照（只读）
-    └── images/<sha256>.png     # 图片，内容寻址，重复自动去重
+    ├── pages/p01.json          # 一页一个文件
+    ├── versions.json           # 渲染历史
+    ├── versions/<id>.json      # 该次渲染喂进去的 Moss JSON（只读）
+    └── images/<sha256>.png
 ```
 
-存档里**没有** `config.json`：配置是全局的，不属于某个项目集合。
+## 页面只有一个数组：items
 
-## project.json
+v3 起不再分 `panels` / `bubbles`，所有东西都在同一个数组里，用 `type` 区分：
+
+| type | 是什么 | 主要字段 |
+|---|---|---|
+| `panel` | 一个分格 | `bbox` `shape` `frame` `camera` `caption` |
+| `bubble` | 一条文字 | `bbox` `kind` `text` `size` `tail` `vertical?` |
+| `native` | 原生 Moss item，绕过语义层 | `bbox` `label` `caption` `text?` |
 
 ```jsonc
 {
-  "id": "rainy-konbini",
-  "slug": "rainy-konbini",          // 目录名，ASCII
-  "name": "雨中的便利店",
-  "size": "page",                   // page | page-hd | square | wide
-  "pages": ["p01", "p02"],
-  "bible": {
-    "characters": [
-      {
-        "id": "ch_w",
-        "code": "W",                // 分格里用这个代号复述
-        "name": "水科 小春",
-        "desc": "a 22 year old college girl, long straight black hair with a blunt fringe, white sailor blouse with a dark square collar edged in two white stripes, pleated skirt, white loose socks, dark loafers, large bust",
-        "enabled": true
-      }
-    ],
-    "scene": "a half-empty train carriage, fluorescent light, blurred grey silhouettes"
-  },
-  "createdAt": "2025-..."
+  "id": "p01", "index": 1, "title": "车厢", "rev": 7,
+  "size": [768, 1280],
+  "reading": "rtl",          // rtl 右→左 | ltr 左→右
+  "style": "mono",           // mono | color | sketch
+  "vertical": true,          // 全局文字竖排；单条 bubble 可用自己的 vertical 覆盖
+  "scene": "a half-empty train carriage, fluorescent light",
+  "note": "",
+  "items": [
+    { "type": "panel", "id": "pn_a", "bbox": [8, 8, 760, 424],
+      "shape": "rect", "frame": "border", "camera": "wide",
+      "caption": "wide shot of a crowded platform, grey silhouettes" },
+
+    { "type": "bubble", "id": "bb_b", "bbox": [60, 30, 500, 96],
+      "kind": "narration", "text": "每天早上八点十七分，我在同一节车厢里。",
+      "size": 20, "tail": "none", "vertical": false },
+
+    { "type": "native", "id": "nt_c", "bbox": [520, 980, 740, 1180],
+      "label": "character", "caption": "水科 小春（22），白衬衫，黑色长发" }
+  ]
 }
 ```
 
-`desc` 按这个顺序写最省事：性别年龄 → 发型 → 五官 → 上装 → 下装 → 袜鞋 → 随身物 → 体型。所有人物在每一页都会被自动写进 `summary.caption`，保证跨页一致。
+## panel
 
-## page（p01.json）
-
-```jsonc
-{
-  "id": "p01",
-  "index": 1,
-  "title": "车厢",
-  "rev": 7,                         // 每次保存自增，只读
-  "size": [768, 1280],              // 必须是 16 的倍数
-  "reading": "rtl",                 // rtl 右→左 | ltr 左→右
-  "style": "mono",                  // mono 黑白网点 | color 彩色 | sketch 线稿
-  "scene": "本页专属场景，空则用 bible.scene",
-  "note": "追加在 summary 末尾的补充说明",
-  "panels": [ ... ],
-  "bubbles": [ ... ]
-}
-```
-
-### panels[]
-
-```jsonc
-{
-  "id": "pn_ab12",
-  "bbox": [8, 8, 760, 424],         // 左上原点，[x1,y1,x2,y2]，绝对像素
-  "shape": "rect",                  // 见下方枚举
-  "frame": "border",                // border | none | thick
-  "camera": "wide",                 // 见下方枚举
-  "caption": "wide shot of a crowded platform, grey silhouettes"
-}
-```
-
-`caption` 只写**画面**：谁、在哪、什么动作、什么景别。不要写心理活动（那属于气泡），也不要写"这一格表现孤独"这种抽象话。
-
-### bubbles[]
-
-```jsonc
-{
-  "id": "bb_cd34",
-  "type": "speech",                 // 见下方枚举
-  "text": "……今天也要，撑过去。",     // 原样渲染，换行用 \n
-  "bbox": [353, 488, 676, 628],
-  "vertical": true,                 // 竖排（默认 true）
-  "size": 22,                       // 字号
-  "tail": "down-left"               // 尾巴方向；"none" = 说话者不在画面
-}
-```
-
-## 枚举
-
-| 字段 | 取值 |
+| 字段 | 值 |
 |---|---|
+| `bbox` | `[x1,y1,x2,y2]`，左上原点、绝对像素、整数 |
 | `shape` | `rect` `slant-top` `slant-side` `bleed-top` `bleed-bottom` `bleed-left` `bleed-right` `bleed-all` `circle` |
-| `frame` | `border` 描边（默认） `none` 无边（出血格用） `thick` 粗边 |
-| `camera` | `eye` 平视 `high` 俯视 `low` 仰视 `wide` 全景 `medium` 中景 `close` 特写 `xclose` 大特写 `ots` 过肩 `dutch` 荷兰角 |
-| `type` | `speech` 对话 `shout` 喊叫 `whisper` 小声 `tremble` 颤抖 `thought` 内心 `heart` 心之声 `narration` 旁白 `sfx` 拟声词 |
-| `tail` | `down-left` `down` `down-right` `left` `right` `up-left` `up` `up-right` `none` |
+| `frame` | `border` 描边（默认） `none` 无边 `thick` 粗边 |
+| `camera` | `eye` `high` `low` `wide` `medium` `close` `xclose` `ots` `dutch` |
+| `caption` | 这一格**看得见**的东西：谁 + 在哪 + 做什么 |
+
+出血格（`bleed-*`）可以超出画布；其它形状超出只会被裁。
+
+## bubble
+
+| 字段 | 值 |
+|---|---|
+| `kind` | `speech` 对话 `shout` 喊叫 `whisper` 小声 `tremble` 颤抖 `thought` 内心 `heart` 心之声 `narration` 旁白 `sfx` 拟声词 |
+| `text` | 要渲染的字，原样；换行用 `\n` |
+| `size` | 字号，默认 22 |
+| `tail` | `down-left` `down` `down-right` `left` `right` `up-left` `up` `up-right` `none`；`none` = 说话者不在画面 |
+| `vertical` | 不写就跟随页面 `vertical`；写 `true`/`false` 单独覆盖 |
+
+## native
+
+语义层覆盖不到时用，直接把 `label` / `caption` / `text` 写进 Moss JSON：
+
+- `label`：`object` | `text` | `character`
+- `caption`：原样拼进产物
+- `text`：`label = text` 时必填
+
+编辑器里它显示为虚线框，提醒你这是「手写的原始项」。
 
 ## 坐标
 
-只有一套坐标系：**左上原点、绝对像素、`[x1,y1,x2,y2]`**。
+只有一套：**左上原点、绝对像素 `[x1,y1,x2,y2]`**。
 
-- 必须是整数，`x1 < x2`、`y1 < y2`
-- 出血格（`bleed-*`）允许超出画布，其它形状超出只是警告
+- 整数，`x1 < x2`、`y1 < y2`
 - 四边留 8~16px 安全边
-- 转成 Moss 模型要的中心原点 `yxyx` 由 `compile` 负责，**永远不要手算**
+- 中心原点 `yxyx` 的转换由编译器负责，**不要手算**
 
 ## 尺寸
 
-`size` 是 `[宽, 高]`，两边都必须是 16 的倍数（这样 `W/2`、`H/2` 是整数）。常用：
+`size` 是 `[宽, 高]`，都必须是 16 的倍数。常用：`[768,1280]` 分镜页、`[1152,1920]` 高清、`[1024,1024]` 方图、`[1536,1024]` 横版。
 
-| 用途 | size |
-|---|---|
-| 分镜页 | `[768, 1280]` |
-| 分镜页高清 | `[1152, 1920]` |
-| 方图 | `[1024, 1024]` |
-| 横版 | `[1536, 1024]` |
+## 没有版式预设
 
-## 版式预设
-
-`manga page new --preset <id>` 或 `manga page apply --page N --preset <id>`：
-
-| id | 说明 |
-|---|---|
-| `band-3` | 三条横带，最稳的叙事页 |
-| `band-4` | 四条横带，推进快 |
-| `daily-5` | 五带、第 2 带左右二分（右格发生、左格反应） |
-| `split-2x2` | 四宫格 |
-| `climax` | 满版 + 两个角部嵌格 |
-| `single` | 整页一张 |
-
-套用会**替换全部 panels**，气泡保留但 bbox 不动——所以换版式后要重新看气泡位置。
+工具不再提供 band-3 / 四宫格之类的预设——漫画排版本来就不该被模板限制。新建页只给**一个占满整页的框**当起手，怎么切、怎么斜、怎么出血，自己拖或者让 AI 按故事来定。
 
 ## versions.json
 
 ```jsonc
 {
-  "currentByPage": { "p01": "v003", "p02": "v005" },   // 每页各自记住采用哪一版
+  "currentByPage": { "p01": "v003" },   // 每页各自采用哪一版
   "items": [
-    {
-      "id": "v003", "at": "2025-...", "page": "p01", "pageIndex": 1,
-      "image": "/media/rainy-konbini/<sha>.png", "file": "<sha>.png",
+    { "id": "v003", "page": "p01", "image": "/media/<slug>/<sha>.png",
       "seed": 909507867, "width": 768, "height": 1280,
-      "steps": 28, "cfg": 5, "sampler": "euler", "scheduler": "simple",
-      "lora": [], "workflow": "default.json", "ms": 16344
-    }
+      "steps": 11, "cfg": 2, "sampler": "euler", "scheduler": "sgm_uniform",
+      "workflow": "moss-user.json", "ms": 18183 }
   ]
 }
 ```
 
-历史只读：`current` 只决定预览用哪一版，改不动已经生成过的图。
+历史只读：切 `currentByPage` 只影响预览用哪一版，改不动已生成的图。
 
 ## journal.jsonl
 
-一行一条，`rev` 单调递增：
-
-```json
-{"rev":12,"at":"...","actor":"cli","project":"rainy-konbini","page":"p01","index":1,
- "ops":[{"op":"bbox","target":"panel","id":"pn_ab12","from":[8,8,760,400],"to":[8,8,760,424]}]}
-```
-
-`manga changes` 就是把 `rev > ackedRev` 的条目按页聚合出来的。
+每次写入一行，`rev` 单调递增；`manga changes` 就是按页聚合这些操作。
 
 ## 不变量
 
 1. `bbox` 四个整数，`x1<x2`、`y1<y2`
 2. `size` 是 16 的倍数
-3. 页面 id 形如 `p01`，项目 slug 是 ASCII
+3. 页面 id `p01`，项目 slug 是 ASCII
 4. 图片只增不改，文件名是内容 sha256
-5. 数组元素 `id` 唯一且稳定（改内容不要换 id，否则 diff 会当成删了加一条）
+5. item 的 `id` 稳定；改内容不要换 id，否则 diff 会当成「删了又加」

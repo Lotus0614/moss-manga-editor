@@ -710,3 +710,20 @@ a { color: inherit; }
 .param-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
 .param-grid .full { grid-column: 1 / -1; }
 .panel-box label .mono { color: var(--mid); font-size: 9px; letter-spacing: 0; margin-left: 4px; }
+/* 画布 item：带标签的半透明框 */
+.item-box { fill: rgba(120,120,120,0.10); stroke: var(--ink); stroke-width: 2.5; }
+.item-box.panel { fill: rgba(120,120,120,0.06); }
+.item-box.bubble { fill: rgba(255,255,255,0.55); }
+.item-box.native { stroke-dasharray: 7 4; fill: rgba(120,120,120,0.04); }
+.item-box.sel { stroke-width: 4; }
+.item-tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  fill: var(--ink);
+  opacity: 0.75;
+  pointer-events: none;
+  user-select: none;
+}
+.item-tag.bubble { font-weight: 700; opacity: 0.9; }
+.item-text { fill: var(--ink); pointer-events: none; user-select: none; }
+.handle { fill: var(--paper); stroke: var(--ink); stroke-width: 2; }

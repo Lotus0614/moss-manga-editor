@@ -46,8 +46,8 @@ async function test(name, fn) {
 // ---------------------------------------------------------------- 纯函数
 
 await test('diff 能认出 bbox 变化', () => {
-  const before = { panels: [{ id: 'a', bbox: [8, 8, 760, 400], caption: 'x' }], bubbles: [] };
-  const after = { panels: [{ id: 'a', bbox: [8, 8, 760, 424], caption: 'x' }], bubbles: [] };
+  const before = { items: [{ type: 'panel', id: 'a', bbox: [8, 8, 760, 400], caption: 'x' }] };
+  const after = { items: [{ type: 'panel', id: 'a', bbox: [8, 8, 760, 424], caption: 'x' }] };
   const ops = diffPage(before, after);
   assert.equal(ops.length, 1);
   assert.equal(ops[0].op, 'bbox');
@@ -55,10 +55,17 @@ await test('diff 能认出 bbox 变化', () => {
 });
 
 await test('diff 能认出文本变化与增删', () => {
-  const before = { panels: [{ id: 'a', bbox: [0, 0, 10, 10] }], bubbles: [{ id: 'b', text: '旧' }] };
+  const before = {
+    items: [
+      { type: 'panel', id: 'a', bbox: [0, 0, 10, 10] },
+      { type: 'bubble', id: 'b', text: '旧', bbox: [0, 0, 10, 10] },
+    ],
+  };
   const after = {
-    panels: [{ id: 'a', bbox: [0, 0, 10, 10] }, { id: 'c', bbox: [0, 20, 10, 30] }],
-    bubbles: [],
+    items: [
+      { type: 'panel', id: 'a', bbox: [0, 0, 10, 10] },
+      { type: 'panel', id: 'c', bbox: [0, 20, 10, 30] },
+    ],
   };
   const ops = diffPage(before, after);
   assert.ok(ops.some((o) => o.op === 'add' && o.id === 'c'));
@@ -66,7 +73,7 @@ await test('diff 能认出文本变化与增删', () => {
 });
 
 await test('没有改动就不产生操作', () => {
-  const page = { panels: [{ id: 'a', bbox: [0, 0, 10, 10] }], bubbles: [] };
+  const page = { items: [{ type: 'panel', id: 'a', bbox: [0, 0, 10, 10] }] };
   assert.deepEqual(diffPage(page, JSON.parse(JSON.stringify(page))), []);
 });
 

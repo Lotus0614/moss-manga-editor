@@ -100,10 +100,10 @@ export function bubbleType(key) {
 
 /**
  * 一条文字项的形态描述（位置由 compile 根据 bbox 补）。
- * @param {{type?:string, tail?:string}} bubble
+ * @param {{kind?:string, tail?:string}} bubble
  */
 export function bubblePhrase(bubble) {
-  const t = bubbleType(bubble.type);
+  const t = bubbleType(bubble.kind);
   const parts = [t.phrase];
   if (t.tail) {
     const tail = bubble.tail;

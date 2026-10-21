@@ -1,10 +1,10 @@
-// 富文档 → Moss Layout JSON。
+// items → Moss Layout JSON。
 //
 // 这是全项目唯一允许做坐标转换的地方。输出必须满足 Moss 模板《JSON Layout》的契约：
 //   - 只保留 summary / items 两个顶层字段
-//   - items 扁平、非空，每项只有 label/caption/bbox/text（可选 tags/palette）
+//   - items 扁平、非空，每项只有 label/caption/bbox/text
 //   - bbox 为中心原点、yxyx、整数
-//   - 单行 JSON，字符串内换行需转义（JSON.stringify 自动处理）
+//   - 单行 JSON
 
 import {
   pageSize,
@@ -14,51 +14,57 @@ import {
   CAMERAS,
   STYLE_PRESETS,
   READING_ORDERS,
-  readingOrderOf,
+  isVertical,
+  panelsOf,
+  bubblesOf,
   bboxCenter,
 } from './manga-doc.mjs';
-import { bubblePhrase, bubbleType } from './bubbles.mjs';
+import { bubblePhrase } from './bubbles.mjs';
 import { validatePage } from './validate.mjs';
 
 const MAX_PER_COLUMN = 12;
 
 /**
- * 编译一页。
- * @param {object} page 富文档
+ * 编译一页。items 按数组顺序输出（作者顺序即模型读到的顺序）。
+ * @param {object} page
  * @param {{characterText?:string, sceneText?:string, note?:string}} [ctx]
- *        人物与场景由调用方（CLI / 服务器）按项目 bible 解析好传进来。
- * @returns {{doc:object, json:string, warnings:Array, stats:object}}
  */
 export function compilePage(page, ctx = {}) {
   const size = pageSize(page);
   const style = STYLE_PRESETS[page.style] || STYLE_PRESETS.mono;
   const guard = style.guard || '';
+  const panels = panelsOf(page);
+  const bubbles = bubblesOf(page);
 
-  const caption = buildSummary(page, size, style, ctx);
+  const caption = buildSummary(page, panels, bubbles, style, ctx);
   const items = [];
 
-  for (const panel of readingOrderOf(page)) {
-    items.push({
-      label: 'object',
-      caption: panelCaption(panel, guard),
-      bbox: toMoss(panel.bbox, size),
-    });
-  }
-
-  for (const bubble of sortBubbles(page)) {
-    const item = {
-      label: 'text',
-      caption: bubbleCaption(bubble, size, guard),
-      bbox: toMoss(bubble.bbox, size),
-    };
-    if (bubble.text) item.text = bubble.text;
-    items.push(item);
+  for (const item of page.items || []) {
+    if (item.type === 'panel') {
+      items.push({ label: 'object', caption: panelCaption(item, guard), bbox: toMoss(item.bbox, size) });
+    } else if (item.type === 'bubble') {
+      const out = {
+        label: 'text',
+        caption: bubbleCaption(item, page, size, guard),
+        bbox: toMoss(item.bbox, size),
+      };
+      if (item.text) out.text = item.text;
+      items.push(out);
+    } else if (item.type === 'native') {
+      const out = {
+        label: item.label || 'object',
+        caption: [item.caption, guard].filter(Boolean).join(', '),
+        bbox: toMoss(item.bbox, size),
+      };
+      if (item.text) out.text = item.text;
+      items.push(out);
+    }
   }
 
   const doc = {
     summary: {
       meta: style.meta,
-      canvas: autoCanvas(page),
+      canvas: panels.length > 1 || bubbles.length > 1 ? 'multi_panel' : 'single',
       caption,
     },
     items,
@@ -72,8 +78,8 @@ export function compilePage(page, ctx = {}) {
     json,
     warnings,
     stats: {
-      panels: page.panels.length,
-      bubbles: page.bubbles.length,
+      panels: panels.length,
+      bubbles: bubbles.length,
       items: items.length,
       chars: caption.length,
       bytes: new TextEncoder().encode(json).length,
@@ -81,22 +87,17 @@ export function compilePage(page, ctx = {}) {
   };
 }
 
-function autoCanvas(page) {
-  return page.panels.length > 1 || page.bubbles.length > 1 ? 'multi_panel' : 'single';
-}
-
 // ---------------------------------------------------------------- summary
 
-function buildSummary(page, size, style, ctx) {
+function buildSummary(page, panels, bubbles, style, ctx) {
   const parts = [style.phrase];
   const order = READING_ORDERS[page.reading] || READING_ORDERS.rtl;
 
-  if (page.panels.length > 0) {
-    const n = page.panels.length;
-    parts.push(`The page is divided into ${n} ${n === 1 ? 'panel' : 'panels'}. ${order.phrase}`);
+  if (panels.length > 0) {
+    parts.push(`The page is divided into ${panels.length} ${panels.length === 1 ? 'panel' : 'panels'}. ${order.phrase}`);
   }
 
-  if (page.bubbles.length > 0) {
+  if (bubbles.length > 0) {
     parts.push(
       'Dialogue is set in white speech bubbles with tails, thoughts in white cloud bubbles with no tail, and narration is bare lettering printed directly on the artwork with no bubble, no box and no background.'
     );
@@ -116,7 +117,7 @@ function buildSummary(page, size, style, ctx) {
   return parts.join('\n\n');
 }
 
-// ---------------------------------------------------------------- items
+// ---------------------------------------------------------------- 各类 item
 
 function panelCaption(panel, guard) {
   const shape = PANEL_SHAPES[panel.shape] || PANEL_SHAPES.rect;
@@ -124,21 +125,19 @@ function panelCaption(panel, guard) {
   const camera = CAMERAS[panel.camera];
   const parts = [shape.phrase];
 
-  // 出血格不描边，说明边框反而会让模型画出一条线
   if (!String(panel.shape || '').startsWith('bleed')) parts.push(frame.phrase);
   if (camera) parts.push(camera.phrase);
 
   const body = (panel.caption || '').trim();
   if (body) parts.push(`This box contains only: ${body}`);
-
   if (guard) parts.push(guard);
   return parts.join(', ');
 }
 
-function bubbleCaption(bubble, size, guard) {
+function bubbleCaption(bubble, page, size, guard) {
   const parts = [bubblePhrase(bubble)];
   parts.push(`placed in the ${placementWord(bubble.bbox, size)}`);
-  parts.push(textLayout(bubble));
+  parts.push(textLayout(bubble, isVertical(page, bubble)));
   if (guard) parts.push(guard);
   return parts.join(', ');
 }
@@ -152,32 +151,22 @@ function placementWord(bbox, size) {
   return `${vertical} ${horizontal} area of the page`;
 }
 
-function textLayout(bubble) {
+function textLayout(bubble, vertical) {
   const [x1, y1, x2, y2] = bubble.bbox;
   const w = Math.max(1, x2 - x1);
   const h = Math.max(1, y2 - y1);
   const fs = Math.max(8, Number(bubble.size) || 22);
-  const cols = Math.max(1, Math.floor(w / (fs * 1.15)));
-  const perCol = Math.max(1, Math.floor(h / (fs * 1.35)));
-  if (bubble.vertical === false) {
-    return `Horizontal lettering, about ${perCol} lines of ${cols} characters each`;
+  if (!vertical) {
+    const cols = Math.max(1, Math.floor(w / (fs * 1.02)));
+    const rows = Math.max(1, Math.floor(h / (fs * 1.3)));
+    return `Horizontal lettering, about ${rows} lines of ${cols} characters each`;
   }
-  const cap = Math.min(perCol, MAX_PER_COLUMN);
-  return `Vertical lettering in ${cols} column${cols > 1 ? 's' : ''} read right to left, about ${cap} characters per column`;
-}
-
-/** 气泡按阅读顺序排：先上后下，同带内右→左（rtl） */
-function sortBubbles(page) {
-  const rtl = page.reading !== 'ltr';
-  return [...page.bubbles].sort((a, b) => {
-    if (Math.abs(a.bbox[1] - b.bbox[1]) > 24) return a.bbox[1] - b.bbox[1];
-    return rtl ? b.bbox[0] - a.bbox[0] : a.bbox[0] - b.bbox[0];
-  });
+  const cols = Math.max(1, Math.floor(w / (fs * 1.15)));
+  const perCol = Math.max(1, Math.min(Math.floor(h / (fs * 1.35)), MAX_PER_COLUMN));
+  return `Vertical lettering in ${cols} column${cols > 1 ? 's' : ''} read right to left, about ${perCol} characters per column`;
 }
 
 /** 供 UI 显示「这一条会写进提示词的形态描述」 */
 export function previewBubbleCaption(bubble, size) {
-  return bubbleCaption(bubble, size || { width: 768, height: 1280 }, '');
+  return bubbleCaption(bubble, { vertical: true }, size || { width: 768, height: 1280 }, '');
 }
-
-export { bubbleType };

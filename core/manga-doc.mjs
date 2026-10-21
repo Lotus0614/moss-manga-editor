@@ -1,14 +1,16 @@
-// 漫画页面文档模型（v2 薄语义层）。
+// 漫画页面文档（v3）：单层 items。
 //
-// 这是存档里唯一可编辑的页面格式，Moss JSON 永远由 core/compile.mjs 现算。
-// 坐标系：文档内一律「左上原点、绝对像素 [x1,y1,x2,y2]」；
-// 只有 toMoss() 做中心原点 yxyx 转换，别在别处再写一遍。
+// 页面只有一串 items，每个 item 用 type 区分：
+//   panel  —— 一个分格：坐标、形状、边框、机位、画面描述
+//   bubble —— 一条文字：坐标、气泡类型、原文、排版
+//   native —— 原生 Moss item：直接给 label/caption/text，绕过语义层（逃生口）
 //
-// 尺寸必须是 16 的正整数倍，W/2 与 H/2 才是整数，换算不会丢精度。
+// 坐标一律「左上原点、绝对像素 [x1,y1,x2,y2]」；只有 toMoss() 做中心原点 yxyx 转换。
+// 尺寸必须是 16 的倍数，W/2 与 H/2 才是整数。
 
 export const GRID = 16;
+export const DEFAULT_SIZE = [768, 1280];
 
-/** 分镜页固定竖版；其余尺寸仅供单图/横版项目使用 */
 export const SIZE_PRESETS = {
   page: { name: '分镜页 768×1280', size: [768, 1280], manga: true },
   'page-hd': { name: '分镜页高清 1152×1920', size: [1152, 1920], manga: true },
@@ -16,30 +18,19 @@ export const SIZE_PRESETS = {
   wide: { name: '横版 1536×1024', size: [1536, 1024], manga: false },
 };
 
-export const DEFAULT_SIZE = [768, 1280];
+export const ITEM_TYPES = ['panel', 'bubble', 'native'];
 
+/** 面板形状 */
 export const PANEL_SHAPES = {
-  rect: { name: '矩形', phrase: 'rectangular panel with straight edges', clip: { kind: 'rect' } },
-  'slant-top': {
-    name: '斜切上边',
-    phrase: 'trapezoid panel with a slanted top edge cutting diagonally',
-    clip: { kind: 'poly', points: [[0, 0.12], [1, 0], [1, 1], [0, 1]] },
-  },
-  'slant-side': {
-    name: '斜切侧边',
-    phrase: 'panel with a sharply angled slanted side edge',
-    clip: { kind: 'poly', points: [[0, 0], [0.86, 0], [1, 1], [0, 1]] },
-  },
-  'bleed-top': { name: '出血·上', phrase: 'panel bleeding off the TOP edge of the page, no border', clip: { kind: 'rect' } },
-  'bleed-bottom': { name: '出血·下', phrase: 'panel bleeding off the BOTTOM edge of the page, no border', clip: { kind: 'rect' } },
-  'bleed-left': { name: '出血·左', phrase: 'panel bleeding off the LEFT edge of the page, no border', clip: { kind: 'rect' } },
-  'bleed-right': { name: '出血·右', phrase: 'panel bleeding off the RIGHT edge of the page, no border', clip: { kind: 'rect' } },
-  'bleed-all': {
-    name: '满版',
-    phrase: 'full-bleed panel covering the whole page, no border, artwork running off all four edges',
-    clip: { kind: 'rect' },
-  },
-  circle: { name: '圆形', phrase: 'circular panel with a clean round border', clip: { kind: 'ellipse' } },
+  rect: { name: '矩形', phrase: 'rectangular panel with straight edges' },
+  'slant-top': { name: '斜切上边', phrase: 'trapezoid panel with a slanted top edge cutting diagonally' },
+  'slant-side': { name: '斜切侧边', phrase: 'panel with a sharply angled slanted side edge' },
+  'bleed-top': { name: '出血·上', phrase: 'panel bleeding off the TOP edge of the page, no border' },
+  'bleed-bottom': { name: '出血·下', phrase: 'panel bleeding off the BOTTOM edge of the page, no border' },
+  'bleed-left': { name: '出血·左', phrase: 'panel bleeding off the LEFT edge of the page, no border' },
+  'bleed-right': { name: '出血·右', phrase: 'panel bleeding off the RIGHT edge of the page, no border' },
+  'bleed-all': { name: '满版', phrase: 'full-bleed panel covering the whole page, no border, artwork running off all four edges' },
+  circle: { name: '圆形', phrase: 'circular panel with a clean round border' },
 };
 
 export const FRAME_STYLES = {
@@ -116,14 +107,14 @@ export function pageSize(page) {
   return { width: DEFAULT_SIZE[0], height: DEFAULT_SIZE[1] };
 }
 
-// ---------------------------------------------------------------- 坐标换算
+/** 全局竖排开关（页面级），单个 item 可用自己的 vertical 覆盖 */
+export function isVertical(page, item) {
+  if (typeof item?.vertical === 'boolean') return item.vertical;
+  return page?.vertical !== false;
+}
 
-/**
- * 文档坐标 → Moss 坐标（中心原点，yxyx）。全项目唯一实现。
- * @param {number[]} bbox [x1,y1,x2,y2]
- * @param {{width:number,height:number}} size
- * @returns {number[]} [y_min-H/2, x_min-W/2, y_max-H/2, x_max-W/2]
- */
+// ---------------------------------------------------------------- 坐标
+
 export function toMoss(bbox, size) {
   const [x1, y1, x2, y2] = bbox;
   const dx = size.width / 2;
@@ -135,7 +126,6 @@ export function toMoss(bbox, size) {
   return [t - dy, l - dx, b - dy, r - dx];
 }
 
-/** Moss 坐标 → 文档坐标（导入用） */
 export function fromMoss(mossBbox, size) {
   const [a, c, d, e] = mossBbox;
   const dx = size.width / 2;
@@ -160,14 +150,11 @@ export function bboxCenter(bbox) {
   return [(x1 + x2) / 2, (y1 + y2) / 2];
 }
 
-export function bboxIntersects(a, b, pad = 0) {
-  return a[0] < b[2] - pad && a[2] > b[0] + pad && a[1] < b[3] - pad && a[3] > b[1] + pad;
-}
+// ---------------------------------------------------------------- item 工厂
 
-// ---------------------------------------------------------------- 工厂函数
-
-export function createPanel(patch = {}) {
+export function createPanelItem(patch = {}) {
   return {
+    type: 'panel',
     id: uid('pn'),
     bbox: [8, 8, 760, 420],
     shape: 'rect',
@@ -178,17 +165,35 @@ export function createPanel(patch = {}) {
   };
 }
 
-export function createBubble(patch = {}) {
+export function createBubbleItem(patch = {}) {
   return {
+    type: 'bubble',
     id: uid('bb'),
-    type: 'speech',
-    text: '',
     bbox: [40, 40, 240, 140],
-    vertical: true,
+    kind: 'speech',
+    text: '',
     size: 22,
     tail: 'down-left',
+    // vertical 不写 = 跟随页面全局
     ...patch,
   };
+}
+
+export function createNativeItem(patch = {}) {
+  return {
+    type: 'native',
+    id: uid('nt'),
+    bbox: [0, 0, 768, 1280],
+    label: 'object',
+    caption: '',
+    ...patch,
+  };
+}
+
+export function createItem(type = 'panel', patch = {}) {
+  if (type === 'bubble') return createBubbleItem(patch);
+  if (type === 'native') return createNativeItem(patch);
+  return createPanelItem(patch);
 }
 
 export function createPage(patch = {}) {
@@ -201,20 +206,74 @@ export function createPage(patch = {}) {
     size,
     reading: 'rtl',
     style: 'mono',
+    vertical: true,
     scene: '',
     note: '',
-    panels: [],
-    bubbles: [],
+    items: [],
     ...patch,
   };
 }
 
-/**
- * 补齐缺失字段，容忍手改坏的 JSON，同时兼容 v1 存档（size 对象、fontSize、tailOff）。
- */
+// ---------------------------------------------------------------- 归一化
+
+function normalizeBubbleItem(b) {
+  return {
+    type: 'bubble',
+    id: b.id || uid('bb'),
+    bbox: b.bbox,
+    kind: b.kind || b.bubbleType || 'speech',
+    text: String(b.text || ''),
+    size: Number(b.size || b.fontSize) || 22,
+    tail: b.tail || (b.tailOff ? 'none' : b.tailDir) || 'down-left',
+    ...(typeof b.vertical === 'boolean' ? { vertical: b.vertical } : {}),
+  };
+}
+
+/** 兼容 v1/v2：panels + bubbles 两套数组会被合并进 items */
 export function normalizePage(raw = {}) {
   const size = pageSize(raw);
   const style = typeof raw.style === 'string' ? raw.style : raw.style?.preset;
+
+  let items = [];
+  if (Array.isArray(raw.items)) {
+    items = raw.items.map((it) => normalizeItem(it, size));
+  } else {
+    // v2 存档迁移
+    for (const p of raw.panels || []) {
+      items.push(
+        normalizeItem(
+          {
+            type: 'panel',
+            id: p.id,
+            bbox: p.bbox,
+            shape: p.shape,
+            frame: p.frame,
+            camera: p.camera,
+            caption: p.caption,
+          },
+          size
+        )
+      );
+    }
+    for (const b of raw.bubbles || []) {
+      items.push(
+        normalizeItem(
+          {
+            type: 'bubble',
+            id: b.id,
+            bbox: b.bbox,
+            kind: b.type || b.kind,
+            text: b.text,
+            size: b.size || b.fontSize,
+            tail: b.tail || (b.tailOff ? 'none' : b.tailDir),
+            vertical: b.vertical,
+          },
+          size
+        )
+      );
+    }
+  }
+
   const page = {
     id: raw.id || uid('pg'),
     index: Number(raw.index) || 1,
@@ -223,37 +282,52 @@ export function normalizePage(raw = {}) {
     size: [size.width, size.height],
     reading: READING_ORDERS[raw.reading || raw.readingOrder] ? raw.reading || raw.readingOrder : 'rtl',
     style: STYLE_PRESETS[style] ? style : 'mono',
+    vertical: raw.vertical !== false,
     scene: String(raw.scene || ''),
-    note: String(raw.note || raw.summary?.caption || ''),
-    panels: (Array.isArray(raw.panels) ? raw.panels : []).map((p) => ({
-      id: p.id || uid('pn'),
-      bbox: normalizeBbox(p.bbox, size),
-      shape: p.shape || 'rect',
-      frame: p.frame || 'border',
-      camera: p.camera || 'medium',
-      caption: String(p.caption || ''),
-    })),
-    bubbles: (Array.isArray(raw.bubbles) ? raw.bubbles : []).map((b) => ({
-      id: b.id || uid('bb'),
-      type: b.type || 'speech',
-      text: String(b.text || ''),
-      bbox: normalizeBbox(b.bbox, size),
-      vertical: b.vertical !== false,
-      size: Number(b.size || b.fontSize) || 22,
-      tail: b.tail || (b.tailOff ? 'none' : b.tailDir) || 'down-left',
-    })),
+    note: String(raw.note || ''),
+    items,
   };
-  if (!READING_ORDERS[page.reading]) page.reading = 'rtl';
   return page;
 }
 
-/** 阅读顺序：同一横带内先右后左 */
+function normalizeItem(raw = {}, size) {
+  const type = ITEM_TYPES.includes(raw.type) ? raw.type : 'panel';
+  const bbox = normalizeBbox(raw.bbox, size);
+  if (type === 'bubble') return normalizeBubbleItem({ ...raw, bbox });
+  if (type === 'native') {
+    return {
+      type: 'native',
+      id: raw.id || uid('nt'),
+      bbox,
+      label: ['object', 'text', 'character'].includes(raw.label) ? raw.label : 'object',
+      caption: String(raw.caption || ''),
+      ...(raw.text ? { text: String(raw.text) } : {}),
+    };
+  }
+  return {
+    type: 'panel',
+    id: raw.id || uid('pn'),
+    bbox,
+    shape: raw.shape || 'rect',
+    frame: raw.frame || 'border',
+    camera: raw.camera || 'medium',
+    caption: String(raw.caption || ''),
+  };
+}
+
+export function panelsOf(page) {
+  return (page.items || []).filter((it) => it.type === 'panel');
+}
+
+export function bubblesOf(page) {
+  return (page.items || []).filter((it) => it.type === 'bubble');
+}
+
+/** 阅读顺序：同一横带内先右后左（用于提示与自检） */
 export function readingOrderOf(page) {
   const rtl = page.reading !== 'ltr';
-  return [...page.panels].sort((a, b) => {
-    const ay = a.bbox[1];
-    const by = b.bbox[1];
-    if (Math.abs(ay - by) > 24) return ay - by;
+  return [...panelsOf(page)].sort((a, b) => {
+    if (Math.abs(a.bbox[1] - b.bbox[1]) > 24) return a.bbox[1] - b.bbox[1];
     return rtl ? b.bbox[0] - a.bbox[0] : a.bbox[0] - b.bbox[0];
   });
 }

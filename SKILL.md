@@ -127,7 +127,7 @@ node scripts/manga.mjs doctor
 
 ## 第 2 步：构思（先别写文件）
 
-先读 `references/STORYBOARD.md`，那是分镜写法的手册（每格怎么写、气泡放哪、字数预算、常见翻车案例）。**不要凭感觉写 caption**——写不好模型就画成一坨。
+写 caption 的要点：**只写看得见的东西**（谁 + 在哪 + 做什么 + 景别 + 光线），不写心理活动、不写抽象形容词、不写质量词。台词要短（一句 6~14 字），一页 5~8 条。
 
 产出四样东西，整段发给用户确认：
 
@@ -144,10 +144,10 @@ node scripts/manga.mjs doctor
 
 ```bash
 node scripts/manga.mjs project new --name "雨中的便利店"
-node scripts/manga.mjs page new --preset band-3        # 一页一条，重复到需要的页数
+node scripts/manga.mjs page new                        # 一页一条，重复到需要的页数
 ```
 
-版式预设：`band-3` 三横带、`band-4` 四横带、`daily-5` 日常五带、`split-2x2` 四宫格、`climax` 高潮页、`single` 整页。
+**没有版式预设**：新建页只给你一个占满整页的框，怎么切自己定（拖框或写 `items` 补丁）。
 
 然后逐页填内容。先看现状，再写补丁文件，最后 `page set`：
 
@@ -228,11 +228,11 @@ node scripts/manga.mjs ack
 | 建项目 | `manga project new --name "名字" [--size page]` |
 | 列项目 | `manga project list` |
 | 看项目 | `manga project show --project slug` |
-| 建页 | `manga page new [--project slug] [--preset band-3] [--title 标题]` |
+| 建页 | `manga page new [--project slug] [--title 标题]` |
 | 列页 | `manga page list [--project slug]` |
 | 看页 | `manga page show --page N [--summary]` |
 | 改页 | `manga page set --page N --file patch.json` |
-| 换版式 | `manga page apply --page N --preset climax` |
+| 改版面 | `manga page set --page N --file patch.json`（items 按 id 合并） |
 | 编译 | `manga compile --page N` |
 | 出图 | `manga render --page N [--seed S] [--steps N] [--dry-run]` |
 | 看变更 | `manga changes [--since rev]` |
@@ -262,8 +262,8 @@ node scripts/manga.mjs ack
 
 | 文件 | 什么时候读 |
 |---|---|
-| `references/STORYBOARD.md` | 构思与写 caption 之前：分镜节奏、每格五要素、气泡位置与字数、翻车对照 |
-| `references/FORMAT.md` | 写补丁前：页面文档每个字段的含义、坐标、版式预设 |
+
+| `references/FORMAT.md` | 写补丁前：items 三种类型、字段含义、坐标规则 |
 | `references/CLI.md` | 忘了参数或输出的字段名 |
 | `references/WORKFLOW.md` | 导入工作流、占位符、报错对照 |
 | `references/RECIPES.md` | 常见改动怎么写（加一格、改台词、换版式、重出一版） |

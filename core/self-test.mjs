@@ -5,7 +5,7 @@
 
 import assert from 'node:assert/strict';
 import { compilePage } from './compile.mjs';
-import { createPage, createPanel, createBubble, toMoss, fromMoss } from './manga-doc.mjs';
+import { createPage, createPanelItem, createBubbleItem, toMoss, fromMoss } from './manga-doc.mjs';
 import { validatePage } from './validate.mjs';
 import { decompile } from './decompile.mjs';
 import { fillGraph, scanTokens, MissingParam, describeWorkflow } from './placeholders.mjs';
@@ -69,12 +69,14 @@ const DOC_BUBBLES = [
 
 function buildDocPage() {
   const page = createPage({ size: SIZE });
-  page.panels = DOC_PANELS.map((moss, i) =>
-    createPanel({ bbox: fromMoss(moss, SIZE_OBJ), caption: `panel content ${i + 1}` })
-  );
-  page.bubbles = DOC_BUBBLES.map((moss, i) =>
-    createBubble({ bbox: fromMoss(moss, SIZE_OBJ), text: `测试台词${i + 1}`, type: i === 1 ? 'thought' : 'speech' })
-  );
+  page.items = [
+    ...DOC_PANELS.map((moss, i) =>
+      createPanelItem({ bbox: fromMoss(moss, SIZE_OBJ), caption: `panel content ${i + 1}` })
+    ),
+    ...DOC_BUBBLES.map((moss, i) =>
+      createBubbleItem({ bbox: fromMoss(moss, SIZE_OBJ), text: `测试台词${i + 1}`, kind: i === 1 ? 'thought' : 'speech' })
+    ),
+  ];
   return page;
 }
 
@@ -122,8 +124,7 @@ test('每个 item 的 caption 都带收尾的锁色句', () => {
 
 test('旁白项包含 no bubble, no box, no background', () => {
   const page = createPage({ size: SIZE });
-  page.panels = [createPanel({ bbox: [8, 8, 760, 400] })];
-  page.bubbles = [createBubble({ type: 'narration', text: '旁白', bbox: [40, 40, 400, 120] })];
+  page.items = [createPanelItem({ bbox: [8, 8, 760, 400] }), createBubbleItem({ kind: 'narration', text: '旁白', bbox: [40, 40, 400, 120] })];
   const out = compilePage(page);
   const text = out.doc.items.find((i) => i.label === 'text');
   assert.ok(/no bubble, no box, no background/i.test(text.caption));
@@ -146,7 +147,7 @@ test('本身已包含全部允许字段，没有多余键', () => {
 
 test('越界面板会被警告', () => {
   const page = createPage({ size: SIZE });
-  page.panels = [createPanel({ bbox: [-40, 0, 400, 400] })];
+  page.items = [createPanelItem({ bbox: [-40, 0, 400, 400] })];
   const warnings = validatePage(page, compilePage(page).doc);
   assert.ok(warnings.some((w) => w.code === 'panel.out'));
 });
@@ -159,9 +160,9 @@ test('空页会被拦下', () => {
 
 test('文字超预算会被警告', () => {
   const page = createPage({ size: SIZE });
-  page.panels = [createPanel({ bbox: [8, 8, 760, 400] })];
-  page.bubbles = [
-    createBubble({ text: '字'.repeat(300), bbox: [40, 40, 120, 100], size: 24 }),
+  page.items = [
+    createPanelItem({ bbox: [8, 8, 760, 400] }),
+    createBubbleItem({ text: '字'.repeat(300), bbox: [40, 40, 120, 100], size: 24 }),
   ];
   const warnings = validatePage(page, compilePage(page).doc);
   assert.ok(warnings.some((w) => w.code === 'bubble.overflow'));
@@ -171,8 +172,8 @@ test('文字超预算会被警告', () => {
 
 test('编译产物能反编译回同一组坐标', () => {
   const page = decompile(compiled.json, SIZE);
-  assert.equal(page.panels.length, 4);
-  assert.equal(page.bubbles.length, 4);
+  assert.equal(page.items.filter((it) => it.type === 'panel').length, 4);
+  assert.equal(page.items.filter((it) => it.type === 'bubble').length, 4);
   const again = compilePage(page);
   const got = again.doc.items.map((i) => JSON.stringify(i.bbox)).sort();
   const want = [...DOC_PANELS, ...DOC_BUBBLES].map((b) => JSON.stringify(b)).sort();
@@ -181,7 +182,7 @@ test('编译产物能反编译回同一组坐标', () => {
 
 test('反编译能认出内心气泡与出血格', () => {
   const page = decompile(compiled.json, SIZE);
-  assert.ok(page.bubbles.some((b) => b.type === 'thought'));
+  assert.ok(page.items.some((it) => it.type === 'bubble' && it.kind === 'thought'));
 });
 
 // ---------------------------------------------------------------- 占位符

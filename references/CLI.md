@@ -99,12 +99,12 @@ manga project delete [--project slug]
 ## page
 
 ```bash
-manga page new [--preset band-3] [--title 标题] [--blank]
+manga page new [--title 标题] [--blank]   # 默认给一个整页框
 manga page list
 manga page show --page 3 [--summary]
 manga page set  --page 3 --file patch.json
 manga page set  --page 3 --patch '{"title":"车厢"}'
-manga page apply --page 3 --preset climax
+manga page set  --page 3 --file patch.json    # items 按 id 合并
 manga page delete --page 3
 ```
 

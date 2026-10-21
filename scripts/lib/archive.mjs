@@ -123,8 +123,9 @@ export async function listPages(dir, slug) {
       index: page.index,
       title: page.title,
       rev: page.rev,
-      panels: page.panels.length,
-      bubbles: page.bubbles.length,
+      panels: page.items.filter((it) => it.type === 'panel').length,
+      bubbles: page.items.filter((it) => it.type === 'bubble').length,
+      items: page.items.length,
     });
   }
   return out.sort((a, b) => a.index - b.index);
@@ -158,20 +159,29 @@ async function nextPageId(dir, slug) {
   return `p${String(max + 1).padStart(2, '0')}`;
 }
 
-export async function createPage(dir, slug, { title = '', size, panels, bubbles } = {}) {
+/**
+ * 新建一页。默认给「一个占满整页的框」当起手，不是版式预设——
+ * 怎么排由用户/AI 自己拖。
+ */
+export async function createPage(dir, slug, { title = '', size, items } = {}) {
   const project = await getProject(dir, slug);
   if (!project) throw new Error(`项目不存在：${slug}`);
   const pages = await listPages(dir, slug);
   const id = await nextPageId(dir, slug);
-  const preset = { page: [768, 1280], 'page-hd': [1152, 1920], square: [1024, 1024], wide: [1536, 1024] };
+  const sizes = { page: [768, 1280], 'page-hd': [1152, 1920], square: [1024, 1024], wide: [1536, 1024] };
+  const pageSize = size || sizes[project.size] || sizes.page;
+  const initialItems =
+    items ||
+    [
+      { type: 'panel', bbox: [8, 8, pageSize[0] - 8, pageSize[1] - 8] },
+    ];
   const page = normalizePage(
     makePage({
       id,
       index: pages.length + 1,
       title,
-      size: size || preset[project.size] || preset.page,
-      panels: panels || [],
-      bubbles: bubbles || [],
+      size: pageSize,
+      items: initialItems,
     })
   );
   const saved = await writePageFile(dir, slug, page, { actor: 'cli', op: 'create' });

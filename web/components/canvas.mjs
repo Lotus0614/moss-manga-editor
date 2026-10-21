@@ -1,188 +1,142 @@
-// 画布：SVG 渲染分格与气泡，支持拖拽移动、八向缩放、吸附。
-// 坐标全程使用文档坐标（左上原点、绝对像素），viewBox 就是画布尺寸。
+// 画布：把每个 item 画成「带标签的框」。
+//
+// 不渲染真实气泡形状——标注清楚比画得像更重要：
+//   分格：标签写「格 · 全景/矩形」，里面是画面描述
+//   文字：标签写【旁白】【对话】…，里面是台词
+// 框半透明，方便看清和底下生成图的区别。
 
 import { html, useRef, useState, useEffect } from '../lib.mjs';
 
-const MIN_SIZE = 32;
+const MIN_SIZE = 40;
 const SNAP = 6;
 
-function shapeClip(shape, bbox) {
-  const [x1, y1, x2, y2] = bbox;
-  const w = x2 - x1;
-  const h = y2 - y1;
-  if (shape === 'slant-top') {
-    return [[x1, y1 + h * 0.12], [x2, y1], [x2, y2], [x1, y2]];
-  }
-  if (shape === 'slant-side') {
-    return [[x1, y1], [x1 + w * 0.86, y1], [x2, y2], [x1, y2]];
-  }
-  return null;
+const BUBBLE_LABEL = {
+  speech: '对话',
+  shout: '喊叫',
+  whisper: '小声',
+  tremble: '颤抖',
+  thought: '内心',
+  heart: '心之声',
+  narration: '旁白',
+  sfx: '拟声词',
+};
+
+const CAMERA_LABEL = {
+  eye: '平视',
+  high: '俯视',
+  low: '仰视',
+  wide: '全景',
+  medium: '中景',
+  close: '特写',
+  xclose: '大特写',
+  ots: '过肩',
+  dutch: '荷兰角',
+};
+
+const SHAPE_LABEL = {
+  rect: '矩形',
+  'slant-top': '斜切上',
+  'slant-side': '斜切侧',
+  'bleed-top': '出血上',
+  'bleed-bottom': '出血下',
+  'bleed-left': '出血左',
+  'bleed-right': '出血右',
+  'bleed-all': '满版',
+  circle: '圆形',
+};
+
+function isVertical(page, item) {
+  if (typeof item.vertical === 'boolean') return item.vertical;
+  return page.vertical !== false;
 }
 
-function starPoints(bbox, spikes = 12) {
+/** 竖排：每列若干字，从右往左，整体居中 */
+function verticalColumns(text, bbox, fs) {
   const [x1, y1, x2, y2] = bbox;
-  const cx = (x1 + x2) / 2;
-  const cy = (y1 + y2) / 2;
-  const rx = (x2 - x1) / 2;
-  const ry = (y2 - y1) / 2;
-  const pts = [];
-  for (let i = 0; i < spikes * 2; i += 1) {
-    const angle = (Math.PI * i) / spikes - Math.PI / 2;
-    const k = i % 2 === 0 ? 1 : 0.82;
-    pts.push([cx + Math.cos(angle) * rx * k, cy + Math.sin(angle) * ry * k]);
-  }
-  return pts;
-}
-
-const toPath = (pts) => pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ') + ' Z';
-
-/** 竖排文字：留出椭圆内切空间，从右往左排并整体居中 */
-function verticalLines(text, bbox, fontSize) {
-  const [x1, y1, x2, y2] = bbox;
-  const insetX = Math.min((x2 - x1) * 0.16, fontSize * 1.6);
-  const insetY = Math.min((y2 - y1) * 0.14, fontSize * 1.2);
-  const usableH = Math.max(fontSize, y2 - y1 - insetY * 2);
-  const perCol = Math.max(1, Math.floor(usableH / (fontSize * 1.1)));
+  const perCol = Math.max(1, Math.floor((y2 - y1 - fs) / (fs * 1.1)));
   const chars = [...String(text || '')];
   const cols = [];
   for (let i = 0; i < chars.length; i += perCol) cols.push(chars.slice(i, i + perCol));
-  const step = fontSize * 1.1;
-  const totalW = Math.max(1, cols.length) * step;
-  const centerX = (x1 + x2) / 2;
-  const startX = centerX + totalW / 2 - step / 2;
-  const centerY = (y1 + y2) / 2;
-  const startY = centerY - (Math.min(perCol, cols[0]?.length || 1) * step) / 2 + fontSize * 0.35;
-  return cols.map((col, i) => ({
-    x: startX - i * step,
-    y: startY,
-    chars: col.slice(0, Math.floor((y2 - y1 - insetY) / step) + 1),
-  }));
+  const step = fs * 1.1;
+  const total = Math.max(1, cols.length) * step;
+  const startX = (x1 + x2) / 2 + total / 2 - step / 2;
+  const rows = Math.min(perCol, cols[0]?.length || 1);
+  const startY = (y1 + y2) / 2 - (rows * step) / 2 + fs * 0.4;
+  return cols.map((col, i) => ({ x: startX - i * step, y: startY, chars: col }));
 }
 
-/** 横排文字：按框宽自动折行 */
-function horizontalLines(text, bbox, fontSize) {
+/** 横排：按宽度折行，整体居中 */
+function horizontalLines(text, bbox, fs) {
   const [x1, y1, x2, y2] = bbox;
-  const usableW = Math.max(fontSize * 2, x2 - x1 - 10);
-  const perLine = Math.max(1, Math.floor(usableW / (fontSize * 1.02)));
-  const out = [];
+  const perLine = Math.max(1, Math.floor((x2 - x1 - 12) / (fs * 1.02)));
+  const lines = [];
   for (const raw of String(text || '').split('\n')) {
     const chars = [...raw];
-    for (let i = 0; i < chars.length; i += perLine) out.push(chars.slice(i, i + perLine).join(''));
-    if (!chars.length) out.push('');
+    for (let i = 0; i < chars.length; i += perLine) lines.push(chars.slice(i, i + perLine).join(''));
+    if (!chars.length) lines.push('');
   }
-  const maxLines = Math.max(1, Math.floor((y2 - y1 - 8) / (fontSize * 1.3)));
-  return out.slice(0, maxLines);
+  const maxLines = Math.max(1, Math.floor((y2 - y1 - 24) / (fs * 1.35)));
+  const shown = lines.slice(0, maxLines);
+  const startY = (y1 + y2) / 2 - (shown.length * fs * 1.35) / 2 + fs;
+  return shown.map((line, i) => ({ x: (x1 + x2) / 2, y: startY + i * fs * 1.35, text: line }));
 }
 
-function Bubble({ bubble, selected, onSelect, onDragStart }) {
-  const t = bubble.type || 'speech';
-  const [x1, y1, x2, y2] = bubble.bbox;
-  const fs = bubble.size || 22;
-  const bare = t === 'narration' || t === 'sfx';
-  const dashed = t === 'heart';
-  const wavy = t === 'tremble';
-  const burst = t === 'shout';
-  const cloud = t === 'thought';
+function ItemBox({ item, page, index, selected, onSelect, onDragStart, onBegin }) {
+  const [x1, y1, x2, y2] = item.bbox;
+  const w = Math.max(0, x2 - x1);
+  const h = Math.max(0, y2 - y1);
+  const isBubble = item.type === 'bubble';
+  const isNative = item.type === 'native';
 
-  const common = {
-    class: `bub-shape ${selected ? 'sel' : ''}`,
-    onPointerDown: (e) => {
-      e.stopPropagation();
-      onSelect?.({ kind: 'bubble', id: bubble.id });
-      onDragStart?.(e, 'bubble', bubble.id, 'move');
-    },
-  };
+  const label = isBubble
+    ? `【${BUBBLE_LABEL[item.kind] || item.kind}】`
+    : isNative
+      ? `原生 · ${item.label}`
+      : `格${index + 1} · ${CAMERA_LABEL[item.camera] || ''}${SHAPE_LABEL[item.shape] ? ` / ${SHAPE_LABEL[item.shape]}` : ''}`;
 
-  let shape = null;
-  if (!bare) {
-    if (burst) {
-      shape = html`<path ...${common} d=${toPath(starPoints(bubble.bbox))} />`;
-    } else if (cloud) {
-      shape = html`<g ...${{ onPointerDown: common.onPointerDown }}>
-        <ellipse class=${common.class} cx=${(x1 + x2) / 2} cy=${(y1 + y2) / 2} rx=${(x2 - x1) / 2} ry=${(y2 - y1) / 2} />
-        <ellipse
-          class=${common.class}
-          cx=${(x1 + x2) / 2}
-          cy=${(y1 + y2) / 2}
-          rx=${(x2 - x1) / 2 - fs * 0.35}
-          ry=${(y2 - y1) / 2 - fs * 0.35}
-          stroke-dasharray="5 4"
-        />
-      </g>`;
-    } else {
-      shape = html`<ellipse
-        ...${common}
-        cx=${(x1 + x2) / 2}
-        cy=${(y1 + y2) / 2}
-        rx=${(x2 - x1) / 2}
-        ry=${(y2 - y1) / 2}
-        stroke-dasharray=${wavy ? '3 3' : dashed ? '7 5' : 'none'}
-      />`;
-    }
-  }
-  const columns = bubble.vertical === false ? [] : verticalLines(bubble.text, bubble.bbox, fs);
-  const rows = bubble.vertical === false ? horizontalLines(bubble.text, bubble.bbox, fs) : [];
+  const fs = isBubble ? Math.max(10, Math.min(Number(item.size) || 22, Math.min(w, h) / 2)) : Math.max(9, Math.min(w / 18, h / 6, 16));
+  const body = isBubble ? item.text : isNative ? item.text || item.caption : item.caption;
+
+  const vertical = isBubble && isVertical(page, item);
+  const cols = vertical ? verticalColumns(body, item.bbox, fs) : [];
+  const rows = !vertical ? horizontalLines(body, item.bbox, fs) : [];
 
   return html`<g>
-    ${shape}
     <rect
+      class=${`item-box ${item.type} ${selected ? 'sel' : ''}`}
       x=${x1}
       y=${y1}
-      width=${x2 - x1}
-      height=${y2 - y1}
-      fill="transparent"
-      style="cursor:move"
-      onPointerDown=${(e) => {
-        e.stopPropagation();
-        onSelect?.({ kind: 'bubble', id: bubble.id });
-        onDragStart?.(e, 'bubble', bubble.id, 'move');
-      }}
+      width=${w}
+      height=${h}
+      rx=${isNative ? 2 : 0}
     />
-    ${bubble.vertical === false
-      ? html`<text class="bub-text" x=${x1 + 6} y=${y1 + fs + 2} font-size=${fs}>
-          ${rows.map((line, i) => html`<tspan x=${x1 + 6} dy=${i === 0 ? 0 : fs * 1.3}>${line}</tspan>`)}
-        </text>`
-      : columns.map(
-          (col) => html`<text class="bub-text" x=${col.x} y=${col.y} font-size=${fs} text-anchor="middle">
-            ${col.chars.map((ch, i) => html`<tspan x=${col.x} dy=${i === 0 ? 0 : fs * 1.1}>${ch}</tspan>`)}
-          </text>`
-        )}
-  </g>`;
-}
-
-function Panel({ panel, index, selected, onSelect, onDragStart, hasImage }) {
-  const [x1, y1, x2, y2] = panel.bbox;
-  const bleed = String(panel.shape || '').startsWith('bleed');
-  const clip = shapeClip(panel.shape, panel.bbox);
-  const isCircle = panel.shape === 'circle';
-  const cx = (x1 + x2) / 2;
-  const cy = (y1 + y2) / 2;
-  const boxClass = `pn-box ${bleed ? 'bleed' : ''} ${selected ? 'sel' : ''} ${hasImage ? 'overlay' : ''}`;
-
-  return html`<g>
-    ${clip
-      ? html`<path class=${boxClass} d=${toPath(clip)} />`
-      : isCircle
-        ? html`<ellipse class=${boxClass} cx=${cx} cy=${cy} rx=${(x2 - x1) / 2} ry=${(y2 - y1) / 2} />`
-        : html`<rect class=${boxClass} x=${x1} y=${y1} width=${x2 - x1} height=${y2 - y1} />`}
-    <text class="pn-index" x=${x1 + 6} y=${y1 + 16}>${String(index + 1).padStart(2, '0')}${panel.camera ? ` · ${panel.camera}` : ''}</text>
+    ${isBubble
+      ? html`<text class="item-tag bubble" x=${x1 + 5} y=${y1 + 13}>${label}</text>`
+      : html`<text class="item-tag" x=${x1 + 5} y=${y1 + 13}>${label}</text>`}
+    ${vertical
+      ? cols.map((col) => html`<text class="item-text" x=${col.x} y=${col.y} font-size=${fs} text-anchor="middle">
+          ${col.chars.map((ch, i) => html`<tspan x=${col.x} dy=${i === 0 ? 0 : fs * 1.1}>${ch}</tspan>`)}
+        </text>`)
+      : rows.map((row) => html`<text class="item-text" x=${row.x} y=${row.y} font-size=${fs} text-anchor="middle">${row.text}</text>`)}
+    ${isNative ? html`<text class="item-tag" x=${x1 + 5} y=${y2 - 6}>native · ${item.caption?.slice(0, 30) || ''}</text>` : null}
     <rect
       x=${x1}
       y=${y1}
-      width=${Math.max(0, x2 - x1)}
-      height=${Math.max(0, y2 - y1)}
+      width=${w}
+      height=${h}
       fill="transparent"
       style="cursor:move"
       onPointerDown=${(e) => {
         e.stopPropagation();
-        onSelect?.({ kind: 'panel', id: panel.id });
-        onDragStart?.(e, 'panel', panel.id, 'move');
+        onBegin?.();
+        onSelect?.({ kind: item.type, id: item.id });
+        onDragStart?.(e, item.id, 'move');
       }}
     />
   </g>`;
 }
 
-export default function Canvas({ page, image, scale, selection, onSelect, onChange, onCommit }) {
+export default function Canvas({ page, image, imageOpacity = 1, scale, selection, onSelect, onBegin, onChange, onCommit }) {
   const [W, H] = page.size;
   const svgRef = useRef(null);
   const dragRef = useRef(null);
@@ -190,46 +144,36 @@ export default function Canvas({ page, image, scale, selection, onSelect, onChan
 
   function pointOf(event) {
     const rect = svgRef.current.getBoundingClientRect();
-    return {
-      x: ((event.clientX - rect.left) / rect.width) * W,
-      y: ((event.clientY - rect.top) / rect.height) * H,
-    };
+    return { x: ((event.clientX - rect.left) / rect.width) * W, y: ((event.clientY - rect.top) / rect.height) * H };
   }
 
-  function edgesToSnap() {
+  function edges() {
     const xs = [0, W / 2, W];
     const ys = [0, H / 2, H];
-    for (const p of page.panels) {
-      xs.push(p.bbox[0], p.bbox[2]);
-      ys.push(p.bbox[1], p.bbox[3]);
+    for (const item of page.items) {
+      xs.push(item.bbox[0], item.bbox[2]);
+      ys.push(item.bbox[1], item.bbox[3]);
     }
     return { xs, ys };
   }
 
-  function snapValue(value, candidates) {
+  function snap(value, candidates) {
     let best = value;
-    let bestDist = SNAP + 1;
+    let dist = SNAP + 1;
     for (const c of candidates) {
-      const dist = Math.abs(value - c);
-      if (dist < bestDist) {
-        bestDist = dist;
+      const d = Math.abs(value - c);
+      if (d < dist) {
+        dist = d;
         best = c;
       }
     }
-    return bestDist <= SNAP ? best : value;
+    return dist <= SNAP ? best : value;
   }
 
-  function startDrag(event, kind, id, mode) {
-    const item = kind === 'panel' ? page.panels.find((p) => p.id === id) : page.bubbles.find((b) => b.id === id);
+  function startDrag(event, id, mode) {
+    const item = page.items.find((it) => it.id === id);
     if (!item) return;
-    dragRef.current = {
-      kind,
-      id,
-      mode,
-      startPoint: pointOf(event),
-      origin: [...item.bbox],
-      moved: false,
-    };
+    dragRef.current = { id, mode, start: pointOf(event), origin: [...item.bbox], moved: false };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp, { once: true });
   }
@@ -238,25 +182,24 @@ export default function Canvas({ page, image, scale, selection, onSelect, onChan
     const drag = dragRef.current;
     if (!drag) return;
     const pt = pointOf(event);
-    const dx = pt.x - drag.startPoint.x;
-    const dy = pt.y - drag.startPoint.y;
+    const dx = pt.x - drag.start.x;
+    const dy = pt.y - drag.start.y;
     const [x1, y1, x2, y2] = drag.origin;
     let bbox;
-    const { xs, ys } = edgesToSnap();
+    const { xs, ys } = edges();
 
     if (drag.mode === 'move') {
       bbox = [x1 + dx, y1 + dy, x2 + dx, y2 + dy];
-      // 整块移动时让左边缘吸附
-      const snappedX = snapValue(bbox[0], xs);
-      const snappedY = snapValue(bbox[1], ys);
-      const offX = snappedX - bbox[0];
-      const offY = snappedY - bbox[1];
-      bbox = [bbox[0] + offX, bbox[1] + offY, bbox[2] + offX, bbox[3] + offY];
+      const sx = snap(bbox[0], xs);
+      const sy = snap(bbox[1], ys);
+      const ox = sx - bbox[0];
+      const oy = sy - bbox[1];
+      bbox = [bbox[0] + ox, bbox[1] + oy, bbox[2] + ox, bbox[3] + oy];
       setGuides(
-        Math.abs(offX) > 0.5 || Math.abs(offY) > 0.5
+        Math.abs(ox) > 0.5 || Math.abs(oy) > 0.5
           ? [
-              ...(Math.abs(offX) > 0.5 ? [{ x: snappedX, y1: 0, y2: H }] : []),
-              ...(Math.abs(offY) > 0.5 ? [{ y: snappedY, x1: 0, x2: W }] : []),
+              ...(Math.abs(ox) > 0.5 ? [{ x: sx, y1: 0, y2: H }] : []),
+              ...(Math.abs(oy) > 0.5 ? [{ y: sy, x1: 0, x2: W }] : []),
             ]
           : []
       );
@@ -276,9 +219,8 @@ export default function Canvas({ page, image, scale, selection, onSelect, onChan
       }
     }
 
-    bbox = bbox.map((v) => Math.round(v));
     drag.moved = true;
-    onChange(drag.kind, drag.id, bbox);
+    onChange(drag.id, bbox.map((v) => Math.round(v)));
   }
 
   function onUp() {
@@ -286,17 +228,12 @@ export default function Canvas({ page, image, scale, selection, onSelect, onChan
     window.removeEventListener('pointermove', onMove);
     setGuides([]);
     dragRef.current = null;
-    if (drag?.moved) onCommit?.(drag.kind, drag.id);
+    if (drag?.moved) onCommit?.();
   }
 
-  useEffect(
-    () => () => {
-      window.removeEventListener('pointermove', onMove);
-    },
-    []
-  );
+  useEffect(() => () => window.removeEventListener('pointermove', onMove), []);
 
-  const handlesFor = (bbox) => {
+  const handles = (bbox) => {
     const [x1, y1, x2, y2] = bbox;
     const mx = (x1 + x2) / 2;
     const my = (y1 + y2) / 2;
@@ -312,12 +249,8 @@ export default function Canvas({ page, image, scale, selection, onSelect, onChan
     ];
   };
 
-  const selectedItem =
-    selection?.kind === 'panel'
-      ? page.panels.find((p) => p.id === selection.id)
-      : selection?.kind === 'bubble'
-        ? page.bubbles.find((b) => b.id === selection.id)
-        : null;
+  const selectedItem = selection ? page.items.find((it) => it.id === selection.id) : null;
+  const panelIndex = (item) => page.items.filter((it) => it.type === 'panel').findIndex((it) => it.id === item.id);
 
   return html`<div class="page-frame">
     <div class="paper" style=${`width:${W * scale}px;height:${H * scale}px`}>
@@ -329,27 +262,16 @@ export default function Canvas({ page, image, scale, selection, onSelect, onChan
         onPointerDown=${() => onSelect?.(null)}
       >
         <rect x="0" y="0" width=${W} height=${H} fill="#ffffff" />
-        ${image
-          ? html`<image href=${image} x="0" y="0" width=${W} height=${H} preserveAspectRatio="xMidYMid slice" />`
-          : null}
+        ${image ? html`<image href=${image} x="0" y="0" width=${W} height=${H} preserveAspectRatio="xMidYMid slice" opacity=${imageOpacity} />` : null}
 
-        <rect class="safe-line" x="8" y="8" width=${W - 16} height=${H - 16} />
-
-        ${page.panels.map((panel, i) => html`<${Panel}
-          key=${panel.id}
-          panel=${panel}
-          index=${i}
-          hasImage=${Boolean(image)}
-          selected=${selection?.kind === 'panel' && selection.id === panel.id}
+        ${page.items.map((item, i) => html`<${ItemBox}
+          key=${item.id}
+          item=${item}
+          page=${page}
+          index=${item.type === 'panel' ? panelIndex(item) : i}
+          selected=${selection?.id === item.id}
           onSelect=${onSelect}
-          onDragStart=${startDrag}
-        />`)}
-
-        ${page.bubbles.map((bubble) => html`<${Bubble}
-          key=${bubble.id}
-          bubble=${bubble}
-          selected=${selection?.kind === 'bubble' && selection.id === bubble.id}
-          onSelect=${onSelect}
+          onBegin=${onBegin}
           onDragStart=${startDrag}
         />`)}
 
@@ -360,17 +282,17 @@ export default function Canvas({ page, image, scale, selection, onSelect, onChan
         )}
 
         ${selectedItem
-          ? handlesFor(selectedItem.bbox).map(
+          ? handles(selectedItem.bbox).map(
               ([mode, x, y]) =>
                 html`<rect
                   class=${`handle ${mode}`}
-                  x=${x - 4}
-                  y=${y - 4}
-                  width="8"
-                  height="8"
+                  x=${x - 6}
+                  y=${y - 6}
+                  width="12"
+                  height="12"
                   onPointerDown=${(e) => {
                     e.stopPropagation();
-                    startDrag(e, selection.kind, selection.id, mode);
+                    startDrag(e, selectedItem.id, mode);
                   }}
                 />`
             )

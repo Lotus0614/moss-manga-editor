@@ -1,5 +1,5 @@
 // 编辑页：左页序 / 中画布 + 工作台 / 右属性面板。
-// 页面文档是唯一可编辑真源，编译预览在浏览器里现算（core/compile.mjs 由服务端托管）。
+// 页面是单层 items；快捷键 Delete 删除、Ctrl+C/V 复制粘贴、Ctrl+Z 撤销。
 
 import {
   html,
@@ -20,20 +20,20 @@ import {
   CAMERA_LABELS,
   SHAPE_LABELS,
   FRAME_LABELS,
-  PRESET_LABELS,
 } from '../lib.mjs';
 import Canvas from '../components/canvas.mjs';
 import { exportLongImage, exportPdf } from '../components/export.mjs';
 import { compilePage } from '../../core/compile.mjs';
 import { compileContext } from '../../core/bible.mjs';
-import { applyPreset } from '../../core/presets.mjs';
-import { createPanel, createBubble } from '../../core/manga-doc.mjs';
+import { createPanelItem, createBubbleItem } from '../../core/manga-doc.mjs';
 
 const STYLE_LABELS = [
   ['mono', '黑白网点'],
   ['color', '彩色'],
   ['sketch', '线稿'],
 ];
+
+const TYPE_NAME = { panel: '分格', bubble: '文字', native: '原生项' };
 
 export default function EditorPage({ projectId, pageId, config, onOpenSettings }) {
   const [project, setProject] = useState(null);
@@ -47,6 +47,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const [gen, setGen] = useState(null);
   const [busyGen, setBusyGen] = useState(false);
   const [scale, setScale] = useState(0.55);
+  const [opacity, setOpacity] = useState(0.55);
   const [changes, setChanges] = useState(null);
   const [showExport, setShowExport] = useState(false);
   const [exporting, setExporting] = useState('');
@@ -55,6 +56,8 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const pageRef = useRef(null);
   const saveTimer = useRef(null);
   const createdFirst = useRef(false);
+  const history = useRef([]);
+  const clipboard = useRef(null);
 
   useEffect(() => {
     pageRef.current = page;
@@ -88,10 +91,12 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
       .then((data) => {
         if (!alive) return;
         setPage(data.page);
+        pageRef.current = data.page;
         setVersions(data.versions || []);
         setCurrent(data.current || '');
         setApp({ page: data.page });
         setSelection(null);
+        history.current = [];
       })
       .catch((err) => toast(err.message, 'bad'));
     return () => {
@@ -150,6 +155,38 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     return () => es.close();
   }, [projectId]);
 
+  // ---- 快捷键
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = (e.target?.tagName || '').toLowerCase();
+      const typing = tag === 'input' || tag === 'textarea' || e.target?.isContentEditable;
+      const mod = e.ctrlKey || e.metaKey;
+
+      if (mod && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        undo();
+        return;
+      }
+      if (typing) return;
+      if (mod && e.key.toLowerCase() === 'c') {
+        copySelected();
+        return;
+      }
+      if (mod && e.key.toLowerCase() === 'v') {
+        paste();
+        return;
+      }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selection) {
+          e.preventDefault();
+          removeItem(selection.id);
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selection]);
+
   function refreshPages() {
     api(`/api/projects/${projectId}/pages`)
       .then((data) => {
@@ -163,19 +200,75 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     api(`/api/projects/${projectId}/pages/${id}`)
       .then((data) => {
         setPage(data.page);
+        pageRef.current = data.page;
         setVersions(data.versions || []);
         setCurrent(data.current || '');
       })
       .catch(() => {});
   }
 
-  function updatePage(patch) {
-    setPage((prev) => {
-      const next = typeof patch === 'function' ? patch(prev) : { ...prev, ...patch };
-      pageRef.current = next;
-      return next;
-    });
+  // ---- 修改与历史
+  function snapshot() {
+    const cur = pageRef.current;
+    if (!cur) return;
+    const json = JSON.stringify(cur);
+    if (history.current[history.current.length - 1] === json) return;
+    history.current.push(json);
+    if (history.current.length > 80) history.current.shift();
+  }
+
+  function mutate(updater) {
+    const cur = pageRef.current;
+    if (!cur) return;
+    snapshot();
+    const next = typeof updater === 'function' ? updater(cur) : { ...cur, ...updater };
+    pageRef.current = next;
+    setPage(next);
     scheduleSave();
+  }
+
+  /** 拖拽过程中只更新视图，不进历史 */
+  function updateBbox(id, bbox) {
+    const cur = pageRef.current;
+    if (!cur) return;
+    const next = { ...cur, items: cur.items.map((it) => (it.id === id ? { ...it, bbox } : it)) };
+    pageRef.current = next;
+    setPage(next);
+  }
+
+  function undo() {
+    const snap = history.current.pop();
+    if (!snap) {
+      toast('没有可撤销的操作');
+      return;
+    }
+    const prev = JSON.parse(snap);
+    pageRef.current = prev;
+    setPage(prev);
+    setSelection(null);
+    saveNow();
+  }
+
+  function copySelected() {
+    const cur = pageRef.current;
+    const item = cur?.items.find((it) => it.id === selection?.id);
+    if (!item) return;
+    clipboard.current = JSON.parse(JSON.stringify(item));
+    toast(`已复制${TYPE_NAME[item.type] || '项'}`);
+  }
+
+  function paste() {
+    const src = clipboard.current;
+    if (!src) return;
+    const patch = {
+      ...src,
+      id: undefined,
+      bbox: [src.bbox[0] + 24, src.bbox[1] + 24, src.bbox[2] + 24, src.bbox[3] + 24],
+    };
+    const created = src.type === 'bubble' ? createBubbleItem(patch) : src.type === 'native' ? patch : createPanelItem(patch);
+    mutate((cur) => ({ ...cur, items: [...cur.items, created] }));
+    setSelection({ kind: created.type, id: created.id });
+    setTimeout(saveNow, 60);
   }
 
   function scheduleSave() {
@@ -194,16 +287,6 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     } catch (err) {
       toast(err.message, 'bad');
     }
-  }
-
-  function onCanvasChange(kind, id, bbox) {
-    setPage((prev) => {
-      if (!prev) return prev;
-      const key = kind === 'panel' ? 'panels' : 'bubbles';
-      const next = { ...prev, [key]: prev[key].map((item) => (item.id === id ? { ...item, bbox } : item)) };
-      pageRef.current = next;
-      return next;
-    });
   }
 
   const compiled = useMemo(() => {
@@ -232,9 +315,9 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     }
   }
 
-  async function addPage(preset = 'band-3') {
+  async function addPage() {
     try {
-      const doc = await apiPost(`/api/projects/${projectId}/pages`, { preset });
+      const doc = await apiPost(`/api/projects/${projectId}/pages`, {});
       refreshPages();
       go(`/p/${projectId}/p/${doc.id}`);
     } catch (err) {
@@ -312,11 +395,30 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const warnings = compiled?.warnings || [];
   const errors = warnings.filter((w) => w.level === 'error');
   const warns = warnings.filter((w) => w.level === 'warn');
-  const selectedPanel = selection?.kind === 'panel' ? page.panels.find((p) => p.id === selection.id) : null;
-  const selectedBubble = selection?.kind === 'bubble' ? page.bubbles.find((b) => b.id === selection.id) : null;
+  const selected = selection ? page.items.find((it) => it.id === selection.id) : null;
   const version = versions.find((v) => v.id === current) || versions.slice(-1)[0];
   const image = version?.image || '';
   const generating = busyGen || Boolean(gen && (gen.status === 'queued' || gen.status === 'running'));
+
+  function addItem(type) {
+    const item =
+      type === 'bubble'
+        ? createBubbleItem({ bbox: [420, 120, 700, 320], text: '新台词' })
+        : createPanelItem({ bbox: [40, 420, 728, 780], caption: '' });
+    mutate((cur) => ({ ...cur, items: [...cur.items, item] }));
+    setSelection({ kind: item.type, id: item.id });
+    setTimeout(saveNow, 60);
+  }
+
+  function removeItem(id) {
+    mutate((cur) => ({ ...cur, items: cur.items.filter((it) => it.id !== id) }));
+    setSelection(null);
+    setTimeout(saveNow, 60);
+  }
+
+  function patchItem(id, patch) {
+    mutate((cur) => ({ ...cur, items: cur.items.map((it) => (it.id === id ? { ...it, ...patch } : it)) }));
+  }
 
   return html`<div class="editor">
     <aside class="rail">
@@ -326,13 +428,13 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
           (p) => html`<div class=${cls('pg', p.id === page.id && 'on')} key=${p.id} onClick=${() => go(`/p/${projectId}/p/${p.id}`)}>
             <span class="n">${String(p.index).padStart(2, '0')}</span>
             <div class="thumb">
-              ${p.cover ? html`<img src=${p.cover} alt="" loading="lazy" />` : html`<span class="ghost">${p.panels}格</span>`}
+              ${p.cover ? html`<img src=${p.cover} alt="" loading="lazy" />` : html`<span class="ghost">${p.items}项</span>`}
             </div>
           </div>`
         )}
       </div>
       <div class="rail-foot">
-        <button class="btn sm grow" onClick=${() => addPage('band-3')}>＋ 新页</button>
+        <button class="btn sm grow" onClick=${addPage}>＋ 新页</button>
         <button class="btn sm ghost" onClick=${removePage}>删</button>
       </div>
     </aside>
@@ -341,18 +443,25 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
       <div class="work-head">
         <input
           class="input"
-          style="width:180px;border-color:var(--line);padding:2px 6px;font-size:12px"
+          style="width:160px;border-color:var(--line);padding:2px 6px;font-size:12px"
           value=${page.title || ''}
           placeholder=${`第 ${page.index} 页`}
-          onInput=${(e) => updatePage({ title: e.currentTarget.value })}
+          onInput=${(e) => mutate({ title: e.currentTarget.value })}
         />
-        <span class="meta">${page.size[0]}×${page.size[1]} · ${page.panels.length}格 ${page.bubbles.length}字 · rev ${page.rev}</span>
+        <span class="meta">${page.size[0]}×${page.size[1]} · ${page.items.length} 项 · rev ${page.rev}</span>
         ${errors.length
           ? html`<span class="tag" style="background:#000;color:#fff">${errors.length} 个错误</span>`
           : warns.length
             ? html`<span class="tag">${warns.length} 个提醒</span>`
             : null}
         <div class="spacer"></div>
+        ${image
+          ? html`<label class="meta" style="display:flex;align-items:center;gap:5px">
+              图
+              <input type="range" min="0" max="1" step="0.05" value=${opacity} style="width:70px" onInput=${(e) => setOpacity(Number(e.currentTarget.value))} />
+            </label>`
+          : null}
+        <button class="btn ghost" onClick=${undo} title="Ctrl+Z">撤销</button>
         <button class="btn ghost" onClick=${() => setShowExport(true)}>导出</button>
         <button class="btn inv" disabled=${errors.length > 0 || generating} onClick=${generate}>
           ${generating ? `生成中 ${gen?.progress || 0}%` : '生成'}
@@ -363,10 +472,12 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         <${Canvas}
           page=${page}
           image=${image}
+          imageOpacity=${opacity}
           scale=${scale}
           selection=${selection}
           onSelect=${setSelection}
-          onChange=${onCanvasChange}
+          onBegin=${snapshot}
+          onChange=${updateBbox}
           onCommit=${saveNow}
         />
       </div>
@@ -394,10 +505,8 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     </section>
 
     <aside class="inspect">
-      <div class="inspect-head">属性${selection ? ' · 选中项' : ''}</div>
-      <div class="inspect-body">
-        ${selectedPanel ? panelForm(selectedPanel) : selectedBubble ? bubbleForm(selectedBubble) : pageForm()}
-      </div>
+      <div class="inspect-head">${selected ? `${TYPE_NAME[selected.type]}属性` : '页面属性'}</div>
+      <div class="inspect-body">${selected ? itemForm(selected) : pageForm()}</div>
     </aside>
 
     ${showExport
@@ -419,213 +528,208 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
       : null}
   </div>`;
 
-  // ---------------------------------------------------------------- 右栏：页面
+  // ---------------------------------------------------------------- 页面属性
 
   function pageForm() {
     return html`<div class="col">
-      <div class="field">
-        <label>阅读顺序</label>
-        <select class="select" value=${page.reading} onChange=${(e) => updatePage({ reading: e.currentTarget.value })}>
-          <option value="rtl">右 → 左</option>
-          <option value="ltr">左 → 右</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>画风</label>
-        <select class="select" value=${page.style} onChange=${(e) => updatePage({ style: e.currentTarget.value })}>
-          ${STYLE_LABELS.map(([v, n]) => html`<option value=${v}>${n}</option>`)}
-        </select>
-      </div>
-      <div class="field">
-        <label>场景（写进 SETTING）</label>
-        <textarea
-          class="textarea"
-          style="min-height:52px"
-          value=${page.scene || ''}
-          placeholder="a half-empty train carriage, fluorescent light"
-          onInput=${(e) => updatePage({ scene: e.currentTarget.value })}
-        ></textarea>
-      </div>
-      <div class="field">
-        <label>补充说明（追加在 summary 末尾）</label>
-        <textarea
-          class="textarea"
-          style="min-height:52px"
-          value=${page.note || ''}
-          onInput=${(e) => updatePage({ note: e.currentTarget.value })}
-        ></textarea>
-      </div>
-
-      <div class="divider"></div>
-      <span class="label">版式</span>
-      <div class="row wrap">
-        ${PRESET_LABELS.map(
-          ([id, name]) => html`<button class="chip ghost" onClick=${() => {
-            updatePage((prev) => applyPreset(prev, id));
-            setTimeout(saveNow, 60);
-          }}>${name}</button>`
-        )}
-      </div>
-      <div class="row wrap">
-        <button class="chip" onClick=${() => { setSelection(null); updatePage({ panels: [...page.panels, createPanel()] }); setTimeout(saveNow, 60); }}>＋格</button>
-        <button class="chip" onClick=${() => { updatePage({ bubbles: [...page.bubbles, createBubble({ text: '新台词' })] }); setTimeout(saveNow, 60); }}>＋文字</button>
-      </div>
-
-      <div class="divider"></div>
-      <span class="label">这一页</span>
-      <div class="col" style="gap:4px">
-        ${page.panels.map(
-          (p, i) => html`<div class="rowitem" onClick=${() => setSelection({ kind: 'panel', id: p.id })}>
-            <span class="mono small">格${i + 1}</span>
-            <span class="grow ellipsis">${p.caption || '（未写描述）'}</span>
-          </div>`
-        )}
-        ${page.bubbles.map(
-          (b, i) => html`<div class="rowitem" onClick=${() => setSelection({ kind: 'bubble', id: b.id })}>
-            <span class="mono small">字${i + 1}</span>
-            <span class="grow ellipsis">${b.text || '（空）'}</span>
-          </div>`
-        )}
-      </div>
-    </div>`;
-  }
-
-  // ---------------------------------------------------------------- 右栏：分格
-
-  function panelForm(panel) {
-    return html`<div class="col">
-      <div class="row">
-        <button class="btn sm ghost" onClick=${() => setSelection(null)}>← 返回</button>
-        <div class="spacer"></div>
-        <button class="btn sm ghost" onClick=${() => removePanel(panel.id)}>删除</button>
-      </div>
-      <div class="field">
-        <label>这一格画什么</label>
-        <textarea
-          class="textarea"
-          style="min-height:96px"
-          value=${panel.caption || ''}
-          placeholder="谁 + 在哪 + 做什么，只写画面"
-          onInput=${(e) => updatePanel(panel.id, { caption: e.currentTarget.value })}
-        ></textarea>
-      </div>
-      <div class="field">
-        <label>机位</label>
-        <select class="select" value=${panel.camera} onChange=${(e) => updatePanel(panel.id, { camera: e.currentTarget.value })}>
-          ${CAMERA_LABELS.map(([v, n]) => html`<option value=${v}>${n}</option>`)}
-        </select>
-      </div>
-      <div class="field">
-        <label>形状</label>
-        <select class="select" value=${panel.shape} onChange=${(e) => updatePanel(panel.id, { shape: e.currentTarget.value })}>
-          ${SHAPE_LABELS.map(([v, n]) => html`<option value=${v}>${n}</option>`)}
-        </select>
-      </div>
-      <div class="field">
-        <label>边框</label>
-        <select class="select" value=${panel.frame} onChange=${(e) => updatePanel(panel.id, { frame: e.currentTarget.value })}>
-          ${FRAME_LABELS.map(([v, n]) => html`<option value=${v}>${n}</option>`)}
-        </select>
-      </div>
-      <div class="field">
-        <label>坐标 x1 / y1 / x2 / y2</label>
-        <div class="row">
-          ${panel.bbox.map(
-            (v, i) => html`<input
-              class="input"
-              type="number"
-              style="width:25%"
-              value=${Math.round(v)}
-              onInput=${(e) => {
-                const bbox = [...panel.bbox];
-                bbox[i] = Number(e.currentTarget.value);
-                updatePanel(panel.id, { bbox });
-              }}
-            />`
-          )}
+      <div class="row2">
+        <div class="field">
+          <label>阅读顺序</label>
+          <select class="select" value=${page.reading} onChange=${(e) => mutate({ reading: e.currentTarget.value })}>
+            <option value="rtl">右 → 左</option>
+            <option value="ltr">左 → 右</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>画风</label>
+          <select class="select" value=${page.style} onChange=${(e) => mutate({ style: e.currentTarget.value })}>
+            ${STYLE_LABELS.map(([v, n]) => html`<option value=${v}>${n}</option>`)}
+          </select>
         </div>
       </div>
+
+      <div class="field">
+        <label>文字排版（全局）</label>
+        <div class="row">
+          <button
+            class=${cls('chip', page.vertical !== false ? 'on' : 'ghost')}
+            onClick=${() =>
+              mutate((cur) => ({
+                ...cur,
+                vertical: true,
+                items: cur.items.map((it) => (it.type === 'bubble' ? { ...it, vertical: undefined } : it)),
+              }))}
+          >全部竖排</button>
+          <button
+            class=${cls('chip', page.vertical === false ? 'on' : 'ghost')}
+            onClick=${() =>
+              mutate((cur) => ({
+                ...cur,
+                vertical: false,
+                items: cur.items.map((it) => (it.type === 'bubble' ? { ...it, vertical: undefined } : it)),
+              }))}
+          >全部横排</button>
+        </div>
+        <span class="hint">单条文字可以在它的属性里单独覆盖。</span>
+      </div>
+
+      <div class="field">
+        <label>场景（写进 SETTING）</label>
+        <textarea class="textarea" style="min-height:48px" value=${page.scene || ''} onInput=${(e) => mutate({ scene: e.currentTarget.value })}></textarea>
+      </div>
+      <div class="field">
+        <label>补充说明</label>
+        <textarea class="textarea" style="min-height:48px" value=${page.note || ''} onInput=${(e) => mutate({ note: e.currentTarget.value })}></textarea>
+      </div>
+
+      <div class="divider"></div>
+      <div class="row wrap">
+        <button class="chip" onClick=${() => addItem('panel')}>＋ 分格</button>
+        <button class="chip" onClick=${() => addItem('bubble')}>＋ 文字</button>
+      </div>
+
+      <div class="divider"></div>
+      <span class="label">本页内容（点选编辑）</span>
+      <div class="col" style="gap:3px">
+        ${page.items.length
+          ? page.items.map(
+              (it, i) => html`<div class="rowitem" onClick=${() => setSelection({ kind: it.type, id: it.id })}>
+                <span class="mono small">${TYPE_NAME[it.type]}${it.type === 'panel' ? i + 1 : ''}</span>
+                <span class="grow ellipsis">${(it.type === 'bubble' ? it.text : it.caption) || '（空）'}</span>
+              </div>`
+            )
+          : html`<span class="hint">还没有内容，点上面的按钮加一个框。</span>`}
+      </div>
     </div>`;
   }
 
-  // ---------------------------------------------------------------- 右栏：文字
+  // ---------------------------------------------------------------- item 属性
 
-  function bubbleForm(bubble) {
-    return html`<div class="col">
+  function itemForm(item) {
+    const bboxInputs = html`<div class="field">
+      <label>坐标 x1 / y1 / x2 / y2</label>
       <div class="row">
-        <button class="btn sm ghost" onClick=${() => setSelection(null)}>← 返回</button>
-        <div class="spacer"></div>
-        <button class="btn sm ghost" onClick=${() => removeBubble(bubble.id)}>删除</button>
+        ${item.bbox.map(
+          (v, i) => html`<input
+            class="input"
+            type="number"
+            style="width:25%"
+            value=${Math.round(v)}
+            onInput=${(e) => {
+              const bbox = [...item.bbox];
+              bbox[i] = Number(e.currentTarget.value);
+              patchItem(item.id, { bbox });
+            }}
+          />`
+        )}
       </div>
+    </div>`;
+
+    const header = html`<div class="row">
+      <button class="btn sm ghost" onClick=${() => setSelection(null)}>← 返回</button>
+      <div class="spacer"></div>
+      <button class="btn sm ghost" onClick=${copySelected}>复制</button>
+      <button class="btn sm ghost" onClick=${() => removeItem(item.id)}>删除</button>
+    </div>`;
+
+    if (item.type === 'bubble') {
+      return html`<div class="col">
+        ${header}
+        <div class="field">
+          <label>文字</label>
+          <textarea class="textarea" style="min-height:90px" value=${item.text || ''} onInput=${(e) => patchItem(item.id, { text: e.currentTarget.value })}></textarea>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>类型</label>
+            <select class="select" value=${item.kind} onChange=${(e) => patchItem(item.id, { kind: e.currentTarget.value })}>
+              ${BUBBLE_LABELS.map((b) => html`<option value=${b.key}>${b.name}</option>`)}
+            </select>
+          </div>
+          <div class="field">
+            <label>字号</label>
+            <input class="input" type="number" value=${item.size} onInput=${(e) => patchItem(item.id, { size: Number(e.currentTarget.value) || 22 })} />
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>排版</label>
+            <select
+              class="select"
+              value=${item.vertical === undefined ? 'auto' : item.vertical ? 'v' : 'h'}
+              onChange=${(e) => {
+                const v = e.currentTarget.value;
+                patchItem(item.id, { vertical: v === 'auto' ? undefined : v === 'v' });
+              }}
+            >
+              <option value="auto">跟随全局</option>
+              <option value="v">竖排</option>
+              <option value="h">横排</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>尾巴</label>
+            <select class="select" value=${item.tail} onChange=${(e) => patchItem(item.id, { tail: e.currentTarget.value })}>
+              <option value="none">无（说话者不在画面）</option>
+              ${['down-left', 'down', 'down-right', 'left', 'right', 'up-left', 'up', 'up-right'].map((d) => html`<option value=${d}>${d}</option>`)}
+            </select>
+          </div>
+        </div>
+        ${bboxInputs}
+      </div>`;
+    }
+
+    if (item.type === 'native') {
+      return html`<div class="col">
+        ${header}
+        <div class="field">
+          <label>label（原生 Moss 字段）</label>
+          <select class="select" value=${item.label} onChange=${(e) => patchItem(item.id, { label: e.currentTarget.value })}>
+            ${['object', 'text', 'character'].map((l) => html`<option value=${l}>${l}</option>`)}
+          </select>
+        </div>
+        <div class="field">
+          <label>caption</label>
+          <textarea class="textarea" style="min-height:80px" value=${item.caption || ''} onInput=${(e) => patchItem(item.id, { caption: e.currentTarget.value })}></textarea>
+        </div>
+        ${item.label === 'text'
+          ? html`<div class="field">
+              <label>text（要渲染的字）</label>
+              <textarea class="textarea" style="min-height:60px" value=${item.text || ''} onInput=${(e) => patchItem(item.id, { text: e.currentTarget.value })}></textarea>
+            </div>`
+          : null}
+        ${bboxInputs}
+      </div>`;
+    }
+
+    return html`<div class="col">
+      ${header}
       <div class="field">
-        <label>文字内容</label>
-        <textarea class="textarea" style="min-height:80px" value=${bubble.text || ''} onInput=${(e) => updateBubble(bubble.id, { text: e.currentTarget.value })}></textarea>
-      </div>
-      <div class="field">
-        <label>类型</label>
-        <select class="select" value=${bubble.type} onChange=${(e) => updateBubble(bubble.id, { type: e.currentTarget.value })}>
-          ${BUBBLE_LABELS.map((b) => html`<option value=${b.key}>${b.name}</option>`)}
-        </select>
+        <label>这一格画什么</label>
+        <textarea class="textarea" style="min-height:110px" value=${item.caption || ''} onInput=${(e) => patchItem(item.id, { caption: e.currentTarget.value })}></textarea>
       </div>
       <div class="row2">
         <div class="field">
-          <label>字号</label>
-          <input class="input" type="number" value=${bubble.size} onInput=${(e) => updateBubble(bubble.id, { size: Number(e.currentTarget.value) || 22 })} />
+          <label>机位</label>
+          <select class="select" value=${item.camera} onChange=${(e) => patchItem(item.id, { camera: e.currentTarget.value })}>
+            ${CAMERA_LABELS.map(([v, n]) => html`<option value=${v}>${n}</option>`)}
+          </select>
         </div>
         <div class="field">
-          <label>排布</label>
-          <select class="select" value=${bubble.vertical === false ? 'h' : 'v'} onChange=${(e) => updateBubble(bubble.id, { vertical: e.currentTarget.value === 'v' })}>
-            <option value="v">竖排</option>
-            <option value="h">横排</option>
+          <label>形状</label>
+          <select class="select" value=${item.shape} onChange=${(e) => patchItem(item.id, { shape: e.currentTarget.value })}>
+            ${SHAPE_LABELS.map(([v, n]) => html`<option value=${v}>${n}</option>`)}
           </select>
         </div>
       </div>
       <div class="field">
-        <label>尾巴</label>
-        <select class="select" value=${bubble.tail} onChange=${(e) => updateBubble(bubble.id, { tail: e.currentTarget.value })}>
-          <option value="none">无尾巴（说话者不在画面）</option>
-          ${['down-left', 'down', 'down-right', 'left', 'right', 'up-left', 'up', 'up-right'].map((d) => html`<option value=${d}>${d}</option>`)}
+        <label>边框</label>
+        <select class="select" value=${item.frame} onChange=${(e) => patchItem(item.id, { frame: e.currentTarget.value })}>
+          ${FRAME_LABELS.map(([v, n]) => html`<option value=${v}>${n}</option>`)}
         </select>
       </div>
-      <div class="field">
-        <label>坐标 x1 / y1 / x2 / y2</label>
-        <div class="row">
-          ${bubble.bbox.map(
-            (v, i) => html`<input
-              class="input"
-              type="number"
-              style="width:25%"
-              value=${Math.round(v)}
-              onInput=${(e) => {
-                const bbox = [...bubble.bbox];
-                bbox[i] = Number(e.currentTarget.value);
-                updateBubble(bubble.id, { bbox });
-              }}
-            />`
-          )}
-        </div>
-      </div>
+      ${bboxInputs}
     </div>`;
-  }
-
-  function updatePanel(id, patch) {
-    updatePage((prev) => ({ ...prev, panels: prev.panels.map((p) => (p.id === id ? { ...p, ...patch } : p)) }));
-  }
-
-  function updateBubble(id, patch) {
-    updatePage((prev) => ({ ...prev, bubbles: prev.bubbles.map((b) => (b.id === id ? { ...b, ...patch } : b)) }));
-  }
-
-  function removePanel(id) {
-    updatePage((prev) => ({ ...prev, panels: prev.panels.filter((p) => p.id !== id) }));
-    setSelection(null);
-    setTimeout(saveNow, 60);
-  }
-
-  function removeBubble(id) {
-    updatePage((prev) => ({ ...prev, bubbles: prev.bubbles.filter((b) => b.id !== id) }));
-    setSelection(null);
-    setTimeout(saveNow, 60);
   }
 
   // ---------------------------------------------------------------- 工作台
@@ -696,9 +800,9 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
 
 function describe(op) {
   if (op.op === 'create') return '新建页面';
-  if (op.op === 'add') return `+ ${op.target === 'bubble' ? '文字' : '格'} ${op.id} [${(op.bbox || []).join(',')}]${op.text ? `「${op.text}」` : ''}`;
-  if (op.op === 'remove') return `- ${op.target === 'bubble' ? '文字' : '格'} ${op.id}`;
-  if (op.op === 'bbox') return `~ ${op.target === 'bubble' ? '文字' : '格'} ${op.id} [${op.from.join(',')}] → [${op.to.join(',')}]`;
+  if (op.op === 'add') return `+ ${op.target} ${op.id} [${(op.bbox || []).join(',')}]${op.text ? `「${op.text}」` : ''}`;
+  if (op.op === 'remove') return `- ${op.target} ${op.id}`;
+  if (op.op === 'bbox') return `~ ${op.target} ${op.id} [${op.from.join(',')}] → [${op.to.join(',')}]`;
   if (op.op === 'text') return `~ 文字 ${op.id}「${op.from}」→「${op.to}」`;
   if (op.op === 'page') return `~ 页.${op.field}：${op.from ?? '（空）'} → ${op.to ?? '（空）'}`;
   return `~ ${op.target} ${op.id} ${op.field}`;

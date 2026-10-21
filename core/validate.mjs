@@ -1,7 +1,7 @@
 // 校验：把《JSON Layout》第七节的检查清单变成代码。
-// level=error 会阻止生成，level=warn 只是提醒。
+// level=error 阻止生成，level=warn 只提醒。
 
-import { pageSize, PANEL_SHAPES, bboxArea } from './manga-doc.mjs';
+import { pageSize, PANEL_SHAPES, ITEM_TYPES, bboxArea, panelsOf, bubblesOf } from './manga-doc.mjs';
 
 const ALLOWED_TOP = new Set(['summary', 'items']);
 const ALLOWED_ITEM = new Set(['label', 'caption', 'bbox', 'text', 'tags', 'palette']);
@@ -10,11 +10,6 @@ const FORBIDDEN = ['children', 'parent', 'id', 'elements', 'boxes', 'layout'];
 
 const MIN_SIDE = 40;
 
-/**
- * @param {object} page 富文档
- * @param {object} [doc] 编译产物（可选，传入时额外检查 Moss 契约）
- * @returns {{level:'error'|'warn', code:string, message:string, target?:string}[]}
- */
 export function validatePage(page, doc) {
   const out = [];
   const size = pageSize(page);
@@ -24,57 +19,67 @@ export function validatePage(page, doc) {
     add('error', 'size.grid', `画布尺寸必须是 16 的倍数，当前 ${size.width}×${size.height}`);
   }
 
-  if (!page.panels.length) add('error', 'panel.empty', '这一页还没有任何分格');
+  const items = page.items || [];
+  if (!items.length) add('error', 'page.empty', '这一页还没有任何内容');
 
-  page.panels.forEach((panel, i) => {
-    const name = `格${i + 1}`;
-    const [x1, y1, x2, y2] = panel.bbox;
-    const bleed = String(panel.shape || '').startsWith('bleed');
-    if (x2 - x1 < MIN_SIDE || y2 - y1 < MIN_SIDE) {
-      add('warn', 'panel.tiny', `${name} 太小（${Math.round(x2 - x1)}×${Math.round(y2 - y1)}），模型可能画不出内容`, panel.id);
-    }
-    if (!bleed && (x1 < 0 || y1 < 0 || x2 > size.width || y2 > size.height)) {
-      add('warn', 'panel.out', `${name} 超出画布，内容可能被裁掉`, panel.id);
-    }
-    if (!panel.caption?.trim()) add('warn', 'panel.blank', `${name} 没有内容描述，只会画出一个空框`, panel.id);
-    if (!PANEL_SHAPES[panel.shape]) {
-      add('warn', 'panel.shape', `${name} 的形状「${panel.shape}」不认识，已按矩形处理`, panel.id);
-    }
-  });
-
-  page.bubbles.forEach((bubble, i) => {
-    const label = `气泡${i + 1}`;
-    const text = (bubble.text || '').trim();
-    if (!text) {
-      add('warn', 'bubble.empty', `${label} 没有文字`, bubble.id);
+  items.forEach((item, i) => {
+    const name = `第 ${i + 1} 项`;
+    if (!ITEM_TYPES.includes(item.type)) {
+      add('error', 'item.type', `${name} 的 type「${item.type}」不认识`, item.id);
       return;
     }
-    if (!bubble.vertical && text.includes('\n')) {
-      add('warn', 'bubble.newline', `${label} 是横排却包含了换行，模型可能忽略`, bubble.id);
+
+    const [x1, y1, x2, y2] = item.bbox;
+    if (x2 - x1 < MIN_SIDE || y2 - y1 < MIN_SIDE) {
+      add('warn', 'item.tiny', `${name} 太小（${Math.round(x2 - x1)}×${Math.round(y2 - y1)}），模型可能画不出内容`, item.id);
     }
-    const budget = textBudget(bubble);
-    const used = text.replace(/\s/g, '').length;
-    if (used > budget.capacity) {
-      add(
-        'warn',
-        'bubble.overflow',
-        `${label} 文字 ${used} 字，按当前框与字号最多约 ${budget.capacity} 字（${budget.cols} 列 × ${budget.perCol} 字），建议拆条或放大框`,
-        bubble.id
-      );
+
+    if (item.type === 'panel') {
+      const bleed = String(item.shape || '').startsWith('bleed');
+      if (!bleed && (x1 < 0 || y1 < 0 || x2 > size.width || y2 > size.height)) {
+        add('warn', 'panel.out', `${name} 超出画布，内容可能被裁掉`, item.id);
+      }
+      if (!item.caption?.trim()) add('warn', 'panel.blank', `${name} 没写画面描述，只会画出一个空框`, item.id);
+      if (!PANEL_SHAPES[item.shape]) add('warn', 'panel.shape', `${name} 的形状「${item.shape}」不认识`, item.id);
     }
-    if (budget.cols > 1 && budget.perCol > 12) {
-      add('warn', 'bubble.columns', `${label} 每列 ${budget.perCol} 字，超过 12 字建议加列`, bubble.id);
+
+    if (item.type === 'bubble') {
+      const text = (item.text || '').trim();
+      if (!text) {
+        add('warn', 'bubble.empty', `${name} 没有文字`, item.id);
+        return;
+      }
+      if (!item.vertical && text.includes('\n')) {
+        add('warn', 'bubble.newline', `${name} 是横排却包含换行，模型可能忽略`, item.id);
+      }
+      const budget = textBudget(item);
+      const used = text.replace(/\s/g, '').length;
+      if (used > budget.capacity) {
+        add(
+          'warn',
+          'bubble.overflow',
+          `${name} 文字 ${used} 字，按当前框与字号最多约 ${budget.capacity} 字（${budget.cols} 列 × ${budget.perCol}），建议拆条或放大框`,
+          item.id
+        );
+      }
+    }
+
+    if (item.type === 'native') {
+      if (!item.caption?.trim()) add('warn', 'native.blank', `${name} 是原生 item 但没有 caption`, item.id);
+      if (item.label === 'text' && !item.text) add('warn', 'native.text', `${name} 是文字类原生 item 但没有 text`, item.id);
     }
   });
 
-  for (let i = 0; i < page.bubbles.length; i += 1) {
-    for (let j = i + 1; j < page.bubbles.length; j += 1) {
-      const a = page.bubbles[i];
-      const b = page.bubbles[j];
+  // 气泡大面积重叠
+  const bubbles = bubblesOf(page);
+  for (let i = 0; i < bubbles.length; i += 1) {
+    for (let j = i + 1; j < bubbles.length; j += 1) {
+      const a = bubbles[i];
+      const b = bubbles[j];
       const overlap = intersectionArea(a.bbox, b.bbox);
       const minArea = Math.min(bboxArea(a.bbox), bboxArea(b.bbox)) || 1;
       if (overlap / minArea > 0.35) {
-        add('warn', 'bubble.overlap', `气泡${i + 1} 与 气泡${j + 1} 大面积重叠`, a.id);
+        add('warn', 'bubble.overlap', `文字 ${a.id} 与 ${b.id} 大面积重叠`, a.id);
       }
     }
   }
@@ -83,7 +88,6 @@ export function validatePage(page, doc) {
   if (ambiguous) add('warn', 'order.ambiguous', ambiguous);
 
   if (doc) checkDocShape(doc, add);
-
   return out;
 }
 
@@ -123,20 +127,19 @@ function intersectionArea(a, b) {
   return w > 0 && h > 0 ? w * h : 0;
 }
 
-export function textBudget(bubble) {
-  const [x1, y1, x2, y2] = bubble.bbox;
+export function textBudget(item) {
+  const [x1, y1, x2, y2] = item.bbox;
   const w = Math.max(1, x2 - x1);
   const h = Math.max(1, y2 - y1);
-  const fs = Math.max(8, Number(bubble.size) || 22);
-  const cols = bubble.vertical === false ? 1 : Math.max(1, Math.floor(w / (fs * 1.15)));
+  const fs = Math.max(8, Number(item.size) || 22);
+  const cols = item.vertical === false ? Math.max(1, Math.floor(w / (fs * 1.02))) : Math.max(1, Math.floor(w / (fs * 1.15)));
   const perCol = Math.max(1, Math.floor(h / (fs * 1.35)));
   return { cols, perCol, capacity: cols * perCol };
 }
 
-/** 同一横带里两块重叠、又分不出先后 → 阅读线会乱 */
 function sameBandAmbiguity(page) {
   const rtl = page.reading !== 'ltr';
-  const panels = page.panels;
+  const panels = panelsOf(page);
   for (let i = 0; i < panels.length; i += 1) {
     for (let j = i + 1; j < panels.length; j += 1) {
       const a = panels[i].bbox;
@@ -144,7 +147,7 @@ function sameBandAmbiguity(page) {
       const sameBand = Math.abs(a[1] - b[1]) < 24 && Math.abs(a[3] - b[3]) < 24;
       const xOverlap = Math.min(a[2], b[2]) - Math.max(a[0], b[0]);
       if (sameBand && xOverlap > 24) {
-        return `格${i + 1} 与 格${j + 1} 在同一横带且位置重叠，${rtl ? '右→左' : '左→右'}阅读顺序会歧义`;
+        return `面板 ${panels[i].id} 与 ${panels[j].id} 在同一横带且位置重叠，${rtl ? '右→左' : '左→右'}阅读顺序会歧义`;
       }
     }
   }

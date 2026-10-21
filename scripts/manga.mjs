@@ -45,8 +45,7 @@ import { prepareRender, renderPage } from './lib/render.mjs';
 import { compilePage } from '../core/compile.mjs';
 import { compileContext } from '../core/bible.mjs';
 import { diffPage, describeOp } from './lib/diff.mjs';
-import { applyPreset, seedPage, LAYOUT_PRESETS, PRESET_IDS } from '../core/presets.mjs';
-import { createPanel, createBubble } from '../core/manga-doc.mjs';
+import { createItem } from '../core/manga-doc.mjs';
 import { pageOutline, projectOutline, warningsText, table, diffText } from './lib/format.mjs';
 
 const HERE = import.meta.dirname;
@@ -374,15 +373,11 @@ async function cmdPage() {
   const project = await needProject();
 
   if (action === 'new') {
-    const title = String(flags.title || '');
-    let page = await createPage(DIR, project.slug, { title });
-    if (!flags.blank) {
-      const preset = String(flags.preset || 'band-3');
-      if (!PRESET_IDS.includes(preset)) fail(`没有这个版式：${preset}（可选：${PRESET_IDS.join(', ')}）`);
-      page = await savePage(DIR, project.slug, seedPage(page.page, preset), { actor: 'cli' });
-    }
-    const fresh = await getPage(DIR, project.slug, page.page.id);
-    return out({ ok: true, page: fresh }, `已新建第 ${fresh.index} 页（${fresh.id}）`);
+    const created = await createPage(DIR, project.slug, {
+      title: String(flags.title || ''),
+      items: flags.blank ? [] : undefined,
+    });
+    return out({ ok: true, page: created.page }, `已新建第 ${created.page.index} 页（${created.page.id}），${created.page.items.length} 项`);
   }
 
   if (action === 'list') {
@@ -390,8 +385,8 @@ async function cmdPage() {
     return out(
       { ok: true, pages },
       table(
-        pages.map((p) => [p.index, p.id, p.title || '—', p.panels, p.bubbles, p.rev]),
-        ['页', 'id', '标题', '格', '字', 'rev']
+        pages.map((p) => [p.index, p.id, p.title || '—', p.items, p.rev]),
+        ['页', 'id', '标题', '项', 'rev']
       )
     );
   }
@@ -422,14 +417,6 @@ async function cmdPage() {
     );
   }
 
-  if (action === 'apply') {
-    const page = await needPage(project);
-    const preset = String(flags.preset || '');
-    if (!PRESET_IDS.includes(preset)) fail(`没有这个版式：${preset}（可选：${PRESET_IDS.join(', ')}）`);
-    const next = applyPreset(page, preset);
-    const saved = await savePage(DIR, project.slug, next, { actor: 'cli' });
-    return out({ ok: true, page: saved.page }, `第 ${page.index} 页已套用「${preset}」，现在 ${saved.page.panels.length} 格`);
-  }
 
   if (action === 'delete') {
     const page = await needPage(project);
@@ -447,7 +434,7 @@ async function cmdPage() {
 function applyPatch(page, patch, { replace = false } = {}) {
   const next = { ...page };
   for (const [key, value] of Object.entries(patch)) {
-    if (key === 'panels' || key === 'bubbles' || key === 'removePanels' || key === 'removeBubbles') continue;
+    if (key === 'items' || key === 'removeItems') continue;
     if (key === 'id') continue;
     next[key] = value;
   }
@@ -467,12 +454,10 @@ function applyPatch(page, patch, { replace = false } = {}) {
     return out;
   };
 
-  let panels = mergeItems(page.panels, patch.panels, (item) => createPanel(item));
-  let bubbles = mergeItems(page.bubbles, patch.bubbles, (item) => createBubble(item));
-  if (Array.isArray(patch.removePanels)) panels = panels.filter((p) => !patch.removePanels.includes(p.id));
-  if (Array.isArray(patch.removeBubbles)) bubbles = bubbles.filter((b) => !patch.removeBubbles.includes(b.id));
+  let items = mergeItems(page.items, patch.items, (item) => createItem(item.type || 'panel', item));
+  if (Array.isArray(patch.removeItems)) items = items.filter((it) => !patch.removeItems.includes(it.id));
 
-  return { ...next, panels, bubbles, id: page.id };
+  return { ...next, items, id: page.id };
 }
 
 function checkScope(config, ops) {
@@ -646,11 +631,10 @@ function cmdHelp() {
   项目与页面
     manga project new --name "名字" [--size page]
     manga project list | show | delete
-    manga page new [--preset band-3] [--title 标题] [--blank]
+    manga page new [--title 标题] [--blank]     默认给一个整页框，排版自己定
     manga page list
     manga page show --page N [--summary]
-    manga page set  --page N --file patch.json
-    manga page apply --page N --preset climax
+    manga page set  --page N --file patch.json   items 按 id 合并
     manga page delete --page N
 
   出图

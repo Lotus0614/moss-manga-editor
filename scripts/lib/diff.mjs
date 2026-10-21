@@ -1,7 +1,7 @@
 // 语义化 diff：把「页面文件前后」压成一组可读操作。
-// 不产生 diff 文件，只在 journal 里记一条；AI 用 `manga changes` 读。
+// 页面是单层 items，所以按 id 对齐即可。
 
-const PAGE_FIELDS = ['title', 'scene', 'note', 'reading', 'style', 'size'];
+const PAGE_FIELDS = ['title', 'scene', 'note', 'reading', 'style', 'size', 'vertical'];
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -13,7 +13,6 @@ function clip(value) {
 /**
  * @param {object|null} before 之前的页面（null = 新建）
  * @param {object} after 之后的页面
- * @returns {Array<object>} 操作列表
  */
 export function diffPage(before, after) {
   if (!before) return [{ op: 'create', target: 'page', index: after?.index ?? null }];
@@ -25,20 +24,19 @@ export function diffPage(before, after) {
     }
   }
 
-  diffItems('panel', before.panels, after.panels, ops);
-  diffItems('bubble', before.bubbles, after.bubbles, ops);
+  diffItems(before.items, after.items, ops);
   return ops;
 }
 
-function diffItems(target, before = [], after = [], ops) {
+function diffItems(before = [], after = [], ops) {
   const oldMap = new Map((before || []).map((x) => [x.id, x]));
   const newMap = new Map((after || []).map((x) => [x.id, x]));
 
   for (const [id, item] of newMap) {
     if (!oldMap.has(id)) {
-      const op = { op: 'add', target, id, bbox: item.bbox };
-      if (target === 'bubble') {
-        op.type = item.type;
+      const op = { op: 'add', target: item.type, id, bbox: item.bbox };
+      if (item.type === 'bubble') {
+        op.kind = item.kind;
         op.text = clip(item.text);
       } else if (item.caption) {
         op.caption = clip(item.caption);
@@ -48,22 +46,19 @@ function diffItems(target, before = [], after = [], ops) {
   }
 
   for (const [id] of oldMap) {
-    if (!newMap.has(id)) ops.push({ op: 'remove', target, id });
+    if (!newMap.has(id)) ops.push({ op: 'remove', target: oldMap.get(id).type, id });
   }
 
   for (const [id, now] of newMap) {
     const prev = oldMap.get(id);
     if (!prev) continue;
-    if (!same(prev.bbox, now.bbox)) {
-      ops.push({ op: 'bbox', target, id, from: prev.bbox, to: now.bbox });
-    }
+    if (!same(prev.bbox, now.bbox)) ops.push({ op: 'bbox', target: now.type, id, from: prev.bbox, to: now.bbox });
     for (const key of Object.keys(now)) {
-      if (key === 'id' || key === 'bbox') continue;
+      if (key === 'id' || key === 'bbox' || key === 'type') continue;
       if (same(prev[key], now[key])) continue;
-      const isText = target === 'bubble' && key === 'text';
       ops.push({
-        op: isText ? 'text' : 'field',
-        target,
+        op: now.type === 'bubble' && key === 'text' ? 'text' : 'field',
+        target: now.type,
         id,
         field: key,
         from: clip(prev[key]),
@@ -73,17 +68,17 @@ function diffItems(target, before = [], after = [], ops) {
   }
 }
 
-/** 一条操作的人话描述，CLI 默认输出用 */
+/** 一条操作的人话描述 */
 export function describeOp(op) {
-  const who = op.target === 'bubble' ? '文字' : op.target === 'panel' ? '格' : '页';
+  const who = op.target === 'bubble' ? '文字' : op.target === 'panel' ? '格' : '原生项';
   if (op.op === 'create') return '新建页面';
   if (op.op === 'add') {
-    const tail = op.op === 'add' && op.text ? `「${op.text}」` : op.caption ? ` ${op.caption}` : '';
+    const tail = op.text ? `「${op.text}」` : op.caption ? ` ${op.caption}` : '';
     return `+ ${who} ${op.id} [${(op.bbox || []).join(',')}]${tail}`;
   }
   if (op.op === 'remove') return `- ${who} ${op.id}`;
   if (op.op === 'bbox') return `~ ${who} ${op.id} 位置 [${op.from.join(',')}] → [${op.to.join(',')}]`;
-  if (op.op === 'text') return `~ 文字 ${op.id} 「${op.from}」→「${op.to}」`;
+  if (op.op === 'text') return `~ 文字 ${op.id}「${op.from}」→「${op.to}」`;
   if (op.op === 'page') return `~ 页.${op.field}: ${fmt(op.from)} → ${fmt(op.to)}`;
   return `~ ${who} ${op.id} ${op.field}: ${fmt(op.from)} → ${fmt(op.to)}`;
 }

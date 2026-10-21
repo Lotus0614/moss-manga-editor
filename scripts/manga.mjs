@@ -346,7 +346,12 @@ async function cmdProject() {
   if (action === 'new') {
     const name = String(flags.name || '').trim();
     if (!name) fail('用法：manga project new --name "项目名" [--size page|page-hd|square|wide]');
-  const project = await createProject(DIR, { name, size: String(flags.size || 'page'), canvas: (await readConfig(CONFIG_DIR)).defaults.canvas });
+  const canvas = String(flags.canvas || '').match(/^(\d+)x(\d+)$/i);
+  const project = await createProject(DIR, {
+    name,
+    size: String(flags.size || 'page'),
+    canvas: canvas ? [Number(canvas[1]), Number(canvas[2])] : (await readConfig(CONFIG_DIR)).defaults.canvas,
+  });
     return out({ ok: true, project }, `已创建项目「${project.name}」，slug=${project.slug}`);
   }
   if (action === 'list') {

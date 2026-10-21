@@ -253,6 +253,7 @@ async function route(req, res, url) {
         if (payload.bible) project.bible = { ...project.bible, ...payload.bible };
         if (payload.defaults) project.defaults = { ...(project.defaults || {}), ...payload.defaults };
         if (payload.generation) project.generation = { ...(project.generation || {}), ...payload.generation };
+        if (Array.isArray(payload.canvas)) project.canvas = payload.canvas;
         await saveProject(ARCHIVE, project);
         return json(res, 200, project);
       }

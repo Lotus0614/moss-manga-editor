@@ -161,12 +161,13 @@ node scripts/manga.mjs page show --page 1 --summary    # 看这一页现在长�
 {
   "title": "车厢",
   "scene": "a half-empty train carriage, fluorescent light",
-  "panels": [
-    { "id": "pn_xxx", "caption": "wide shot of a crowded platform, grey silhouettes", "camera": "wide" },
-    { "id": "pn_yyy", "caption": "close-up of her hand gripping the strap", "camera": "close" }
-  ],
-  "bubbles": [
-    { "id": "bb_zzz", "text": "……今天也要，撑过去。" }
+  "items": [
+    { "type": "panel", "id": "pn_xxx", "bbox": [8, 8, 760, 420],
+      "caption": "wide shot of a crowded platform, grey silhouettes", "camera": "wide" },
+    { "type": "panel", "id": "pn_yyy", "bbox": [8, 428, 760, 848],
+      "caption": "close-up of her hand gripping the strap", "camera": "close" },
+    { "type": "bubble", "id": "bb_zzz", "bbox": [420, 900, 700, 1080],
+      "kind": "speech", "text": "……今天也要，撑过去。" }
   ]
 }
 ```
@@ -225,7 +226,7 @@ node scripts/manga.mjs ack
 | 校验工作流 | `manga workflow check` |
 | 改配置 | `manga config set defaults.ckpt=xxx editable.text=true` |
 | 看配置 | `manga config get defaults` |
-| 建项目 | `manga project new --name "名字" [--size page]` |
+| 建项目 | `manga project new --name "名字" [--canvas 768x1280]` |
 | 列项目 | `manga project list` |
 | 看项目 | `manga project show --project slug` |
 | 建页 | `manga page new [--project slug] [--title 标题]` |

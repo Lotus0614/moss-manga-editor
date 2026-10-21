@@ -86,7 +86,7 @@ manga workflow show [--name default.json]
 ## project
 
 ```bash
-manga project new --name "雨中的便利店" [--size page]
+manga project new --name "雨中的便利店" [--canvas 768x1280]
 manga project list
 manga project show [--project slug]
 manga project delete [--project slug]

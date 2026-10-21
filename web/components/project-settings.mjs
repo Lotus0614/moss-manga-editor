@@ -34,6 +34,7 @@ export default function ProjectSettings({ slug, open, onClose, onSaved, onOpenGl
           reading: d.reading || 'rtl',
           style: d.style || 'mono',
           vertical: d.vertical !== false,
+          canvas: p.canvas || [768, 1280],
           generation: {
             steps: '',
             cfg: '',
@@ -60,6 +61,7 @@ export default function ProjectSettings({ slug, open, onClose, onSaved, onOpenGl
         name: form.name,
         defaults: { reading: form.reading, style: form.style, vertical: form.vertical },
         generation: form.generation,
+        canvas: form.canvas,
       });
       onSaved?.(saved);
       toast('已保存');
@@ -108,6 +110,19 @@ export default function ProjectSettings({ slug, open, onClose, onSaved, onOpenGl
           </div>
           <span class="hint">只作用于新建的页面；已有页面在页面属性里单独改。</span>
         </div>
+
+        <div class="divider"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="field">
+            <label>画布宽（16 的倍数）</label>
+            <input class="input" type="number" step="16" value=${form.canvas[0]} onInput=${(e) => setForm({ ...form, canvas: [Number(e.currentTarget.value) || 768, form.canvas[1]] })} />
+          </div>
+          <div class="field">
+            <label>画布高（16 的倍数）</label>
+            <input class="input" type="number" step="16" value=${form.canvas[1]} onInput=${(e) => setForm({ ...form, canvas: [form.canvas[0], Number(e.currentTarget.value) || 1280] })} />
+          </div>
+        </div>
+        <span class="hint">只影响之后新建的页面；已有页面尺寸不变。</span>
 
         <div class="divider"></div>
         <span class="label">生图参数（留空 = 跟随全局）</span>

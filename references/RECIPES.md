@@ -1,7 +1,7 @@
 # 常见改法（补丁配方）
 
 所有补丁都是「只写要改的字段」，用 `manga page set --page N --file patch.json` 应用。
-没写的字段保持原样；数组（`panels`、`bubbles`）一旦出现就**整体替换**。
+没写的字段保持原样；`items` 按 `id` 合并（对不上的当作新项追加），删项用 `removeItems`。
 
 先看现状：
 
@@ -16,7 +16,7 @@ manga page show --page 1 --summary
 ## 改一句台词
 
 ```json
-{ "bubbles": [{ "id": "bb_cd34", "text": "……今天，也要撑过去。" }] }
+{ "items": [{ "type": "bubble", "id": "bb_cd34", "text": "……今天，也要撑过去。" }] }
 ```
 
 注意：只写这一条，其它气泡**不要**出现在数组里，否则会被删掉。
@@ -26,7 +26,7 @@ manga page show --page 1 --summary
 ## 只改一格的画面描述
 
 ```json
-{ "panels": [{ "id": "pn_ab12", "caption": "close-up of her hand gripping the strap, blurred passengers behind" }] }
+{ "items": [{ "type": "panel", "id": "pn_ab12", "caption": "close-up of her hand gripping the strap, blurred passengers behind" }] }
 ```
 
 ---
@@ -34,7 +34,7 @@ manga page show --page 1 --summary
 ## 挪动 + 放大一格
 
 ```json
-{ "panels": [{ "id": "pn_ab12", "bbox": [8, 700, 760, 1272] }] }
+{ "items": [{ "type": "panel", "id": "pn_ab12", "bbox": [8, 700, 760, 1272] }] }
 ```
 
 `bbox` 是左上原点 `[x1,y1,x2,y2]`，必须是整数，别超出画布（出血格除外）。
@@ -61,13 +61,13 @@ manga page show --page 1 --summary
 
 ## 加一条旁白
 
-`panels` / `bubbles` 是整体替换，所以加一条要**把所有气泡都列出来**，新的那条不给 `id`（会自动生成）：
+加一条新文字：`items` 里放一个不带 `id` 的对象就会追加（id 自动生成）：
 
 ```json
 {
-  "bubbles": [
-    { "id": "bb_cd34", "text": "……今天也要，撑过去。", "bbox": [353, 488, 676, 628], "type": "speech", "tail": "down-left" },
-    { "text": "八点十七分，车厢里没有座位。", "bbox": [40, 30, 420, 96], "type": "narration", "vertical": false, "size": 20 }
+  "items": [
+    { "type": "bubble", "id": "bb_cd34", "text": "……今天也要，撑过去。", "bbox": [353, 488, 676, 628], "kind": "speech", "tail": "down-left" },
+    { "type": "bubble", "text": "八点十七分，车厢里没有座位。", "bbox": [40, 30, 420, 96], "kind": "narration", "vertical": false, "size": 20 }
   ]
 }
 ```

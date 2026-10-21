@@ -13,7 +13,7 @@ export default function ProjectsPage() {
   const [list, setList] = useState(null);
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ name: '', size: 'page', withSamplePage: true });
+  const [form, setForm] = useState({ name: '', width: 768, height: 1280, withSamplePage: true });
   const [busy, setBusy] = useState(false);
 
   async function load() {
@@ -35,10 +35,10 @@ export default function ProjectsPage() {
     try {
       const project = await api('/api/projects', {
         method: 'POST',
-        body: { name: form.name.trim() || '未命名项目', size: form.size, withSamplePage: form.withSamplePage },
+        body: { name: form.name.trim() || '未命名项目', canvas: [form.width, form.height], withSamplePage: form.withSamplePage },
       });
       setCreating(false);
-      setForm({ name: '', size: 'page', withSamplePage: true });
+      setForm({ name: '', width: 768, height: 1280, withSamplePage: true });
       go(`/p/${project.slug}`);
     } catch (err) {
       toast(err.message, 'bad');
@@ -115,11 +115,15 @@ export default function ProjectsPage() {
                   onKeyDown=${(e) => e.key === 'Enter' && create()}
                 />
               </div>
-              <div class="field">
-                <label>画布</label>
-                <select class="select" value=${form.size} onChange=${(e) => setForm({ ...form, size: e.currentTarget.value })}>
-                  ${SIZES.map(([id, label]) => html`<option value=${id}>${label}</option>`)}
-                </select>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <div class="field">
+                  <label>画布宽（16 的倍数）</label>
+                  <input class="input" type="number" step="16" value=${form.width} onInput=${(e) => setForm({ ...form, width: Number(e.currentTarget.value) || 768 })} />
+                </div>
+                <div class="field">
+                  <label>画布高（16 的倍数）</label>
+                  <input class="input" type="number" step="16" value=${form.height} onInput=${(e) => setForm({ ...form, height: Number(e.currentTarget.value) || 1280 })} />
+                </div>
               </div>
               <label class="chk">
                 <input

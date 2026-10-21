@@ -187,6 +187,8 @@ async function route(req, res, url) {
 
   if (path === '/api/ack' && method === 'POST') return json(res, 200, await ack(ARCHIVE));
 
+  if (path === '/api/jobs' && method === 'GET') return json(res, 200, { jobs: jobs.slice(-30).reverse() });
+
   if (path === '/api/jobs/stream' && method === 'GET') {
     const stream = sse(res);
     const listener = (job) => stream.send('job', job);
@@ -305,6 +307,7 @@ async function route(req, res, url) {
         bus.emit('job', { ...job });
         renderPage({
           dir: ARCHIVE,
+          configDir: CONFIG_DIR,
           slug,
           project,
           page,

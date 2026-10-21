@@ -1,17 +1,17 @@
 {
-  "name": "moss-manga-editor",
-  "version": "0.1.0",
+  "name": "moss-manga",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "MOSS 漫画编辑器：零构建、零依赖、AI 友好的漫画分镜生成工具",
+  "description": "MOSS 漫画技能：CLI + 预览编辑器，为 Agent 生成漫画分镜而设计",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "start": "node server.mjs",
-    "dev": "node --watch server.mjs",
+    "manga": "node scripts/manga.mjs",
+    "serve": "node server.mjs",
+    "test": "node core/self-test.mjs && node tools/test-export.mjs && node scripts/dev/test-archive.mjs",
     "check": "node tools/check.mjs",
-    "self-test": "node core/self-test.mjs",
     "vendor": "node tools/vendor.mjs"
   }
 }

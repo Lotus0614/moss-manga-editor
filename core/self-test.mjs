@@ -24,7 +24,8 @@ function test(name, fn) {
   }
 }
 
-const SIZE = { width: 768, height: 1280 };
+const SIZE = [768, 1280];
+const SIZE_OBJ = { width: 768, height: 1280 };
 
 // ---------------------------------------------------------------- 坐标
 
@@ -40,13 +41,13 @@ test('输出顺序是 yxyx，不是 xyxy', () => {
 
 test('toMoss / fromMoss 往返一致', () => {
   for (const bbox of [[8, 0, 536, 400], [0, 0, 768, 1280], [100, 200, 100, 300]]) {
-    const back = fromMoss(toMoss(bbox, SIZE), SIZE);
+    const back = fromMoss(toMoss(bbox, SIZE_OBJ), SIZE_OBJ);
     assert.deepEqual(back, [Math.min(bbox[0], bbox[2]), Math.min(bbox[1], bbox[3]), Math.max(bbox[0], bbox[2]), Math.max(bbox[1], bbox[3])]);
   }
 });
 
 test('左上向下取整、右下向上取整', () => {
-  const got = toMoss([10.6, 20.2, 100.4, 200.9], SIZE);
+  const got = toMoss([10.6, 20.2, 100.4, 200.9], SIZE_OBJ);
   // 草稿取整为 [10,20,101,201] → 减偏移
   assert.deepEqual(got, [20 - 640, 10 - 384, 201 - 640, 101 - 384]);
 });
@@ -69,10 +70,10 @@ const DOC_BUBBLES = [
 function buildDocPage() {
   const page = createPage({ size: SIZE });
   page.panels = DOC_PANELS.map((moss, i) =>
-    createPanel({ name: `格${i + 1}`, bbox: fromMoss(moss, SIZE), caption: `panel content ${i + 1}` })
+    createPanel({ bbox: fromMoss(moss, SIZE_OBJ), caption: `panel content ${i + 1}` })
   );
   page.bubbles = DOC_BUBBLES.map((moss, i) =>
-    createBubble({ bbox: fromMoss(moss, SIZE), text: `测试台词${i + 1}`, type: i === 1 ? 'thought' : 'speech' })
+    createBubble({ bbox: fromMoss(moss, SIZE_OBJ), text: `测试台词${i + 1}`, type: i === 1 ? 'thought' : 'speech' })
   );
   return page;
 }
@@ -160,7 +161,7 @@ test('文字超预算会被警告', () => {
   const page = createPage({ size: SIZE });
   page.panels = [createPanel({ bbox: [8, 8, 760, 400] })];
   page.bubbles = [
-    createBubble({ text: '字'.repeat(300), bbox: [40, 40, 120, 100], fontSize: 24 }),
+    createBubble({ text: '字'.repeat(300), bbox: [40, 40, 120, 100], size: 24 }),
   ];
   const warnings = validatePage(page, compilePage(page).doc);
   assert.ok(warnings.some((w) => w.code === 'bubble.overflow'));

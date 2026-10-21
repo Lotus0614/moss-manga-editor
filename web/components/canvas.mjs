@@ -77,7 +77,7 @@ function horizontalLines(text, bbox, fontSize) {
 function Bubble({ bubble, selected, onSelect, onDragStart }) {
   const t = bubble.type || 'speech';
   const [x1, y1, x2, y2] = bubble.bbox;
-  const fs = bubble.fontSize || 22;
+  const fs = bubble.size || 22;
   const bare = t === 'narration' || t === 'sfx';
   const dashed = t === 'heart';
   const wavy = t === 'tremble';
@@ -120,7 +120,6 @@ function Bubble({ bubble, selected, onSelect, onDragStart }) {
       />`;
     }
   }
-
   const columns = bubble.vertical === false ? [] : verticalLines(bubble.text, bubble.bbox, fs);
   const rows = bubble.vertical === false ? horizontalLines(bubble.text, bubble.bbox, fs) : [];
 
@@ -183,14 +182,11 @@ function Panel({ panel, index, selected, onSelect, onDragStart, hasImage }) {
   </g>`;
 }
 
-export default function Canvas({ page, scale, selection, onSelect, onChange, onCommit }) {
-  const W = page.size.width;
-  const H = page.size.height;
+export default function Canvas({ page, image, scale, selection, onSelect, onChange, onCommit }) {
+  const [W, H] = page.size;
   const svgRef = useRef(null);
   const dragRef = useRef(null);
   const [guides, setGuides] = useState([]);
-
-  const currentVersion = (page.versions || []).find((v) => v.id === page.currentVersionId) || (page.versions || []).slice(-1)[0];
 
   function pointOf(event) {
     const rect = svgRef.current.getBoundingClientRect();
@@ -333,8 +329,8 @@ export default function Canvas({ page, scale, selection, onSelect, onChange, onC
         onPointerDown=${() => onSelect?.(null)}
       >
         <rect x="0" y="0" width=${W} height=${H} fill="#ffffff" />
-        ${currentVersion?.image
-          ? html`<image href=${currentVersion.image} x="0" y="0" width=${W} height=${H} preserveAspectRatio="xMidYMid slice" />`
+        ${image
+          ? html`<image href=${image} x="0" y="0" width=${W} height=${H} preserveAspectRatio="xMidYMid slice" />`
           : null}
 
         <rect class="safe-line" x="8" y="8" width=${W - 16} height=${H - 16} />
@@ -343,7 +339,7 @@ export default function Canvas({ page, scale, selection, onSelect, onChange, onC
           key=${panel.id}
           panel=${panel}
           index=${i}
-          hasImage=${Boolean(currentVersion?.image)}
+          hasImage=${Boolean(image)}
           selected=${selection?.kind === 'panel' && selection.id === panel.id}
           onSelect=${onSelect}
           onDragStart=${startDrag}

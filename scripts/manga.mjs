@@ -1,0 +1,647 @@
+#!/usr/bin/env node
+// moss-manga CLI —— Agent 操作漫画存档的唯一入口。
+//
+//   node scripts/manga.mjs doctor
+//   node scripts/manga.mjs page show --page 1 --summary
+//
+// 所有命令都支持 --json，输出稳定的结构化结果；默认输出给人看的紧凑文本。
+
+import { spawn } from 'node:child_process';
+import { readFile, writeFile, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import {
+  resolveArchiveDir,
+  ensureArchive,
+  readConfig,
+  writeConfig,
+  readState,
+  getPath,
+  setPath,
+} from './lib/config.mjs';
+import {
+  listProjects,
+  getProject,
+  createProject,
+  saveProject,
+  removeProject,
+  listPages,
+  getPage,
+  savePage,
+  createPage,
+  removePage,
+  changes,
+  ack,
+  currentRev,
+  readJournal,
+} from './lib/archive.mjs';
+import { listWorkflows, importWorkflow, readWorkflow } from './lib/workflow.mjs';
+import { ComfyClient } from './lib/comfy.mjs';
+import { prepareRender, renderPage } from './lib/render.mjs';
+import { compilePage } from '../core/compile.mjs';
+import { compileContext } from '../core/bible.mjs';
+import { diffPage, describeOp } from './lib/diff.mjs';
+import { applyPreset, seedPage, LAYOUT_PRESETS, PRESET_IDS } from '../core/presets.mjs';
+import { createPanel, createBubble } from '../core/manga-doc.mjs';
+import { pageOutline, projectOutline, warningsText, table, diffText } from './lib/format.mjs';
+
+const HERE = import.meta.dirname;
+const SERVER = resolve(HERE, '..', 'server.mjs');
+const VERSION = '2.0.0';
+
+// ---------------------------------------------------------------- 参数解析
+
+function parseArgs(argv) {
+  const positional = [];
+  const flags = {};
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (!arg.startsWith('--')) {
+      positional.push(arg);
+      continue;
+    }
+    const body = arg.slice(2);
+    const eq = body.indexOf('=');
+    if (eq >= 0) {
+      flags[body.slice(0, eq)] = body.slice(eq + 1);
+    } else if (i + 1 < argv.length && !argv[i + 1].startsWith('--')) {
+      flags[body] = argv[i + 1];
+      i += 1;
+    } else {
+      flags[body] = true;
+    }
+  }
+  return { positional, flags };
+}
+
+const { positional, flags } = parseArgs(process.argv.slice(2));
+const command = positional[0] || 'help';
+const JSON_MODE = Boolean(flags.json);
+const DIR = resolveArchiveDir(flags.dir);
+
+function out(payload, human) {
+  if (JSON_MODE) {
+    process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+  } else {
+    process.stdout.write(`${human ?? ''}\n`);
+  }
+}
+
+function fail(message, code = 'error') {
+  if (JSON_MODE) process.stdout.write(`${JSON.stringify({ ok: false, code, error: message }, null, 2)}\n`);
+  else process.stderr.write(`错误：${message}\n`);
+  process.exit(1);
+}
+
+// ---------------------------------------------------------------- 通用解析
+
+async function needProject() {
+  if (flags.project) {
+    const project = await getProject(DIR, String(flags.project));
+    if (!project) fail(`项目不存在：${flags.project}`);
+    return project;
+  }
+  const projects = await listProjects(DIR);
+  if (projects.length === 1) return projects[0];
+  if (!projects.length) fail('还没有任何项目，先用 `manga project new --name "名字"` 建一个');
+  fail(`有多个项目，请用 --project 指定：${projects.map((p) => p.slug).join(', ')}`);
+}
+
+async function needPage(project) {
+  const ref = flags.page;
+  if (ref === undefined) fail('缺少 --page（页码，从 1 开始）');
+  const page = await getPage(DIR, project.slug, ref);
+  if (!page) {
+    const pages = await listPages(DIR, project.slug);
+    fail(`找不到第 ${ref} 页（现有：${pages.map((p) => p.index).join(', ') || '无'}）`);
+  }
+  return page;
+}
+
+// ---------------------------------------------------------------- 命令
+
+async function cmdDoctor() {
+  const archiveExists = existsSync(join(DIR, 'config.json'));
+  const result = {
+    ok: true,
+    configured: false,
+    archive: DIR,
+    archiveExists,
+    version: VERSION,
+    comfy: { url: '', reachable: false, version: '', checkpoints: 0, loras: 0 },
+    workflow: { name: '', ok: false, params: [], error: '' },
+    ckpt: '',
+    projects: 0,
+    problems: [],
+  };
+
+  if (!archiveExists) {
+    result.problems.push('还没有初始化存档：先运行 `manga init`');
+    out(result, ['未初始化', `存档位置：${DIR}`, '下一步：manga init --comfy http://127.0.0.1:8188'].join('\n'));
+    return;
+  }
+
+  const config = await readConfig(DIR);
+  result.comfy.url = config.comfy.url;
+  result.ckpt = config.defaults.ckpt;
+  result.workflow.name = config.workflow.name;
+
+  const client = new ComfyClient({ url: config.comfy.url });
+  try {
+    const stats = await client.stats();
+    const info = await client.objectInfo();
+    result.comfy.reachable = true;
+    result.comfy.version = stats.system?.comfyui_version || '';
+    result.comfy.checkpoints = info.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0]?.length || 0;
+    result.comfy.loras = info.LoraLoader?.input?.required?.lora_name?.[0]?.length || 0;
+    const checkpoints = info.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
+    if (!result.ckpt) {
+      result.problems.push('还没有设置 ckpt：manga config set defaults.ckpt <文件名>');
+    } else if (checkpoints.length && !checkpoints.includes(result.ckpt)) {
+      result.problems.push(`ckpt「${result.ckpt}」在 ComfyUI 里找不到`);
+    }
+  } catch (err) {
+    result.comfy.error = err.message;
+    result.problems.push(`连不上 ComfyUI：${err.message}`);
+  }
+
+  try {
+    const workflows = await listWorkflows(DIR);
+    const picked = workflows.find((w) => w.name === config.workflow.name) || workflows[0];
+    if (picked) {
+      result.workflow = { name: picked.name, ok: picked.ok, params: picked.params.map((p) => p.name), error: picked.error };
+      if (!picked.ok) result.problems.push(`工作流有问题：${picked.error}`);
+    } else {
+      result.workflow.ok = false;
+      result.problems.push('没有可用的工作流文件');
+    }
+  } catch (err) {
+    result.problems.push(`读取工作流失败：${err.message}`);
+  }
+
+  const projects = await listProjects(DIR);
+  result.projects = projects.length;
+  result.configured = result.comfy.reachable && Boolean(result.ckpt) && result.workflow.ok && result.problems.length === 0;
+
+  out(
+    result,
+    [
+      `存档：${DIR}`,
+      `ComfyUI：${config.comfy.url} ${result.comfy.reachable ? `✓ ${result.comfy.version}` : '✗ 连不上'}`,
+      `检查点：${result.ckpt || '（未设置）'}`,
+      `工作流：${result.workflow.name} ${result.workflow.ok ? `✓ ${result.workflow.params.length} 个参数` : '✗'}`,
+      `项目：${projects.length} 个`,
+      result.configured ? '状态：已配置，可以直接开始画' : `状况：${result.problems.length} 个问题`,
+      ...result.problems.map((p) => `  - ${p}`),
+    ].join('\n')
+  );
+}
+
+async function cmdInit() {
+  await ensureArchive(DIR);
+  const patch = {};
+  if (flags.comfy) patch.comfy = { url: String(flags.comfy) };
+  if (flags.ckpt) patch.defaults = { ckpt: String(flags.ckpt) };
+  if (flags.workflow) {
+    const file = resolve(String(flags.workflow));
+    const imported = await importWorkflow(DIR, await readFile(file, 'utf8'), 'default.json');
+    patch.workflow = { name: imported.name, exposed: imported.params.map((p) => p.name) };
+  } else if (!existsSync(join(DIR, 'workflows', 'default.json'))) {
+    // 没指定就把内置的通用工作流放进存档，保证开箱能跑通链路
+    const builtin = await readWorkflow(DIR, 'moss-image.api.json');
+    const imported = await importWorkflow(DIR, builtin.raw, 'default.json');
+    patch.workflow = { name: imported.name, exposed: imported.params.map((p) => p.name) };
+  }
+  const config = Object.keys(patch).length ? await writeConfig(DIR, patch) : await readConfig(DIR);
+  out(
+    { ok: true, archive: DIR, config },
+    [
+      `存档已就绪：${DIR}`,
+      `ComfyUI：${config.comfy.url}`,
+      `工作流：${config.workflow.name}`,
+      config.defaults.ckpt ? `检查点：${config.defaults.ckpt}` : '检查点：还没选（manga config set defaults.ckpt <文件名>）',
+    ].join('\n')
+  );
+}
+
+async function cmdConfig() {
+  const action = positional[1] || 'get';
+  if (action === 'get') {
+    const config = await readConfig(DIR);
+    const key = positional[2];
+    if (key) {
+      const value = getPath(config, key);
+      return out({ ok: true, key, value }, `${key} = ${JSON.stringify(value)}`);
+    }
+    return out({ ok: true, config }, JSON.stringify(config, null, 2));
+  }
+  if (action !== 'set') fail('用法：manga config get [键] | manga config set 键=值 [键=值...]');
+
+  let config = await readConfig(DIR);
+  const pairs = positional.slice(2);
+  if (!pairs.length) fail('至少给一个 键=值');
+  for (const pair of pairs) {
+    const eq = pair.indexOf('=');
+    if (eq < 0) fail(`不是 键=值 形式：${pair}`);
+    const key = pair.slice(0, eq);
+    const raw = pair.slice(eq + 1);
+    let value;
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      value = raw;
+    }
+    config = setPath(config, key, value);
+  }
+  await writeConfig(DIR, config);
+  out({ ok: true, config }, `已更新：${pairs.join('，')}`);
+}
+
+async function cmdWorkflow() {
+  const action = positional[1] || 'list';
+  if (action === 'list') {
+    const workflows = await listWorkflows(DIR);
+    return out(
+      { ok: true, workflows },
+      table(
+        workflows.map((w) => [w.name, w.source, w.ok ? `${w.params.length} 参数` : '解析失败', w.params.map((p) => p.name).join(',')]),
+        ['文件', '来源', '状态', '参数']
+      )
+    );
+  }
+  if (action === 'import') {
+    const file = positional[2] || flags.file;
+    if (!file) fail('用法：manga workflow import <API JSON 文件> [--name default.json]');
+    const raw = await readFile(resolve(String(file)), 'utf8');
+    const name = String(flags.name || 'default.json');
+    const imported = await importWorkflow(DIR, raw, name);
+    await writeConfig(DIR, { workflow: { name: imported.name, exposed: imported.params.map((p) => p.name) } });
+    return out(
+      { ok: true, workflow: imported },
+      [
+        `已导入 ${imported.name}（${imported.nodeCount} 个节点）`,
+        `识别到参数：${imported.params.map((p) => `{{${p.name}}}:${p.type}`).join(', ') || '（没有占位符）'}`,
+        '已设为当前工作流。',
+      ].join('\n')
+    );
+  }
+  if (action === 'show') {
+    const name = String(flags.name || (await readConfig(DIR)).workflow.name);
+    const wf = await readWorkflow(DIR, name);
+    return out({ ok: true, ...wf }, wf.raw);
+  }
+  fail('用法：manga workflow list | import <文件> | show');
+}
+
+async function cmdProject() {
+  const action = positional[1] || 'list';
+  if (action === 'new') {
+    const name = String(flags.name || '').trim();
+    if (!name) fail('用法：manga project new --name "项目名" [--size page|page-hd|square|wide]');
+    const project = await createProject(DIR, { name, size: String(flags.size || 'page') });
+    return out({ ok: true, project }, `已创建项目「${project.name}」，slug=${project.slug}`);
+  }
+  if (action === 'list') {
+    const projects = await listProjects(DIR);
+    const rows = [];
+    for (const p of projects) rows.push([p.slug, p.name, p.size, (await listPages(DIR, p.slug)).length]);
+    return out({ ok: true, projects }, table(rows, ['slug', '名称', '画布', '页数']));
+  }
+  if (action === 'show') {
+    const project = await needProject();
+    const pages = await listPages(DIR, project.slug);
+    return out({ ok: true, project, pages }, projectOutline(project, pages));
+  }
+  if (action === 'delete') {
+    const project = await needProject();
+    await removeProject(DIR, project.slug);
+    return out({ ok: true }, `已删除项目「${project.name}」`);
+  }
+  fail('用法：manga project new|list|show|delete');
+}
+
+async function cmdPage() {
+  const action = positional[1] || 'list';
+  const project = await needProject();
+
+  if (action === 'new') {
+    const title = String(flags.title || '');
+    let page = await createPage(DIR, project.slug, { title });
+    if (!flags.blank) {
+      const preset = String(flags.preset || 'band-3');
+      if (!PRESET_IDS.includes(preset)) fail(`没有这个版式：${preset}（可选：${PRESET_IDS.join(', ')}）`);
+      page = await savePage(DIR, project.slug, seedPage(page.page, preset), { actor: 'cli' });
+    }
+    const fresh = await getPage(DIR, project.slug, page.page.id);
+    return out({ ok: true, page: fresh }, `已新建第 ${fresh.index} 页（${fresh.id}）`);
+  }
+
+  if (action === 'list') {
+    const pages = await listPages(DIR, project.slug);
+    return out(
+      { ok: true, pages },
+      table(
+        pages.map((p) => [p.index, p.id, p.title || '—', p.panels, p.bubbles, p.rev]),
+        ['页', 'id', '标题', '格', '字', 'rev']
+      )
+    );
+  }
+
+  if (action === 'show') {
+    const page = await needPage(project);
+    if (JSON_MODE) return out({ ok: true, page }, '');
+    return out({ ok: true, page }, flags.summary === false ? JSON.stringify(page, null, 2) : pageOutline(page));
+  }
+
+  if (action === 'set') {
+    const page = await needPage(project);
+    let patch = null;
+    if (flags.file) patch = JSON.parse(await readFile(resolve(String(flags.file)), 'utf8'));
+    else if (flags.patch) patch = JSON.parse(String(flags.patch));
+    if (!patch) fail('需要 --file <patch.json> 或 --patch \'{"title":"..."}\'');
+
+    const next = applyPatch(page, patch, { replace: Boolean(flags.replace) });
+    const ops = diffPage(page, next);
+    const refused = checkScope(await readConfig(DIR), ops);
+    if (refused.length) {
+      fail(`这些改动超出了允许范围（${refused.join('、')}）：${ops.map(describeOp).join('；')}`, 'scope');
+    }
+    const saved = await savePage(DIR, project.slug, next, { actor: 'cli' });
+    return out(
+      { ok: true, page: saved.page, rev: saved.rev, ops: saved.ops },
+      saved.ops.length ? `已保存第 ${page.index} 页（rev ${saved.rev}）\n${saved.ops.map((o) => `  ${describeOp(o)}`).join('\n')}` : '没有变化'
+    );
+  }
+
+  if (action === 'apply') {
+    const page = await needPage(project);
+    const preset = String(flags.preset || '');
+    if (!PRESET_IDS.includes(preset)) fail(`没有这个版式：${preset}（可选：${PRESET_IDS.join(', ')}）`);
+    const next = applyPreset(page, preset);
+    const saved = await savePage(DIR, project.slug, next, { actor: 'cli' });
+    return out({ ok: true, page: saved.page }, `第 ${page.index} 页已套用「${preset}」，现在 ${saved.page.panels.length} 格`);
+  }
+
+  if (action === 'delete') {
+    const page = await needPage(project);
+    await removePage(DIR, project.slug, page.id);
+    return out({ ok: true }, `已删除第 ${page.index} 页`);
+  }
+
+  fail('用法：manga page new|list|show|set|apply|delete');
+}
+
+/**
+ * 应用补丁：数组默认按 id 合并（只改你写的那几条），--replace 才是整体替换。
+ * 删除用 patch.removePanels / patch.removeBubbles 显式列出 id。
+ */
+function applyPatch(page, patch, { replace = false } = {}) {
+  const next = { ...page };
+  for (const [key, value] of Object.entries(patch)) {
+    if (key === 'panels' || key === 'bubbles' || key === 'removePanels' || key === 'removeBubbles') continue;
+    if (key === 'id') continue;
+    next[key] = value;
+  }
+
+  const mergeItems = (existing, incoming, factory) => {
+    if (replace) return incoming.map((item) => (item.id ? item : factory(item)));
+    const out = existing.map((item) => ({ ...item }));
+    for (const item of incoming || []) {
+      if (item?.id) {
+        const index = out.findIndex((x) => x.id === item.id);
+        if (index >= 0) out[index] = { ...out[index], ...item, id: item.id };
+        else out.push(factory(item));
+      } else {
+        out.push(factory(item));
+      }
+    }
+    return out;
+  };
+
+  let panels = mergeItems(page.panels, patch.panels, (item) => createPanel(item));
+  let bubbles = mergeItems(page.bubbles, patch.bubbles, (item) => createBubble(item));
+  if (Array.isArray(patch.removePanels)) panels = panels.filter((p) => !patch.removePanels.includes(p.id));
+  if (Array.isArray(patch.removeBubbles)) bubbles = bubbles.filter((b) => !patch.removeBubbles.includes(b.id));
+
+  return { ...next, panels, bubbles, id: page.id };
+}
+
+function checkScope(config, ops) {
+  const editable = config.editable || {};
+  const refused = new Set();
+  for (const op of ops) {
+    if (op.op === 'page' && op.field === 'style' && editable.style === false) refused.add('画风');
+    if (op.target === 'panel' && editable.layout === false) refused.add('版面');
+    if (op.target === 'bubble') {
+      if (op.op === 'bbox' && editable.layout === false) refused.add('版面');
+      if (op.op === 'text' && editable.text === false) refused.add('台词');
+      if (op.op === 'field' && op.field === 'type' && editable.bubbleType === false) refused.add('气泡类型');
+      if (op.op === 'add' && editable.text === false) refused.add('台词');
+    }
+  }
+  return [...refused];
+}
+
+async function cmdCompile() {
+  const project = await needProject();
+  const page = await needPage(project);
+  const compiled = compilePage(page, compileContext(project, page));
+  const warnings = compiled.warnings;
+  if (JSON_MODE) return out({ ok: true, json: compiled.json, doc: compiled.doc, warnings, stats: compiled.stats }, '');
+  return out(
+    { ok: true, json: compiled.json, warnings },
+    `第 ${page.index} 页编译结果（${compiled.stats.bytes} 字节，${compiled.stats.items} 项）\n${warningsText(warnings)}\n\n${compiled.json}`
+  );
+}
+
+async function cmdRender() {
+  const project = await needProject();
+  const page = await needPage(project);
+  const config = await readConfig(DIR);
+
+  if (flags['dry-run']) {
+    const prepared = await prepareRender({ dir: DIR, project, page, config, opts: flags });
+    if (!prepared.ok) return fail(prepared.error, 'render');
+    return out(
+      { ok: true, dryRun: true, workflow: prepared.workflow, values: prepared.values, graph: prepared.graph },
+      `会使用工作流 ${prepared.workflow}，seed=${prepared.values.seed}\n${warningsText(prepared.warnings)}`
+    );
+  }
+
+  const started = Date.now();
+  try {
+    const result = await renderPage({
+      dir: DIR,
+      slug: project.slug,
+      project,
+      page,
+      config,
+      opts: flags,
+      onProgress: (p) => {
+        if (!JSON_MODE && p?.max) process.stderr.write(`\r生成中 ${Math.round((p.value / p.max) * 100)}%   `);
+      },
+    });
+    if (!JSON_MODE) process.stderr.write('\r');
+    const human = [
+      `第 ${page.index} 页已生成（${Date.now() - started}ms）`,
+      `图片：${result.image}`,
+      `seed：${result.seed}`,
+      warningsText(result.warnings),
+    ].join('\n');
+    out({ ok: true, ...result }, human);
+  } catch (err) {
+    return fail(err.message, 'render');
+  }
+}
+
+async function cmdChanges() {
+  const since = flags.since !== undefined ? Number(flags.since) : undefined;
+  const result = await changes(DIR, since);
+  // 给每页补上当前校验提醒数，省得 Agent 再跑一次 compile
+  for (const group of result.pages) {
+    const project = await getProject(DIR, group.project);
+    const page = await getPage(DIR, group.project, group.page);
+    if (project && page) {
+      const compiled = compilePage(page, compileContext(project, page));
+      group.warnings = compiled.warnings.length;
+      group.title = page.title;
+      group.index = page.index;
+    }
+  }
+  out({ ok: true, ...result }, diffText(result));
+}
+
+async function cmdAck() {
+  const result = await ack(DIR);
+  out({ ok: true, ...result }, `已确认，ackedRev = ${result.ackedRev}`);
+}
+
+async function cmdServe() {
+  const port = Number(flags.port || 5123);
+  const pidFile = join(DIR, 'server.pid');
+  if (existsSync(pidFile)) {
+    const pid = Number((await readFile(pidFile, 'utf8')).trim());
+    try {
+      process.kill(pid, 0);
+      return out({ ok: true, running: true, url: `http://127.0.0.1:${port}` }, `预览服务已经在跑：http://127.0.0.1:${port}`);
+    } catch {
+      await rm(pidFile, { force: true });
+    }
+  }
+
+  const child = spawn(process.execPath, [SERVER], {
+    detached: true,
+    stdio: 'ignore',
+    env: { ...process.env, MOSS_ARCHIVE: DIR, PORT: String(port) },
+  });
+  child.unref();
+  await writeFile(pidFile, String(child.pid), 'utf8');
+
+  const url = `http://127.0.0.1:${port}`;
+  for (let i = 0; i < 40; i += 1) {
+    await new Promise((r) => setTimeout(r, 250));
+    try {
+      const res = await fetch(`${url}/api/health`);
+      if (res.ok) break;
+    } catch {
+      /* 还没起来 */
+    }
+  }
+  if (flags.open) openBrowser(url);
+  out({ ok: true, running: true, url, pid: child.pid }, `预览已启动：${url}\n改完页面保存后刷新即可；关闭用 manga stop`);
+}
+
+async function cmdStop() {
+  const pidFile = join(DIR, 'server.pid');
+  if (!existsSync(pidFile)) return out({ ok: true, running: false }, '预览服务没有在跑');
+  const pid = Number((await readFile(pidFile, 'utf8')).trim());
+  try {
+    process.kill(pid);
+  } catch {
+    /* 已经没了 */
+  }
+  await rm(pidFile, { force: true });
+  out({ ok: true, running: false }, '预览服务已关闭');
+}
+
+async function cmdOpen() {
+  const port = Number(flags.port || 5123);
+  const url = `http://127.0.0.1:${port}`;
+  openBrowser(url);
+  out({ ok: true, url }, url);
+}
+
+function openBrowser(url) {
+  const cmd = process.platform === 'win32' ? 'cmd' : process.platform === 'darwin' ? 'open' : 'xdg-open';
+  const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
+  try {
+    spawn(cmd, args, { detached: true, stdio: 'ignore' }).unref();
+  } catch {
+    /* 打不开就算了，URL 已经打印 */
+  }
+}
+
+function cmdHelp() {
+  process.stdout.write(`moss-manga CLI v${VERSION}
+
+  配置
+    manga doctor                          检查配置与 ComfyUI 连通性
+    manga init [--comfy URL] [--ckpt NAME] [--workflow FILE]
+    manga config get [键] | config set 键=值 ...
+    manga workflow list | import <文件> [--name default.json]
+
+  项目与页面
+    manga project new --name "名字" [--size page]
+    manga project list | show | delete
+    manga page new [--preset band-3] [--title 标题] [--blank]
+    manga page list
+    manga page show --page N [--summary]
+    manga page set  --page N --file patch.json
+    manga page apply --page N --preset climax
+    manga page delete --page N
+
+  出图
+    manga compile --page N                       打印 Moss JSON 与校验
+    manga render  --page N [--seed S] [--steps N] [--dry-run]
+    manga changes [--since N] | manga ack
+
+  预览
+    manga serve [--port 5123] [--open] | manga stop | manga open
+
+ 全局：--dir <存档目录>  --project <slug>  --json
+`);
+}
+
+// ---------------------------------------------------------------- 分发
+
+const COMMANDS = {
+  doctor: cmdDoctor,
+  init: cmdInit,
+  config: cmdConfig,
+  workflow: cmdWorkflow,
+  project: cmdProject,
+  page: cmdPage,
+  compile: cmdCompile,
+  render: cmdRender,
+  changes: cmdChanges,
+  ack: cmdAck,
+  serve: cmdServe,
+  stop: cmdStop,
+  open: cmdOpen,
+  help: async () => cmdHelp(),
+};
+
+const handler = COMMANDS[command];
+if (!handler) {
+  cmdHelp();
+  process.exitCode = 2;
+} else {
+  try {
+    await handler();
+  } catch (err) {
+    fail(err.message, err.code || 'error');
+  }
+}
+

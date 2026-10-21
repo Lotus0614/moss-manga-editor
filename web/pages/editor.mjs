@@ -1,5 +1,5 @@
-// 编辑页：左页序 / 中画布 + 底部工作台 / 右 Agent。
-// 页面文档在这里是唯一可编辑真源，编译预览是它的纯函数产物。
+// 编辑页：左页序 / 中画布 + 工作台 / 右栏取消（不再有 Agent）。
+// 页面文档是唯一可编辑真源，编译预览在浏览器里现算（core/compile.mjs 由服务端托管）。
 
 import {
   html,
@@ -23,11 +23,10 @@ import {
   PRESET_LABELS,
 } from '../lib.mjs';
 import Canvas from '../components/canvas.mjs';
-import Chat from '../components/chat.mjs';
 import { exportLongImage, exportPdf } from '../components/export.mjs';
 import { compilePage } from '../../core/compile.mjs';
 import { compileContext } from '../../core/bible.mjs';
-import { applyPreset, seedPage } from '../../core/presets.mjs';
+import { applyPreset } from '../../core/presets.mjs';
 import { createPanel, createBubble } from '../../core/manga-doc.mjs';
 
 const STYLE_LABELS = [
@@ -41,12 +40,15 @@ export default function EditorPage({ projectId, pageId }) {
   const [pages, setPages] = useState([]);
   const [pagesLoaded, setPagesLoaded] = useState(false);
   const [page, setPage] = useState(null);
+  const [versions, setVersions] = useState([]);
+  const [current, setCurrent] = useState('');
   const [selection, setSelection] = useState(null);
   const [tab, setTab] = useState('props');
   const [gen, setGen] = useState(null);
   const [scale, setScale] = useState(0.55);
-  const [exporting, setExporting] = useState('');
+  const [changes, setChanges] = useState(null);
   const [showExport, setShowExport] = useState(false);
+  const [exporting, setExporting] = useState('');
 
   const stageRef = useRef(null);
   const pageRef = useRef(null);
@@ -57,7 +59,6 @@ export default function EditorPage({ projectId, pageId }) {
     pageRef.current = page;
   }, [page]);
 
-  // ---- 加载项目与页面列表
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -79,15 +80,16 @@ export default function EditorPage({ projectId, pageId }) {
     };
   }, [projectId]);
 
-  // ---- 加载当前页
   useEffect(() => {
     if (!pageId) return;
     let alive = true;
     api(`/api/projects/${projectId}/pages/${pageId}`)
-      .then((doc) => {
+      .then((data) => {
         if (!alive) return;
-        setPage(doc);
-        setApp({ page: doc });
+        setPage(data.page);
+        setVersions(data.versions || []);
+        setCurrent(data.current || '');
+        setApp({ page: data.page });
         setSelection(null);
       })
       .catch((err) => toast(err.message, 'bad'));
@@ -96,7 +98,6 @@ export default function EditorPage({ projectId, pageId }) {
     };
   }, [projectId, pageId]);
 
-  // ---- 没有页面时自动建一页（必须等页面列表真的加载完，否则会反复建页）
   useEffect(() => {
     if (!pagesLoaded || pageId || !project || createdFirst.current) return;
     if (!pages.length) {
@@ -109,22 +110,20 @@ export default function EditorPage({ projectId, pageId }) {
     }
   }, [project, pages, pagesLoaded, pageId, projectId]);
 
-  // ---- 画布自适应缩放
   useEffect(() => {
     const el = stageRef.current;
     if (!el || !page) return;
     const fit = () => {
       const w = el.clientWidth - 44;
       const h = el.clientHeight - 44;
-      setScale(Math.max(0.18, Math.min(w / page.size.width, h / page.size.height)));
+      setScale(Math.max(0.18, Math.min(w / page.size[0], h / page.size[1])));
     };
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [page?.size.width, page?.size.height, page]);
+  }, [page?.size?.[0], page?.size?.[1], page]);
 
-  // ---- 生成任务进度
   useEffect(() => {
     const es = new EventSource('/api/jobs/stream');
     es.addEventListener('job', (event) => {
@@ -134,15 +133,12 @@ export default function EditorPage({ projectId, pageId }) {
       } catch {
         return;
       }
-      const current = pageRef.current;
-      if (!current || job.pageId !== current.id) return;
+      const cur = pageRef.current;
+      if (!cur || job.page !== cur.id) return;
       setGen(job);
       if (job.status === 'done') {
         toast('生成完成');
-        api(`/api/projects/${projectId}/pages/${current.id}`).then((doc) => {
-          setPage(doc);
-          setApp({ page: doc });
-        });
+        reloadPage(cur.id);
         refreshPages();
       } else if (job.status === 'error') {
         toast(job.error || '生成失败', 'bad');
@@ -160,6 +156,16 @@ export default function EditorPage({ projectId, pageId }) {
       .catch(() => {});
   }
 
+  function reloadPage(id) {
+    api(`/api/projects/${projectId}/pages/${id}`)
+      .then((data) => {
+        setPage(data.page);
+        setVersions(data.versions || []);
+        setCurrent(data.current || '');
+      })
+      .catch(() => {});
+  }
+
   function updatePage(patch) {
     setPage((prev) => {
       const next = typeof patch === 'function' ? patch(prev) : { ...prev, ...patch };
@@ -171,16 +177,16 @@ export default function EditorPage({ projectId, pageId }) {
 
   function scheduleSave() {
     clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(saveNow, 700);
+    saveTimer.current = setTimeout(saveNow, 600);
   }
 
   async function saveNow() {
-    const current = pageRef.current;
-    if (!current) return;
+    const cur = pageRef.current;
+    if (!cur) return;
     try {
-      const saved = await apiPut(`/api/projects/${projectId}/pages/${current.id}`, current);
+      const saved = await apiPut(`/api/projects/${projectId}/pages/${cur.id}`, cur);
       pageRef.current = saved;
-      setPage((prev) => (prev && prev.id === saved.id ? { ...saved, ...prev } : prev));
+      setPage((prev) => (prev && prev.id === saved.id ? { ...prev, rev: saved.rev } : prev));
       refreshPages();
     } catch (err) {
       toast(err.message, 'bad');
@@ -191,17 +197,10 @@ export default function EditorPage({ projectId, pageId }) {
     setPage((prev) => {
       if (!prev) return prev;
       const key = kind === 'panel' ? 'panels' : 'bubbles';
-      const next = {
-        ...prev,
-        [key]: prev[key].map((item) => (item.id === id ? { ...item, bbox } : item)),
-      };
+      const next = { ...prev, [key]: prev[key].map((item) => (item.id === id ? { ...item, bbox } : item)) };
       pageRef.current = next;
       return next;
     });
-  }
-
-  function onCanvasCommit() {
-    saveNow();
   }
 
   const compiled = useMemo(() => {
@@ -209,15 +208,15 @@ export default function EditorPage({ projectId, pageId }) {
     try {
       return compilePage(page, compileContext(project, page));
     } catch (err) {
-      return { json: '', doc: null, warnings: [{ level: 'error', code: 'compile', message: err.message }], stats: {} };
+      return { json: '', warnings: [{ level: 'error', code: 'compile', message: err.message }], stats: {} };
     }
   }, [page, project]);
 
   async function generate() {
     if (!page) return;
     try {
-      const res = await apiPost(`/api/projects/${projectId}/pages/${page.id}/generate`, {});
-      setGen({ status: 'queued', progress: { value: 0, max: 0 }, id: res.jobId });
+      const res = await apiPost(`/api/projects/${projectId}/pages/${page.id}/render`, {});
+      setGen({ status: 'running', progress: 0, id: res.jobId });
     } catch (err) {
       toast(err.message, 'bad');
     }
@@ -235,25 +234,52 @@ export default function EditorPage({ projectId, pageId }) {
 
   async function removePage() {
     if (!page) return;
-    if (!confirm(`删除第 ${page.index} 页？该页的历史图片也会一起删掉。`)) return;
+    if (!confirm(`删除第 ${page.index} 页？这一页的历史图会一起删掉。`)) return;
     try {
       await apiDelete(`/api/projects/${projectId}/pages/${page.id}`);
       const rest = pages.filter((p) => p.id !== page.id);
       setPages(rest);
-      if (rest.length) go(`/p/${projectId}/p/${rest[0].id}`);
-      else go(`/p/${projectId}`);
+      go(rest.length ? `/p/${projectId}/p/${rest[0].id}` : `/p/${projectId}`);
     } catch (err) {
       toast(err.message, 'bad');
     }
   }
 
+  async function loadChanges() {
+    try {
+      setChanges(await api('/api/changes'));
+    } catch (err) {
+      toast(err.message, 'bad');
+    }
+  }
+
+  async function confirmChanges() {
+    try {
+      await apiPost('/api/ack', {});
+      toast('已确认');
+      loadChanges();
+    } catch (err) {
+      toast(err.message, 'bad');
+    }
+  }
+
+  async function collectExportItems() {
+    const items = [];
+    for (const p of pages) {
+      const data = await api(`/api/projects/${projectId}/pages/${p.id}`);
+      const list = data.versions || [];
+      const picked = list.find((v) => v.id === data.current && v.page === p.id) || list.filter((v) => v.page === p.id).slice(-1)[0];
+      if (picked) items.push({ image: picked.image, index: p.index, title: p.title });
+    }
+    return items;
+  }
+
   async function doExport(kind) {
     setExporting(kind);
     try {
-      const docs = await Promise.all(pages.map((p) => api(`/api/projects/${projectId}/pages/${p.id}`)));
-      const ordered = docs.sort((a, b) => a.index - b.index);
-      if (kind === 'long') await exportLongImage(ordered, project?.name || 'chapter');
-      else await exportPdf(ordered, project?.name || 'chapter');
+      const items = await collectExportItems();
+      if (kind === 'long') await exportLongImage(items, project?.name || 'chapter');
+      else await exportPdf(items, project?.name || 'chapter');
       setShowExport(false);
     } catch (err) {
       toast(err.message, 'bad');
@@ -262,30 +288,23 @@ export default function EditorPage({ projectId, pageId }) {
     }
   }
 
-  if (!page) {
-    return html`<div class="page-scroll"><div class="container">载入中…</div></div>`;
-  }
+  if (!page) return html`<div class="page-scroll"><div class="container">载入中…</div></div>`;
 
   const warnings = compiled?.warnings || [];
   const errors = warnings.filter((w) => w.level === 'error');
   const warns = warnings.filter((w) => w.level === 'warn');
   const selectedPanel = selection?.kind === 'panel' ? page.panels.find((p) => p.id === selection.id) : null;
   const selectedBubble = selection?.kind === 'bubble' ? page.bubbles.find((b) => b.id === selection.id) : null;
-  const currentVersion = (page.versions || []).find((v) => v.id === page.currentVersionId) || (page.versions || []).slice(-1)[0];
-  const genProgress =
-    gen?.progress?.max > 0 ? Math.round((gen.progress.value / gen.progress.max) * 100) : gen?.status === 'done' ? 100 : 0;
+  const currentVersion = versions.find((v) => v.id === current) || versions.slice(-1)[0];
+  const image = currentVersion?.image || '';
+  const genProgress = gen?.progress || 0;
 
   return html`<div class="editor">
-    <!-- 页序 -->
     <aside class="rail">
       <div class="rail-head">PAGES<div class="spacer"></div>${pages.length}</div>
       <div class="rail-list">
         ${pages.map(
-          (p) => html`<div
-            class=${cls('pg', p.id === page.id && 'on')}
-            key=${p.id}
-            onClick=${() => go(`/p/${projectId}/p/${p.id}`)}
-          >
+          (p) => html`<div class=${cls('pg', p.id === page.id && 'on')} key=${p.id} onClick=${() => go(`/p/${projectId}/p/${p.id}`)}>
             <span class="n">${String(p.index).padStart(2, '0')}</span>
             <div class="thumb">
               ${p.cover ? html`<img src=${p.cover} alt="" loading="lazy" />` : html`<span class="ghost">${p.panels}格</span>`}
@@ -295,11 +314,10 @@ export default function EditorPage({ projectId, pageId }) {
       </div>
       <div class="rail-foot">
         <button class="btn sm grow" onClick=${() => addPage('band-3')}>＋ 新页</button>
-        <button class="btn sm ghost" title="删除本页" onClick=${removePage}>删</button>
+        <button class="btn sm ghost" onClick=${removePage}>删</button>
       </div>
     </aside>
 
-    <!-- 画布 + 工作台 -->
     <section class="work">
       <div class="work-head">
         <input
@@ -309,16 +327,14 @@ export default function EditorPage({ projectId, pageId }) {
           placeholder=${`第 ${page.index} 页`}
           onInput=${(e) => updatePage({ title: e.currentTarget.value })}
         />
-        <span class="meta">${page.size.width}×${page.size.height} · ${page.panels.length}格 ${page.bubbles.length}字</span>
+        <span class="meta">${page.size[0]}×${page.size[1]} · ${page.panels.length}格 ${page.bubbles.length}字 · rev ${page.rev}</span>
         ${errors.length
           ? html`<span class="tag" style="background:#000;color:#fff">${errors.length} 个错误</span>`
           : warns.length
             ? html`<span class="tag">${warns.length} 个提醒</span>`
             : null}
         <div class="spacer"></div>
-        ${gen && gen.status !== 'done' && gen.status !== 'error'
-          ? html`<span class="meta">${gen.status === 'queued' ? '排队' : `生成 ${genProgress}%`}</span>`
-          : null}
+        ${gen && gen.status !== 'done' && gen.status !== 'error' ? html`<span class="meta">生成 ${genProgress}%</span>` : null}
         <button class="btn ghost" onClick=${() => setShowExport(true)}>导出</button>
         <button class="btn inv" disabled=${errors.length > 0} onClick=${generate}>生成</button>
       </div>
@@ -326,51 +342,44 @@ export default function EditorPage({ projectId, pageId }) {
       <div class="stage" ref=${stageRef}>
         <${Canvas}
           page=${page}
+          image=${image}
           scale=${scale}
           selection=${selection}
           onSelect=${setSelection}
           onChange=${onCanvasChange}
-          onCommit=${onCanvasCommit}
+          onCommit=${saveNow}
         />
       </div>
 
-      <!-- 工作台 -->
       <div class="dock">
         <div class="dock-head">
           <div class=${cls('tab', tab === 'props' && 'on')} onClick=${() => setTab('props')}>属性</div>
           <div class=${cls('tab', tab === 'prompt' && 'on')} onClick=${() => setTab('prompt')}>
-            提示词
-            ${errors.length ? html`<span class="badge">${errors.length}</span>` : warns.length ? html`<span class="badge warn">${warns.length}</span>` : null}
+            提示词${errors.length
+              ? html`<span class="badge">${errors.length}</span>`
+              : warns.length
+                ? html`<span class="badge warn">${warns.length}</span>`
+                : null}
           </div>
           <div class=${cls('tab', tab === 'history' && 'on')} onClick=${() => setTab('history')}>
-            历史<span class="badge warn">${(page.versions || []).length}</span>
+            历史<span class="badge warn">${versions.length}</span>
           </div>
-          <div class="spacer"></div>
-          <button class="btn sm ghost" onClick=${() => setTab(tab)}>刷新</button>
+          <div class=${cls('tab', tab === 'changes' && 'on')} onClick=${() => { setTab('changes'); loadChanges(); }}>
+            变更
+          </div>
         </div>
-
         <div class="dock-body">
-          ${tab === 'props' ? renderProps() : tab === 'prompt' ? renderPrompt() : renderHistory()}
+          ${tab === 'props' ? renderProps() : tab === 'prompt' ? renderPrompt() : tab === 'history' ? renderHistory() : renderChanges()}
         </div>
       </div>
     </section>
-
-    <${Chat} projectId=${projectId} pageId=${page.id} onActivity=${() => {
-      api(`/api/projects/${projectId}/pages/${page.id}`).then((doc) => {
-        setPage(doc);
-        refreshPages();
-      });
-    }} />
 
     ${showExport
       ? html`<div class="modal-mask" onClick=${(e) => e.target === e.currentTarget && setShowExport(false)}>
           <div class="modal">
             <header>导出</header>
             <div class="body">
-              <div class="hint">
-                只导出已经生成过图片的页面（每页取当前采用的版本），按页码顺序排列。
-                现在有 ${pages.filter((p) => p.cover).length} / ${pages.length} 页可导出。
-              </div>
+              <div class="hint">每页取当前采用的版本，按页码排序；没有图的页会被跳过。</div>
               <button class="btn wide" disabled=${exporting === 'long'} onClick=${() => doExport('long')}>
                 ${exporting === 'long' ? '拼接中…' : '单张长图（PNG）'}
               </button>
@@ -384,35 +393,31 @@ export default function EditorPage({ projectId, pageId }) {
       : null}
   </div>`;
 
-  // ---------------------------------------------------------------- 属性页签
+  // ---------------------------------------------------------------- 属性
 
   function renderProps() {
     return html`<div class="inspector">
       <div class="props">
         <div class="field full">
-          <label>页面描述补充（会追加到 summary）</label>
+          <label>页面补充说明（追加到 summary 末尾）</label>
           <textarea
             class="textarea"
             style="min-height:44px"
-            value=${page.summary?.caption || ''}
+            value=${page.note || ''}
             placeholder="这一段整体要传达什么"
-            onInput=${(e) => updatePage({ summary: { ...page.summary, caption: e.currentTarget.value } })}
+            onInput=${(e) => updatePage({ note: e.currentTarget.value })}
           ></textarea>
         </div>
         <div class="field">
           <label>阅读顺序</label>
-          <select class="select" value=${page.readingOrder} onChange=${(e) => updatePage({ readingOrder: e.currentTarget.value })}>
+          <select class="select" value=${page.reading} onChange=${(e) => updatePage({ reading: e.currentTarget.value })}>
             <option value="rtl">右 → 左</option>
             <option value="ltr">左 → 右</option>
           </select>
         </div>
         <div class="field">
           <label>画风</label>
-          <select
-            class="select"
-            value=${page.style.preset}
-            onChange=${(e) => updatePage({ style: { ...page.style, preset: e.currentTarget.value } })}
-          >
+          <select class="select" value=${page.style} onChange=${(e) => updatePage({ style: e.currentTarget.value })}>
             ${STYLE_LABELS.map(([v, n]) => html`<option value=${v}>${n}</option>`)}
           </select>
         </div>
@@ -421,7 +426,7 @@ export default function EditorPage({ projectId, pageId }) {
           <input
             class="input"
             value=${page.scene || ''}
-            placeholder="例如：a half-empty train carriage, fluorescent light"
+            placeholder="a half-empty train carriage, fluorescent light"
             onInput=${(e) => updatePage({ scene: e.currentTarget.value })}
           />
         </div>
@@ -433,14 +438,13 @@ export default function EditorPage({ projectId, pageId }) {
             ? panelInspector(selectedPanel)
             : bubbleInspector(selectedBubble)
           : html`<div class="col">
-              <span class="hint">在画布上点一个格子或一条文字来编辑；也可以直接用下面的版式重排。</span>
+              <span class="hint">点画布上的格子或文字来编辑；也可以直接用下面的版式重排。</span>
               <div class="row wrap">
                 ${PRESET_LABELS.map(
-                  ([id, name]) =>
-                    html`<button class="chip ghost" onClick=${() => {
-                      updatePage((prev) => applyPreset(prev, id));
-                      setTimeout(saveNow, 60);
-                    }}>${name}</button>`
+                  ([id, name]) => html`<button class="chip ghost" onClick=${() => {
+                    updatePage((prev) => applyPreset(prev, id));
+                    setTimeout(saveNow, 60);
+                  }}>${name}</button>`
                 )}
                 <button class="chip" onClick=${() => {
                   updatePage({ panels: [...page.panels, createPanel()] });
@@ -459,7 +463,7 @@ export default function EditorPage({ projectId, pageId }) {
   function panelInspector(panel) {
     return html`<div class="props">
       <div class="field full">
-        <label>这一格画什么（caption）</label>
+        <label>这一格画什么</label>
         <textarea
           class="textarea"
           style="min-height:56px"
@@ -485,10 +489,6 @@ export default function EditorPage({ projectId, pageId }) {
         <select class="select" value=${panel.frame} onChange=${(e) => updatePanel(panel.id, { frame: e.currentTarget.value })}>
           ${FRAME_LABELS.map(([v, n]) => html`<option value=${v}>${n}</option>`)}
         </select>
-      </div>
-      <div class="field">
-        <label>名字</label>
-        <input class="input" value=${panel.name || ''} onInput=${(e) => updatePanel(panel.id, { name: e.currentTarget.value })} />
       </div>
       <div class="field full">
         <label>坐标 x1 / y1 / x2 / y2</label>
@@ -518,12 +518,7 @@ export default function EditorPage({ projectId, pageId }) {
     return html`<div class="props">
       <div class="field full">
         <label>文字内容</label>
-        <textarea
-          class="textarea"
-          style="min-height:56px"
-          value=${bubble.text || ''}
-          onInput=${(e) => updateBubble(bubble.id, { text: e.currentTarget.value })}
-        ></textarea>
+        <textarea class="textarea" style="min-height:56px" value=${bubble.text || ''} onInput=${(e) => updateBubble(bubble.id, { text: e.currentTarget.value })}></textarea>
       </div>
       <div class="field">
         <label>类型</label>
@@ -533,37 +528,21 @@ export default function EditorPage({ projectId, pageId }) {
       </div>
       <div class="field">
         <label>字号</label>
-        <input
-          class="input"
-          type="number"
-          value=${bubble.fontSize}
-          onInput=${(e) => updateBubble(bubble.id, { fontSize: Number(e.currentTarget.value) || 22 })}
-        />
+        <input class="input" type="number" value=${bubble.size} onInput=${(e) => updateBubble(bubble.id, { size: Number(e.currentTarget.value) || 22 })} />
       </div>
       <div class="field">
-        <label>尾巴方向</label>
-        <select class="select" value=${bubble.tailDir} onChange=${(e) => updateBubble(bubble.id, { tailDir: e.currentTarget.value })}>
-          ${['down-left', 'down', 'down-right', 'left', 'right', 'up-left', 'up', 'up-right'].map(
-            (d) => html`<option value=${d}>${d}</option>`
-          )}
+        <label>尾巴</label>
+        <select class="select" value=${bubble.tail} onChange=${(e) => updateBubble(bubble.id, { tail: e.currentTarget.value })}>
+          <option value="none">无尾巴（说话者不在画面）</option>
+          ${['down-left', 'down', 'down-right', 'left', 'right', 'up-left', 'up', 'up-right'].map((d) => html`<option value=${d}>${d}</option>`)}
         </select>
       </div>
       <div class="field">
         <label>排布</label>
-        <select
-          class="select"
-          value=${bubble.vertical === false ? 'h' : 'v'}
-          onChange=${(e) => updateBubble(bubble.id, { vertical: e.currentTarget.value === 'v' })}
-        >
+        <select class="select" value=${bubble.vertical === false ? 'h' : 'v'} onChange=${(e) => updateBubble(bubble.id, { vertical: e.currentTarget.value === 'v' })}>
           <option value="v">竖排</option>
           <option value="h">横排</option>
         </select>
-      </div>
-      <div class="row full">
-        <label class="chk">
-          <input type="checkbox" checked=${!!bubble.tailOff} onChange=${(e) => updateBubble(bubble.id, { tailOff: e.currentTarget.checked })} />
-          说话者不在画面里（不要尾巴）
-        </label>
       </div>
       <div class="field full">
         <label>坐标 x1 / y1 / x2 / y2</label>
@@ -609,7 +588,7 @@ export default function EditorPage({ projectId, pageId }) {
     setTimeout(saveNow, 60);
   }
 
-  // ---------------------------------------------------------------- 提示词页签
+  // ---------------------------------------------------------------- 提示词
 
   function renderPrompt() {
     return html`<div class="row" style="align-items:flex-start;gap:16px">
@@ -640,33 +619,62 @@ export default function EditorPage({ projectId, pageId }) {
     </div>`;
   }
 
-  // ---------------------------------------------------------------- 历史页签
+  // ---------------------------------------------------------------- 历史
 
   function renderHistory() {
-    const versions = [...(page.versions || [])].reverse();
-    if (!versions.length) {
-      return html`<div class="hint">这一页还没有生成过图片。点右上角「生成」试试。</div>`;
-    }
+    const list = [...versions].reverse();
+    if (!list.length) return html`<div class="hint">这一页还没有生成过图片。点右上角「生成」。</div>`;
     return html`<div class="col" style="gap:10px">
       <div class="history-strip">
-        ${versions.map(
+        ${list.map(
           (v) => html`<div
-            class=${cls('version', v.id === currentVersion?.id && 'on')}
+            class=${cls('version', v.id === current && 'on')}
             key=${v.id}
             onClick=${() => {
-              updatePage({ currentVersionId: v.id });
-              setTimeout(saveNow, 60);
+              setCurrent(v.id);
+              apiPost(`/api/projects/${projectId}/versions/current`, { id: v.id }).catch(() => {});
             }}
           >
             <img src=${v.image} alt="" loading="lazy" />
-            <div class="vmeta">
-              <b>${v.seed}</b>
-              ${formatTime(v.at).slice(5)}
-            </div>
+            <div class="vmeta"><b>${v.seed}</b>${formatTime(v.at).slice(5)}</div>
           </div>`
         )}
       </div>
-      <span class="hint">点缩略图切换当前采用版；历史版本的布局只读，不能修改。</span>
+      <span class="hint">历史只读：切换只影响预览用哪一版，不会改布局。</span>
     </div>`;
   }
+
+  // ---------------------------------------------------------------- 变更
+
+  function renderChanges() {
+    if (!changes) return html`<div class="hint">读取中…</div>`;
+    if (!changes.pages.length) {
+      return html`<div class="row">
+        <span class="hint">自 rev ${changes.since} 以来没有改动（当前 rev ${changes.to}）。</span>
+      </div>`;
+    }
+    return html`<div class="col" style="gap:8px">
+      <div class="row">
+        <span class="mono small muted">rev ${changes.since} → ${changes.to}</span>
+        <div class="spacer"></div>
+        <button class="btn sm" onClick=${confirmChanges}>确认已查看</button>
+      </div>
+      ${changes.pages.map(
+        (group) => html`<div class="col" style="gap:2px">
+          <span class="mono small">第 ${group.index ?? '?'} 页 · ${group.title || group.page}</span>
+          ${group.ops.map((op) => html`<div class="small" style="border-left:2px solid var(--line);padding-left:8px">${describe(op)}</div>`)}
+        </div>`
+      )}
+    </div>`;
+  }
+}
+
+function describe(op) {
+  if (op.op === 'create') return '新建页面';
+  if (op.op === 'add') return `+ ${op.target === 'bubble' ? '文字' : '格'} ${op.id} [${(op.bbox || []).join(',')}]${op.text ? `「${op.text}」` : ''}`;
+  if (op.op === 'remove') return `- ${op.target === 'bubble' ? '文字' : '格'} ${op.id}`;
+  if (op.op === 'bbox') return `~ ${op.target === 'bubble' ? '文字' : '格'} ${op.id} [${op.from.join(',')}] → [${op.to.join(',')}]`;
+  if (op.op === 'text') return `~ 文字 ${op.id}「${op.from}」→「${op.to}」`;
+  if (op.op === 'page') return `~ 页.${op.field}：${op.from ?? '（空）'} → ${op.to ?? '（空）'}`;
+  return `~ ${op.target} ${op.id} ${op.field}`;
 }

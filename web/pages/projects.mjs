@@ -1,6 +1,6 @@
 // 项目列表页。
 
-import { html, api, apiDelete, go, useState, useEffect, formatTime, toast, cls } from '../lib.mjs';
+import { html, api, apiDelete, go, useState, useEffect, toast } from '../lib.mjs';
 
 const SIZES = [
   ['page', '分镜页 768×1280'],
@@ -9,7 +9,7 @@ const SIZES = [
   ['wide', '横版 1536×1024'],
 ];
 
-export default function ProjectsPage({ settings }) {
+export default function ProjectsPage() {
   const [list, setList] = useState(null);
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
@@ -31,16 +31,15 @@ export default function ProjectsPage({ settings }) {
   }, []);
 
   async function create() {
-    const name = form.name.trim() || '未命名项目';
     setBusy(true);
     try {
       const project = await api('/api/projects', {
         method: 'POST',
-        body: { name, size: form.size, withSamplePage: form.withSamplePage },
+        body: { name: form.name.trim() || '未命名项目', size: form.size, withSamplePage: form.withSamplePage },
       });
       setCreating(false);
       setForm({ name: '', size: 'page', withSamplePage: true });
-      go(`/p/${project.id}`);
+      go(`/p/${project.slug}`);
     } catch (err) {
       toast(err.message, 'bad');
     } finally {
@@ -50,9 +49,9 @@ export default function ProjectsPage({ settings }) {
 
   async function remove(event, project) {
     event.stopPropagation();
-    if (!confirm(`删除项目「${project.name}」？页面的历史图片会一起删掉，无法恢复。`)) return;
+    if (!confirm(`删除项目「${project.name}」？页面与历史图会一起删掉。`)) return;
     try {
-      await apiDelete(`/api/projects/${project.id}`);
+      await apiDelete(`/api/projects/${project.slug}`);
       toast('已删除');
       load();
     } catch (err) {
@@ -60,17 +59,8 @@ export default function ProjectsPage({ settings }) {
     }
   }
 
-  const ready = settings?.ready;
-
   return html`<div class="page-scroll">
     <div class="container">
-      ${!ready
-        ? html`<div class="banner warn">
-            <span>还没配置完 ComfyUI 或大模型，现在可以先把版面排好，出图前补上配置。</span>
-            <button class="btn" onClick=${() => go('/settings')}>去设置</button>
-          </div>`
-        : null}
-
       <div class="section-title">
         <h1>项目</h1>
         <span class="count">${list ? `${list.length} 个` : '…'}</span>
@@ -83,22 +73,17 @@ export default function ProjectsPage({ settings }) {
       ${list === null
         ? html`<div class="empty-state">读取中…</div>`
         : list.length === 0
-          ? html`<div class="empty-state">
-              <b>还没有项目</b>
-              新建一个，然后让 Agent 或你自己排出第一页。
-            </div>`
+          ? html`<div class="empty-state"><b>还没有项目</b>新建一个，或者让你的 Agent 用 CLI 建。</div>`
           : html`<div class="grid-projects">
               ${list.map(
-                (p) => html`<div class="card" key=${p.id} onClick=${() => go(`/p/${p.id}`)}>
+                (p) => html`<div class="card" key=${p.slug} onClick=${() => go(`/p/${p.slug}`)}>
                   <div class="cover">
-                    ${p.cover
-                      ? html`<img src=${p.cover} alt="" loading="lazy" />`
-                      : html`<span class="empty">NO IMAGE</span>`}
+                    ${p.cover ? html`<img src=${p.cover} alt="" loading="lazy" />` : html`<span class="empty">NO IMAGE</span>`}
                   </div>
                   <div class="meta">
                     <div class="name">${p.name}</div>
                     <div class="row">
-                      <span class="sub">${p.pageCount} 页</span>
+                      <span class="sub">${p.pages} 页</span>
                       <div class="spacer"></div>
                       <button class="btn sm ghost" onClick=${(e) => remove(e, p)}>删除</button>
                     </div>
@@ -127,11 +112,7 @@ export default function ProjectsPage({ settings }) {
               </div>
               <div class="field">
                 <label>画布</label>
-                <select
-                  class="select"
-                  value=${form.size}
-                  onChange=${(e) => setForm({ ...form, size: e.currentTarget.value })}
-                >
+                <select class="select" value=${form.size} onChange=${(e) => setForm({ ...form, size: e.currentTarget.value })}>
                   ${SIZES.map(([id, label]) => html`<option value=${id}>${label}</option>`)}
                 </select>
               </div>

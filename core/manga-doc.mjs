@@ -1,29 +1,25 @@
-// 漫画页面文档模型（富语义层）。
+// 漫画页面文档模型（v2 薄语义层）。
 //
-// 坐标系约定（非常重要，改之前先读 docs/DATA-MODEL.md）：
-//   - 文档内一律使用「左上原点、绝对像素、[x1,y1,x2,y2]」
-//   - 送给 Moss 模型的坐标是「中心原点、yxyx」，只由 core/compile.mjs 一次转换
-//   - 尺寸必须是 16 的正整数倍：width/2 与 height/2 才能是整数，转换不会丢精度
+// 这是存档里唯一可编辑的页面格式，Moss JSON 永远由 core/compile.mjs 现算。
+// 坐标系：文档内一律「左上原点、绝对像素 [x1,y1,x2,y2]」；
+// 只有 toMoss() 做中心原点 yxyx 转换，别在别处再写一遍。
+//
+// 尺寸必须是 16 的正整数倍，W/2 与 H/2 才是整数，换算不会丢精度。
 
 export const GRID = 16;
 
 /** 分镜页固定竖版；其余尺寸仅供单图/横版项目使用 */
-export const SIZE_PRESETS = [
-  { id: 'page', label: '分镜页 768 × 1280', width: 768, height: 1280, manga: true },
-  { id: 'page-hd', label: '分镜页高清 1152 × 1920', width: 1152, height: 1920, manga: true },
-  { id: 'square', label: '方图 1024 × 1024', width: 1024, height: 1024, manga: false },
-  { id: 'wide', label: '横版 1536 × 1024', width: 1536, height: 1024, manga: false },
-];
+export const SIZE_PRESETS = {
+  page: { name: '分镜页 768×1280', size: [768, 1280], manga: true },
+  'page-hd': { name: '分镜页高清 1152×1920', size: [1152, 1920], manga: true },
+  square: { name: '方图 1024×1024', size: [1024, 1024], manga: false },
+  wide: { name: '横版 1536×1024', size: [1536, 1024], manga: false },
+};
 
-export const DEFAULT_SIZE = { width: 768, height: 1280 };
+export const DEFAULT_SIZE = [768, 1280];
 
-/** 面板形状：clip 用于编辑器预览，phrase 用于拼英文 caption */
 export const PANEL_SHAPES = {
-  rect: {
-    name: '矩形',
-    phrase: 'rectangular panel with straight edges',
-    clip: { kind: 'rect' },
-  },
+  rect: { name: '矩形', phrase: 'rectangular panel with straight edges', clip: { kind: 'rect' } },
   'slant-top': {
     name: '斜切上边',
     phrase: 'trapezoid panel with a slanted top edge cutting diagonally',
@@ -34,36 +30,16 @@ export const PANEL_SHAPES = {
     phrase: 'panel with a sharply angled slanted side edge',
     clip: { kind: 'poly', points: [[0, 0], [0.86, 0], [1, 1], [0, 1]] },
   },
-  'bleed-top': {
-    name: '出血·上',
-    phrase: 'panel bleeding off the TOP edge of the page, no border',
-    clip: { kind: 'rect' },
-  },
-  'bleed-bottom': {
-    name: '出血·下',
-    phrase: 'panel bleeding off the BOTTOM edge of the page, no border',
-    clip: { kind: 'rect' },
-  },
-  'bleed-left': {
-    name: '出血·左',
-    phrase: 'panel bleeding off the LEFT edge of the page, no border',
-    clip: { kind: 'rect' },
-  },
-  'bleed-right': {
-    name: '出血·右',
-    phrase: 'panel bleeding off the RIGHT edge of the page, no border',
-    clip: { kind: 'rect' },
-  },
+  'bleed-top': { name: '出血·上', phrase: 'panel bleeding off the TOP edge of the page, no border', clip: { kind: 'rect' } },
+  'bleed-bottom': { name: '出血·下', phrase: 'panel bleeding off the BOTTOM edge of the page, no border', clip: { kind: 'rect' } },
+  'bleed-left': { name: '出血·左', phrase: 'panel bleeding off the LEFT edge of the page, no border', clip: { kind: 'rect' } },
+  'bleed-right': { name: '出血·右', phrase: 'panel bleeding off the RIGHT edge of the page, no border', clip: { kind: 'rect' } },
   'bleed-all': {
     name: '满版',
     phrase: 'full-bleed panel covering the whole page, no border, artwork running off all four edges',
     clip: { kind: 'rect' },
   },
-  circle: {
-    name: '圆形',
-    phrase: 'circular panel with a clean round border',
-    clip: { kind: 'ellipse' },
-  },
+  circle: { name: '圆形', phrase: 'circular panel with a clean round border', clip: { kind: 'ellipse' } },
 };
 
 export const FRAME_STYLES = {
@@ -129,23 +105,22 @@ export function isGrid(value, grid = GRID) {
   return Number.isInteger(value) && value % grid === 0;
 }
 
-export function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-
 export function pageSize(page) {
-  const s = page?.size || {};
-  return {
-    width: isGrid(s.width) ? s.width : DEFAULT_SIZE.width,
-    height: isGrid(s.height) ? s.height : DEFAULT_SIZE.height,
-  };
+  const raw = page?.size;
+  if (Array.isArray(raw)) {
+    const [w, h] = raw;
+    if (isGrid(w) && isGrid(h)) return { width: w, height: h };
+  } else if (raw && typeof raw === 'object') {
+    if (isGrid(raw.width) && isGrid(raw.height)) return { width: raw.width, height: raw.height };
+  }
+  return { width: DEFAULT_SIZE[0], height: DEFAULT_SIZE[1] };
 }
 
 // ---------------------------------------------------------------- 坐标换算
 
 /**
- * 文档坐标 → Moss 坐标（中心原点，yxyx）。全项目唯一实现，别在别处再写一遍。
- * @param {number[]} bbox [x1,y1,x2,y2] 左上原点
+ * 文档坐标 → Moss 坐标（中心原点，yxyx）。全项目唯一实现。
+ * @param {number[]} bbox [x1,y1,x2,y2]
  * @param {{width:number,height:number}} size
  * @returns {number[]} [y_min-H/2, x_min-W/2, y_max-H/2, x_max-W/2]
  */
@@ -160,7 +135,7 @@ export function toMoss(bbox, size) {
   return [t - dy, l - dx, b - dy, r - dx];
 }
 
-/** Moss 坐标 → 文档坐标（反向，用于导入别人给的 JSON） */
+/** Moss 坐标 → 文档坐标（导入用） */
 export function fromMoss(mossBbox, size) {
   const [a, c, d, e] = mossBbox;
   const dx = size.width / 2;
@@ -168,8 +143,7 @@ export function fromMoss(mossBbox, size) {
   return [c + dx, a + dy, e + dx, d + dy];
 }
 
-/** bbox 归一化：保证 x1<=x2、y1<=y2、四舍五入到整数 */
-export function normalizeBbox(bbox, size = DEFAULT_SIZE) {
+export function normalizeBbox(bbox, size = { width: DEFAULT_SIZE[0], height: DEFAULT_SIZE[1] }) {
   if (!Array.isArray(bbox) || bbox.length !== 4) return [0, 0, size.width, size.height];
   const nums = bbox.map((v) => (Number.isFinite(Number(v)) ? Number(v) : 0));
   const [x1, y1, x2, y2] = nums;
@@ -195,14 +169,11 @@ export function bboxIntersects(a, b, pad = 0) {
 export function createPanel(patch = {}) {
   return {
     id: uid('pn'),
-    name: '',
     bbox: [8, 8, 760, 420],
     shape: 'rect',
     frame: 'border',
     camera: 'medium',
     caption: '',
-    cast: [],
-    locked: false,
     ...patch,
   };
 }
@@ -213,73 +184,76 @@ export function createBubble(patch = {}) {
     type: 'speech',
     text: '',
     bbox: [40, 40, 240, 140],
-    tailDir: 'down-left',
-    tailOff: false,
     vertical: true,
-    fontSize: 22,
-    panelId: '',
-    locked: false,
+    size: 22,
+    tail: 'down-left',
     ...patch,
   };
 }
 
 export function createPage(patch = {}) {
-  const size = patch.size || DEFAULT_SIZE;
+  const size = Array.isArray(patch.size) ? patch.size : DEFAULT_SIZE;
   return {
     id: uid('pg'),
     index: 1,
     title: '',
+    rev: 0,
     size,
-    readingOrder: 'rtl',
-    style: { preset: 'mono', lora: '', guardPerItem: true },
+    reading: 'rtl',
+    style: 'mono',
     scene: '',
-    cast: [],
-    summary: { meta: [], caption: '', palette: [] },
+    note: '',
     panels: [],
     bubbles: [],
-    notes: '',
-    versions: [],
-    createdAt: now(),
-    updatedAt: now(),
     ...patch,
   };
 }
 
-/** 补齐缺失字段，容忍手改坏的 JSON */
+/**
+ * 补齐缺失字段，容忍手改坏的 JSON，同时兼容 v1 存档（size 对象、fontSize、tailOff）。
+ */
 export function normalizePage(raw = {}) {
-  const size = {
-    width: isGrid(Number(raw.size?.width)) ? Number(raw.size.width) : DEFAULT_SIZE.width,
-    height: isGrid(Number(raw.size?.height)) ? Number(raw.size.height) : DEFAULT_SIZE.height,
-  };
+  const size = pageSize(raw);
+  const style = typeof raw.style === 'string' ? raw.style : raw.style?.preset;
   const page = {
-    ...createPage(),
-    ...raw,
-    size,
-    style: { ...createPage().style, ...(raw.style || {}) },
-    summary: { meta: [], caption: '', palette: [], ...(raw.summary || {}) },
-    panels: Array.isArray(raw.panels) ? raw.panels.map((p) => createPanel({ ...p, bbox: normalizeBbox(p.bbox, size) })) : [],
-    bubbles: Array.isArray(raw.bubbles)
-      ? raw.bubbles.map((b) => createBubble({ ...b, bbox: normalizeBbox(b.bbox, size) }))
-      : [],
-    versions: Array.isArray(raw.versions) ? raw.versions : [],
+    id: raw.id || uid('pg'),
+    index: Number(raw.index) || 1,
+    title: String(raw.title || ''),
+    rev: Number(raw.rev) || 0,
+    size: [size.width, size.height],
+    reading: READING_ORDERS[raw.reading || raw.readingOrder] ? raw.reading || raw.readingOrder : 'rtl',
+    style: STYLE_PRESETS[style] ? style : 'mono',
+    scene: String(raw.scene || ''),
+    note: String(raw.note || raw.summary?.caption || ''),
+    panels: (Array.isArray(raw.panels) ? raw.panels : []).map((p) => ({
+      id: p.id || uid('pn'),
+      bbox: normalizeBbox(p.bbox, size),
+      shape: p.shape || 'rect',
+      frame: p.frame || 'border',
+      camera: p.camera || 'medium',
+      caption: String(p.caption || ''),
+    })),
+    bubbles: (Array.isArray(raw.bubbles) ? raw.bubbles : []).map((b) => ({
+      id: b.id || uid('bb'),
+      type: b.type || 'speech',
+      text: String(b.text || ''),
+      bbox: normalizeBbox(b.bbox, size),
+      vertical: b.vertical !== false,
+      size: Number(b.size || b.fontSize) || 22,
+      tail: b.tail || (b.tailOff ? 'none' : b.tailDir) || 'down-left',
+    })),
   };
-  if (!Array.isArray(page.summary.meta)) page.summary.meta = [];
-  if (!Array.isArray(page.summary.palette)) page.summary.palette = [];
-  if (!Array.isArray(page.cast)) page.cast = [];
-  if (!READING_ORDERS[page.readingOrder]) page.readingOrder = 'rtl';
-  if (!STYLE_PRESETS[page.style.preset]) page.style.preset = 'mono';
+  if (!READING_ORDERS[page.reading]) page.reading = 'rtl';
   return page;
 }
 
-/** 阅读顺序：同一横带内先右后左；用于编辑器排序提示与自检 */
+/** 阅读顺序：同一横带内先右后左 */
 export function readingOrderOf(page) {
-  const rtl = page.readingOrder !== 'ltr';
+  const rtl = page.reading !== 'ltr';
   return [...page.panels].sort((a, b) => {
     const ay = a.bbox[1];
     const by = b.bbox[1];
     if (Math.abs(ay - by) > 24) return ay - by;
-    const ax = a.bbox[0];
-    const bx = b.bbox[0];
-    return rtl ? bx - ax : ax - bx;
+    return rtl ? b.bbox[0] - a.bbox[0] : a.bbox[0] - b.bbox[0];
   });
 }

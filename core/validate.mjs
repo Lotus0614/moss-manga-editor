@@ -1,7 +1,7 @@
 // 校验：把《JSON Layout》第七节的检查清单变成代码。
-// level=error 会阻止生成，level=warn 只是提醒。UI 用 blocking() 判断。
+// level=error 会阻止生成，level=warn 只是提醒。
 
-import { pageSize, PANEL_SHAPES, bboxArea, bboxIntersects } from './manga-doc.mjs';
+import { pageSize, PANEL_SHAPES, bboxArea } from './manga-doc.mjs';
 
 const ALLOWED_TOP = new Set(['summary', 'items']);
 const ALLOWED_ITEM = new Set(['label', 'caption', 'bbox', 'text', 'tags', 'palette']);
@@ -20,36 +20,28 @@ export function validatePage(page, doc) {
   const size = pageSize(page);
   const add = (level, code, message, target) => out.push({ level, code, message, target });
 
-  // ---- 画布
   if (size.width % 16 !== 0 || size.height % 16 !== 0) {
     add('error', 'size.grid', `画布尺寸必须是 16 的倍数，当前 ${size.width}×${size.height}`);
   }
 
-  // ---- 面板
-  if (!page.panels.length) {
-    add('error', 'panel.empty', '这一页还没有任何分格');
-  }
+  if (!page.panels.length) add('error', 'panel.empty', '这一页还没有任何分格');
+
   page.panels.forEach((panel, i) => {
-    const name = panel.name || `格${i + 1}`;
+    const name = `格${i + 1}`;
     const [x1, y1, x2, y2] = panel.bbox;
     const bleed = String(panel.shape || '').startsWith('bleed');
     if (x2 - x1 < MIN_SIDE || y2 - y1 < MIN_SIDE) {
       add('warn', 'panel.tiny', `${name} 太小（${Math.round(x2 - x1)}×${Math.round(y2 - y1)}），模型可能画不出内容`, panel.id);
     }
-    if (!bleed) {
-      if (x1 < 0 || y1 < 0 || x2 > size.width || y2 > size.height) {
-        add('warn', 'panel.out', `${name} 超出画布，内容可能被裁掉`, panel.id);
-      }
+    if (!bleed && (x1 < 0 || y1 < 0 || x2 > size.width || y2 > size.height)) {
+      add('warn', 'panel.out', `${name} 超出画布，内容可能被裁掉`, panel.id);
     }
-    if (!panel.caption?.trim()) {
-      add('warn', 'panel.blank', `${name} 没有内容描述，只会画出一个空框`, panel.id);
-    }
+    if (!panel.caption?.trim()) add('warn', 'panel.blank', `${name} 没有内容描述，只会画出一个空框`, panel.id);
     if (!PANEL_SHAPES[panel.shape]) {
       add('warn', 'panel.shape', `${name} 的形状「${panel.shape}」不认识，已按矩形处理`, panel.id);
     }
   });
 
-  // ---- 气泡
   page.bubbles.forEach((bubble, i) => {
     const label = `气泡${i + 1}`;
     const text = (bubble.text || '').trim();
@@ -75,7 +67,6 @@ export function validatePage(page, doc) {
     }
   });
 
-  // ---- 气泡互相压盖
   for (let i = 0; i < page.bubbles.length; i += 1) {
     for (let j = i + 1; j < page.bubbles.length; j += 1) {
       const a = page.bubbles[i];
@@ -88,18 +79,10 @@ export function validatePage(page, doc) {
     }
   }
 
-  // ---- 阅读顺序
   const ambiguous = sameBandAmbiguity(page);
-  if (ambiguous) {
-    add('warn', 'order.ambiguous', ambiguous);
-  }
+  if (ambiguous) add('warn', 'order.ambiguous', ambiguous);
 
-  // ---- 编译产物契约
-  if (doc) {
-    checkDocShape(doc, add);
-  } else if (!page.panels.length && !page.bubbles.length) {
-    add('error', 'doc.empty', '页面既没有分格也没有文字，无法生成');
-  }
+  if (doc) checkDocShape(doc, add);
 
   return out;
 }
@@ -111,9 +94,7 @@ function checkDocShape(doc, add) {
   for (const key of Object.keys(doc.summary || {})) {
     if (!ALLOWED_SUMMARY.has(key)) add('error', 'doc.summary.key', `summary 多出了字段「${key}」`);
   }
-  if (!doc.summary?.caption?.trim()) {
-    add('error', 'doc.caption', 'summary.caption 为空');
-  }
+  if (!doc.summary?.caption?.trim()) add('error', 'doc.caption', 'summary.caption 为空');
   if (!Array.isArray(doc.items) || doc.items.length === 0) {
     add('error', 'doc.items', 'items 不能为空');
     return;
@@ -131,12 +112,8 @@ function checkDocShape(doc, add) {
     } else if (!(item.bbox[0] < item.bbox[2] && item.bbox[1] < item.bbox[3])) {
       add('error', 'doc.item.bbox.order', `items[${i}].bbox 的 y_min<y_max 且 x_min<x_max 不成立`);
     }
-    if (item.label === 'text' && !item.text) {
-      add('error', 'doc.item.text', `items[${i}] 是文字项但缺少 text`);
-    }
-    if (!item.caption?.trim()) {
-      add('error', 'doc.item.caption', `items[${i}].caption 为空`);
-    }
+    if (item.label === 'text' && !item.text) add('error', 'doc.item.text', `items[${i}] 是文字项但缺少 text`);
+    if (!item.caption?.trim()) add('error', 'doc.item.caption', `items[${i}].caption 为空`);
   });
 }
 
@@ -150,15 +127,15 @@ export function textBudget(bubble) {
   const [x1, y1, x2, y2] = bubble.bbox;
   const w = Math.max(1, x2 - x1);
   const h = Math.max(1, y2 - y1);
-  const fs = Math.max(8, Number(bubble.fontSize) || 22);
+  const fs = Math.max(8, Number(bubble.size) || 22);
   const cols = bubble.vertical === false ? 1 : Math.max(1, Math.floor(w / (fs * 1.15)));
   const perCol = Math.max(1, Math.floor(h / (fs * 1.35)));
-  return { cols, perCol, capacity: cols * perCol * (bubble.vertical === false ? 1 : 1) };
+  return { cols, perCol, capacity: cols * perCol };
 }
 
 /** 同一横带里两块重叠、又分不出先后 → 阅读线会乱 */
 function sameBandAmbiguity(page) {
-  const rtl = page.readingOrder !== 'ltr';
+  const rtl = page.reading !== 'ltr';
   const panels = page.panels;
   for (let i = 0; i < panels.length; i += 1) {
     for (let j = i + 1; j < panels.length; j += 1) {
@@ -177,5 +154,3 @@ function sameBandAmbiguity(page) {
 export function blocking(warnings) {
   return warnings.filter((w) => w.level === 'error');
 }
-
-export { bboxIntersects };

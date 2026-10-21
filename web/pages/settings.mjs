@@ -1,101 +1,76 @@
-// 设置页：ComfyUI、大模型、出图默认值、工作流、Agent。
+// 设置页：ComfyUI、检查点与出图默认值、工作流、编辑范围。
 
-import { html, api, apiPut, useState, useEffect, toast, go, cls } from '../lib.mjs';
+import { html, api, apiPut, useState, useEffect, toast, go } from '../lib.mjs';
 
-function Status({ state }) {
-  if (!state) return null;
-  return html`<div class="status ${state.ok ? 'ok' : 'bad'}">
-    ${state.ok ? 'OK' : 'FAIL'} · ${state.message || ''}
-  </div>`;
-}
-
-export default function SettingsPage({ settings, onSaved }) {
+export default function SettingsPage({ config, onSaved }) {
   const [form, setForm] = useState(null);
   const [busy, setBusy] = useState('');
-  const [comfyTest, setComfyTest] = useState(null);
-  const [llmTest, setLlmTest] = useState(null);
-  const [models, setModels] = useState({ checkpoints: [], loras: [], samplers: [], schedulers: [] });
+  const [comfy, setComfy] = useState(null);
+  const [models, setModels] = useState({ checkpoints: [], loras: [], samplers: [] });
   const [workflows, setWorkflows] = useState([]);
   const [wfName, setWfName] = useState('');
   const [wfRaw, setWfRaw] = useState('');
   const [wfParams, setWfParams] = useState([]);
 
   useEffect(() => {
-    if (settings) {
-      setForm({
-        comfy: { ...settings.comfy },
-        llm: { ...settings.llm },
-        defaults: { ...settings.defaults },
-        agent: { ...settings.agent },
-        onboarded: settings.onboarded,
-      });
-      setWfName(settings.comfy.workflow || '');
+    if (config) {
+      setForm(JSON.parse(JSON.stringify(config)));
+      setWfName(config.workflow?.name || 'default.json');
     }
-  }, [settings]);
+  }, [config]);
 
   useEffect(() => {
-    loadWorkflows();
     loadModels();
+    loadWorkflows();
   }, []);
 
-  async function loadWorkflows() {
-    try {
-      const data = await api('/api/workflows');
-      setWorkflows(data.workflows || []);
-      if (!wfName && data.workflows?.length) setWfName(data.workflows[0].name);
-    } catch (err) {
-      toast(err.message, 'bad');
+  useEffect(() => {
+    if (wfName) {
+      api(`/api/workflows/${encodeURIComponent(wfName)}`)
+        .then((data) => {
+          setWfRaw(data.raw || '');
+        })
+        .catch(() => {});
     }
-  }
+  }, [wfName]);
 
   async function loadModels() {
     try {
-      const data = await api('/api/comfy/models');
-      setModels(data);
+      setModels(await api('/api/comfy/models'));
     } catch {
       /* ComfyUI 没开就静默 */
     }
   }
 
-  async function openWorkflow(name) {
-    setWfName(name);
+  async function loadWorkflows() {
     try {
-      const data = await api(`/api/workflows/${encodeURIComponent(name)}`);
-      setWfRaw(data.raw || '');
-      setWfParams(data.params || []);
+      const data = await api('/api/workflows');
+      setWorkflows(data.workflows || []);
     } catch (err) {
       toast(err.message, 'bad');
     }
   }
 
-  useEffect(() => {
-    if (wfName) openWorkflow(wfName);
-  }, [wfName]);
-
   if (!form) return html`<div class="page-scroll"><div class="container">读取设置…</div></div>`;
 
-  const setComfy = (patch) => setForm({ ...form, comfy: { ...form.comfy, ...patch } });
-  const setLlm = (patch) => setForm({ ...form, llm: { ...form.llm, ...patch } });
+  const patchComfy = (patch) => setForm({ ...form, comfy: { ...form.comfy, ...patch } });
   const setDefaults = (patch) => setForm({ ...form, defaults: { ...form.defaults, ...patch } });
-  const setAgent = (patch) => setForm({ ...form, agent: { ...form.agent, ...patch } });
+  const setEditable = (patch) => setForm({ ...form, editable: { ...form.editable, ...patch } });
+  const setParam = (patch) => setForm({ ...form, editable: { ...form.editable, params: { ...form.editable.params, ...patch } } });
 
-  async function save(extra = {}) {
+  async function save() {
     setBusy('save');
     try {
-      const payload = {
+      const saved = await apiPut('/api/config', {
         comfy: form.comfy,
-        llm: form.llm,
         defaults: form.defaults,
-        agent: form.agent,
-        ...extra,
-      };
-      const saved = await apiPut('/api/settings', payload);
+        editable: form.editable,
+        workflow: form.workflow,
+      });
       onSaved?.(saved);
       toast('已保存');
-      return saved;
     } catch (err) {
       toast(err.message, 'bad');
-      return null;
     } finally {
       setBusy('');
     }
@@ -103,32 +78,17 @@ export default function SettingsPage({ settings, onSaved }) {
 
   async function testComfy() {
     setBusy('comfy');
-    setComfyTest(null);
+    setComfy(null);
     try {
-      const result = await api('/api/settings/test-comfy', {
-        method: 'POST',
-        body: { url: form.comfy.url, token: form.comfy.token },
-      });
-      setComfyTest(result);
-      if (result.ok) loadModels();
+      const res = await api('/api/comfy/models');
+      if (res.ok) {
+        setComfy({ ok: true, message: `连接正常 · ${res.checkpoints.length} 个检查点 / ${res.loras.length} 个 LoRA` });
+        setModels(res);
+      } else {
+        setComfy({ ok: false, message: res.message || '连不上' });
+      }
     } catch (err) {
-      setComfyTest({ ok: false, message: err.message });
-    } finally {
-      setBusy('');
-    }
-  }
-
-  async function testLlm() {
-    setBusy('llm');
-    setLlmTest(null);
-    try {
-      const result = await api('/api/settings/test-llm', {
-        method: 'POST',
-        body: { baseUrl: form.llm.baseUrl, apiKey: form.llm.apiKey, model: form.llm.model },
-      });
-      setLlmTest(result);
-    } catch (err) {
-      setLlmTest({ ok: false, message: err.message });
+      setComfy({ ok: false, message: err.message });
     } finally {
       setBusy('');
     }
@@ -137,9 +97,9 @@ export default function SettingsPage({ settings, onSaved }) {
   async function saveWorkflow() {
     setBusy('wf');
     try {
-      const data = await apiPut(`/api/workflows/${encodeURIComponent(wfName)}`, { raw: wfRaw });
-      setWfParams(data.params || []);
-      toast(`工作流已保存，识别到 ${data.params?.length || 0} 个参数`);
+      const res = await apiPut(`/api/workflows/${encodeURIComponent(wfName)}`, { raw: wfRaw });
+      setWfParams(res.params || []);
+      toast(`已保存，识别到 ${res.params?.length || 0} 个参数`);
       loadWorkflows();
     } catch (err) {
       toast(err.message, 'bad');
@@ -148,79 +108,46 @@ export default function SettingsPage({ settings, onSaved }) {
     }
   }
 
-  async function finishOnboarding() {
-    const saved = await save({ onboarded: true });
-    if (saved) go('/projects');
-  }
-
   return html`<div class="page-scroll">
     <div class="container">
       <div class="section-title">
         <h1>设置</h1>
-        <span class="count">${form.onboarded ? '已配置' : '首次配置'}</span>
+        <span class="count">${config?.archive || ''}</span>
       </div>
 
-      ${!form.onboarded
-        ? html`<div class="banner warn">
-            <span>第一次用：填好下面两块（ComfyUI 地址 + 大模型），点「完成设置」就能开始。</span>
-          </div>`
-        : null}
-
       <div class="settings-grid">
-        <!-- ComfyUI -->
         <section class="panel-box">
           <header>ComfyUI</header>
           <div class="body">
-            <div class="field">
-              <label>服务地址</label>
-              <input
-                class="input"
-                value=${form.comfy.url}
-                placeholder="http://127.0.0.1:8188"
-                onInput=${(e) => setComfy({ url: e.currentTarget.value })}
-              />
-              <span class="hint">ComfyUI 默认端口 8188；如果开了 --listen 或走了反代，把完整地址填这里。</span>
-            </div>
             <div class="row2">
               <div class="field">
-                <label>访问令牌（可选）</label>
-                <input
-                  class="input"
-                  value=${form.comfy.token}
-                  placeholder=${form.comfy.tokenSet ? '已设置，留空则不修改' : '没有就留空'}
-                  onInput=${(e) => setComfy({ token: e.currentTarget.value })}
-                />
+                <label>服务地址</label>
+                <input class="input" value=${form.comfy.url} placeholder="http://127.0.0.1:8188" onInput=${(e) => patchComfy({ url: e.currentTarget.value })} />
               </div>
               <div class="field">
-                <label>单张生成超时（毫秒）</label>
-                <input
-                  class="input"
-                  type="number"
-                  value=${form.comfy.timeoutMs}
-                  onInput=${(e) => setComfy({ timeoutMs: Number(e.currentTarget.value) || 180000 })}
-                />
+                <label>单张超时（毫秒）</label>
+                <input class="input" type="number" value=${form.comfy.timeoutMs} onInput=${(e) => patchComfy({ timeoutMs: Number(e.currentTarget.value) || 180000 })} />
               </div>
             </div>
             <div class="row">
-              <button class="btn" disabled=${busy === 'comfy'} onClick=${testComfy}>
-                ${busy === 'comfy' ? '测试中…' : '测试连接'}
-              </button>
+              <button class="btn" disabled=${busy === 'comfy'} onClick=${testComfy}>${busy === 'comfy' ? '测试中…' : '测试连接'}</button>
               <button class="btn ghost" onClick=${loadModels}>刷新模型列表</button>
+              ${comfy
+                ? html`<div class="status ${comfy.ok ? 'ok' : 'bad'}">${comfy.ok ? 'OK' : 'FAIL'} · ${comfy.message}</div>`
+                : null}
             </div>
-            <${Status} state=${comfyTest} />
           </div>
         </section>
 
-        <!-- 出图默认值 -->
         <section class="panel-box">
-          <header>出图默认值</header>
+          <header>检查点与出图默认值</header>
           <div class="body">
             <div class="row2">
               <div class="field">
                 <label>检查点 ckpt</label>
                 <select class="select" value=${form.defaults.ckpt} onChange=${(e) => setDefaults({ ckpt: e.currentTarget.value })}>
                   <option value="">（未选择）</option>
-                  ${models.checkpoints.map((m) => html`<option value=${m} selected=${m === form.defaults.ckpt}>${m}</option>`)}
+                  ${models.checkpoints.map((m) => html`<option value=${m}>${m}</option>`)}
                   ${form.defaults.ckpt && !models.checkpoints.includes(form.defaults.ckpt)
                     ? html`<option value=${form.defaults.ckpt}>${form.defaults.ckpt}</option>`
                     : null}
@@ -228,12 +155,7 @@ export default function SettingsPage({ settings, onSaved }) {
               </div>
               <div class="field">
                 <label>默认 LoRA（可空）</label>
-                <input
-                  class="input"
-                  value=${form.defaults.lora}
-                  placeholder="<lora:moss\\xxx:0.7>"
-                  onInput=${(e) => setDefaults({ lora: e.currentTarget.value })}
-                />
+                <input class="input" value=${form.defaults.lora} placeholder="<lora:moss\\xxx:0.7>" onInput=${(e) => setDefaults({ lora: e.currentTarget.value })} />
               </div>
             </div>
             <div class="row3">
@@ -252,133 +174,59 @@ export default function SettingsPage({ settings, onSaved }) {
             </div>
             <div class="field">
               <label>负面提示词</label>
-              <textarea
-                class="textarea"
-                style="min-height:52px"
-                value=${form.defaults.negative}
-                onInput=${(e) => setDefaults({ negative: e.currentTarget.value })}
-              ></textarea>
+              <textarea class="textarea" style="min-height:52px" value=${form.defaults.negative} onInput=${(e) => setDefaults({ negative: e.currentTarget.value })}></textarea>
             </div>
-            <span class="hint">这些值会填进工作流里同名的占位符（{{steps}}、{{cfg}}、{{sampler}}…）。</span>
           </div>
         </section>
 
-        <!-- 大模型 -->
-        <section class="panel-box">
-          <header>大模型（OpenAI 兼容）</header>
-          <div class="body">
-            <div class="field">
-              <label>Base URL</label>
-              <input
-                class="input"
-                value=${form.llm.baseUrl}
-                placeholder="https://api.deepseek.com/v1"
-                onInput=${(e) => setLlm({ baseUrl: e.currentTarget.value })}
-              />
-              <span class="hint">填到 /v1 为止。DeepSeek、OpenAI、OpenRouter、vLLM、Ollama 都是这个格式。</span>
-            </div>
-            <div class="row2">
-              <div class="field">
-                <label>API Key</label>
-                <input
-                  class="input"
-                  type="password"
-                  value=${form.llm.apiKey}
-                  placeholder=${form.llm.apiKeySet ? `已设置 ${form.llm.apiKeyHint}，留空则不修改` : 'sk-…'}
-                  onInput=${(e) => setLlm({ apiKey: e.currentTarget.value })}
-                />
-              </div>
-              <div class="field">
-                <label>模型名</label>
-                <input
-                  class="input"
-                  value=${form.llm.model}
-                  placeholder="deepseek-chat"
-                  onInput=${(e) => setLlm({ model: e.currentTarget.value })}
-                />
-              </div>
-            </div>
-            <div class="row">
-              <label class="chk">
-                <input type="checkbox" checked=${form.llm.vision !== false} onChange=${(e) => setLlm({ vision: e.currentTarget.checked })} />
-                模型支持看图
-              </label>
-              <div class="spacer"></div>
-              <button class="btn" disabled=${busy === 'llm'} onClick=${testLlm}>
-                ${busy === 'llm' ? '测试中…' : '测试连通'}
-              </button>
-            </div>
-            <${Status} state=${llmTest} />
-            <span class="hint">密钥只存在本机 data/settings.json，界面上永远不会回显完整内容。</span>
-          </div>
-        </section>
-
-        <!-- 工作流 -->
         <section class="panel-box">
           <header>ComfyUI 工作流</header>
           <div class="body">
             <div class="row">
               <select class="select grow" value=${wfName} onChange=${(e) => setWfName(e.currentTarget.value)}>
                 ${workflows.map((w) => html`<option value=${w.name}>${w.name}${w.ok ? '' : '（解析失败）'}</option>`)}
-                ${!workflows.length ? html`<option value="">（workflows 目录为空）</option>` : null}
+                ${!workflows.length ? html`<option value="">（没有工作流）</option>` : null}
               </select>
-              <button class="btn" disabled=${busy === 'wf'} onClick=${saveWorkflow}>${busy === 'wf' ? '保存中…' : '保存工作流'}</button>
+              <button class="btn" disabled=${busy === 'wf'} onClick=${saveWorkflow}>${busy === 'wf' ? '保存中…' : '保存'}</button>
             </div>
             <span class="hint">
-              把 ComfyUI 里导出的 <b>API 格式</b> JSON 贴进下面，想暴露成参数的字段写成 {{prompt}}、{{seed}} 这种占位符。
-              保存后会自动识别出参数清单。
+              把 ComfyUI 里「工作流 → 导出 (API)」得到的 JSON 贴进来；想暴露成参数的字段写成 <b>{{prompt}}</b>、<b>{{seed}}</b>。
+              保存后自动识别参数清单。
             </span>
-            <textarea
-              class="textarea"
-              style="min-height:190px;font-family:var(--mono);font-size:11px"
-              value=${wfRaw}
-              onInput=${(e) => setWfRaw(e.currentTarget.value)}
-            ></textarea>
+            <textarea class="textarea" style="min-height:170px;font-family:var(--mono);font-size:11px" value=${wfRaw} onInput=${(e) => setWfRaw(e.currentTarget.value)}></textarea>
             <div class="row wrap">
-              ${wfParams.length
-                ? wfParams.map((p) => html`<span class="chip ghost" title="出现 ${p.count} 次">{{${p.name}}} · ${p.type}</span>`)
-                : html`<span class="hint">还没有识别到占位符。</span>`}
-            </div>
-            <div class="row">
-              <button class="btn ghost" onClick=${() => setComfy({ workflow: wfName })}>设为当前工作流</button>
-              <span class="hint">当前：${form.comfy.workflow}</span>
+              ${wfParams.length ? wfParams.map((p) => html`<span class="chip ghost">{{${p.name}}} · ${p.type}</span>`) : null}
+              <div class="spacer"></div>
+              <button class="btn ghost" onClick=${() => setForm({ ...form, workflow: { ...form.workflow, name: wfName } })}>设为当前</button>
+              <span class="hint">当前：${form.workflow.name}</span>
             </div>
           </div>
         </section>
 
-        <!-- Agent -->
         <section class="panel-box">
-          <header>Agent</header>
+          <header>允许 Agent 改什么</header>
           <div class="body">
-            <div class="row3">
-              <div class="field">
-                <label>默认模式</label>
-                <select class="select" value=${form.agent.mode} onChange=${(e) => setAgent({ mode: e.currentTarget.value })}>
-                  <option value="single">单 Agent</option>
-                  <option value="sub">子 Agent</option>
-                </select>
-              </div>
-              <div class="field">
-                <label>最多工具轮数</label>
-                <input class="input" type="number" value=${form.agent.maxSteps} onInput=${(e) => setAgent({ maxSteps: Number(e.currentTarget.value) || 10 })} />
-              </div>
-              <div class="field">
-                <label>保留对话条数</label>
-                <input class="input" type="number" value=${form.agent.keepMessages} onInput=${(e) => setAgent({ keepMessages: Number(e.currentTarget.value) || 12 })} />
-              </div>
+            <div class="row wrap" style="gap:16px">
+              <label class="chk"><input type="checkbox" checked=${form.editable.layout !== false} onChange=${(e) => setEditable({ layout: e.currentTarget.checked })} />版面（格子位置 / 形状 / 气泡位置）</label>
+              <label class="chk"><input type="checkbox" checked=${form.editable.text !== false} onChange=${(e) => setEditable({ text: e.currentTarget.checked })} />台词</label>
+              <label class="chk"><input type="checkbox" checked=${form.editable.bubbleType !== false} onChange=${(e) => setEditable({ bubbleType: e.currentTarget.checked })} />气泡类型</label>
+              <label class="chk"><input type="checkbox" checked=${form.editable.style !== false} onChange=${(e) => setEditable({ style: e.currentTarget.checked })} />画风</label>
             </div>
-            <span class="hint">超过保留条数的旧对话会被压缩成摘要，避免上下文越滚越大。</span>
+            <div class="row wrap" style="gap:16px">
+              <label class="chk"><input type="checkbox" checked=${form.editable.params?.seed !== false} onChange=${(e) => setParam({ seed: e.currentTarget.checked })} />允许改 seed</label>
+              <label class="chk"><input type="checkbox" checked=${form.editable.params?.steps === true} onChange=${(e) => setParam({ steps: e.currentTarget.checked })} />允许改步数</label>
+              <label class="chk"><input type="checkbox" checked=${form.editable.params?.cfg === true} onChange=${(e) => setParam({ cfg: e.currentTarget.checked })} />允许改 CFG</label>
+            </div>
+            <span class="hint">关掉的范围，CLI 的 page set 会直接拒绝越权改动，避免 Agent 悄悄改了你不想让它碰的东西。</span>
           </div>
         </section>
       </div>
 
       <div class="row" style="margin-top:22px">
-        <button class="btn inv" disabled=${busy === 'save'} onClick=${() => save()}>${busy === 'save' ? '保存中…' : '保存设置'}</button>
-        ${!form.onboarded
-          ? html`<button class="btn" disabled=${busy === 'save'} onClick=${finishOnboarding}>完成设置，开始用</button>`
-          : html`<button class="btn ghost" onClick=${() => go('/projects')}>回到项目</button>`}
-        <span class="hint">只有 ComfyUI 和大模型都填了才算 ready。</span>
+        <button class="btn inv" disabled=${busy === 'save'} onClick=${save}>${busy === 'save' ? '保存中…' : '保存设置'}</button>
+        <button class="btn ghost" onClick=${() => go('/projects')}>回到项目</button>
       </div>
     </div>
   </div>`;
 }
+

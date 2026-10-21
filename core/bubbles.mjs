@@ -1,6 +1,6 @@
 // 八种漫画文字载体的英文模板。
-// 直接抄自 Moss Image 模板《漫画生成技巧》4.1 / 4.2 节，改文案前先看那份文档，
-// 这些句子是喂给模型的「形状指令」，改错会让气泡画歪。
+// 抄自 Moss 模板《漫画生成技巧》4.1 / 4.2 节。这些句子是喂给模型的「形状指令」，
+// 改文案前先看那份文档，改错会让气泡画歪。
 
 /**
  * @typedef {Object} BubbleType
@@ -8,7 +8,7 @@
  * @property {string} key     程序内标识
  * @property {string} name    中文名（UI 显示）
  * @property {string} phrase  写进 caption 的英文形态描述
- * @property {boolean} tail   是否带尾巴（带尾巴时需要指向说话者）
+ * @property {boolean} tail   是否带尾巴
  * @property {boolean} inline 是否为浮字（无气泡，允许出血跨格）
  */
 
@@ -66,7 +66,8 @@ export const BUBBLE_TYPES = [
     id: '07',
     key: 'narration',
     name: '旁白',
-    phrase: 'narration lettering printed DIRECTLY on the artwork, floating freely, no bubble, no box, no background, thin white outline only',
+    phrase:
+      'narration lettering printed DIRECTLY on the artwork, floating freely, no bubble, no box, no background, thin white outline only',
     tail: false,
     inline: true,
   },
@@ -98,18 +99,16 @@ export function bubbleType(key) {
 }
 
 /**
- * 一条文字项的形态描述（不含位置，位置由 compile 根据 bbox 补）。
- * @param {{type?:string, tailDir?:string, tailOff?:boolean}} bubble
+ * 一条文字项的形态描述（位置由 compile 根据 bbox 补）。
+ * @param {{type?:string, tail?:string}} bubble
  */
 export function bubblePhrase(bubble) {
   const t = bubbleType(bubble.type);
   const parts = [t.phrase];
-  if (t.tail && !bubble.tailOff) {
-    const dir = TAIL_DIRECTIONS[bubble.tailDir] || TAIL_DIRECTIONS['down-left'];
-    parts.push(`a short tapering tail ${dir}`);
-  }
-  if (t.tail && bubble.tailOff) {
-    parts.push('NO tail because the speaker is off panel');
+  if (t.tail) {
+    const tail = bubble.tail;
+    if (!tail || tail === 'none') parts.push('NO tail because the speaker is off panel');
+    else parts.push(`a short tapering tail ${TAIL_DIRECTIONS[tail] || TAIL_DIRECTIONS['down-left']}`);
   }
   return parts.join(', ');
 }

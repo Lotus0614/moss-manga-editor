@@ -24,15 +24,15 @@ const MAX_PER_COLUMN = 12;
 
 /**
  * 编译一页。
- * @param {object} page 富文档（core/manga-doc.mjs 的 createPage 形状）
- * @param {{characterText?:string, sceneText?:string, extra?:string}} [ctx]
- *        人物设定与场景由调用方按 Bible 解析好传进来，编译器本身不读项目数据。
+ * @param {object} page 富文档
+ * @param {{characterText?:string, sceneText?:string, note?:string}} [ctx]
+ *        人物与场景由调用方（CLI / 服务器）按项目 bible 解析好传进来。
  * @returns {{doc:object, json:string, warnings:Array, stats:object}}
  */
 export function compilePage(page, ctx = {}) {
   const size = pageSize(page);
-  const style = STYLE_PRESETS[page.style?.preset] || STYLE_PRESETS.mono;
-  const guard = page.style?.guardPerItem === false ? '' : style.guard;
+  const style = STYLE_PRESETS[page.style] || STYLE_PRESETS.mono;
+  const guard = style.guard || '';
 
   const caption = buildSummary(page, size, style, ctx);
   const items = [];
@@ -57,13 +57,12 @@ export function compilePage(page, ctx = {}) {
 
   const doc = {
     summary: {
-      meta: page.summary?.meta?.length ? page.summary.meta : style.meta,
-      canvas: page.style?.canvas || autoCanvas(page),
+      meta: style.meta,
+      canvas: autoCanvas(page),
       caption,
     },
     items,
   };
-  if (page.summary?.palette?.length) doc.summary.palette = page.summary.palette;
 
   const json = JSON.stringify(doc);
   const warnings = validatePage(page, doc);
@@ -90,7 +89,7 @@ function autoCanvas(page) {
 
 function buildSummary(page, size, style, ctx) {
   const parts = [style.phrase];
-  const order = READING_ORDERS[page.readingOrder] || READING_ORDERS.rtl;
+  const order = READING_ORDERS[page.reading] || READING_ORDERS.rtl;
 
   if (page.panels.length > 0) {
     const n = page.panels.length;
@@ -109,10 +108,10 @@ function buildSummary(page, size, style, ctx) {
   const sceneText = ((ctx.sceneText ?? page.scene) || '').trim();
   if (sceneText) parts.push(sceneText);
 
-  const extra = ((ctx.extra ?? page.summary?.caption) || '').trim();
-  if (extra) parts.push(extra);
+  const note = ((ctx.note ?? page.note) || '').trim();
+  if (note) parts.push(note);
 
-  if (style.guard && page.style?.guardPerItem !== false) parts.push(style.guard);
+  if (style.guard) parts.push(style.guard);
 
   return parts.join('\n\n');
 }
@@ -125,8 +124,8 @@ function panelCaption(panel, guard) {
   const camera = CAMERAS[panel.camera];
   const parts = [shape.phrase];
 
-  // 出血格不描边，说明边框反而会让模型画一条线出来
-  if (!panel.shape?.startsWith('bleed')) parts.push(frame.phrase);
+  // 出血格不描边，说明边框反而会让模型画出一条线
+  if (!String(panel.shape || '').startsWith('bleed')) parts.push(frame.phrase);
   if (camera) parts.push(camera.phrase);
 
   const body = (panel.caption || '').trim();
@@ -157,7 +156,7 @@ function textLayout(bubble) {
   const [x1, y1, x2, y2] = bubble.bbox;
   const w = Math.max(1, x2 - x1);
   const h = Math.max(1, y2 - y1);
-  const fs = Math.max(8, Number(bubble.fontSize) || 22);
+  const fs = Math.max(8, Number(bubble.size) || 22);
   const cols = Math.max(1, Math.floor(w / (fs * 1.15)));
   const perCol = Math.max(1, Math.floor(h / (fs * 1.35)));
   if (bubble.vertical === false) {
@@ -169,14 +168,14 @@ function textLayout(bubble) {
 
 /** 气泡按阅读顺序排：先上后下，同带内右→左（rtl） */
 function sortBubbles(page) {
-  const rtl = page.readingOrder !== 'ltr';
+  const rtl = page.reading !== 'ltr';
   return [...page.bubbles].sort((a, b) => {
     if (Math.abs(a.bbox[1] - b.bbox[1]) > 24) return a.bbox[1] - b.bbox[1];
     return rtl ? b.bbox[0] - a.bbox[0] : a.bbox[0] - b.bbox[0];
   });
 }
 
-/** 供 UI 显示「这一页会写进气泡的形态描述」 */
+/** 供 UI 显示「这一条会写进提示词的形态描述」 */
 export function previewBubbleCaption(bubble, size) {
   return bubbleCaption(bubble, size || { width: 768, height: 1280 }, '');
 }

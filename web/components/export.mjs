@@ -22,15 +22,12 @@ function loadImage(src) {
   });
 }
 
-/** 收集有图的页，按页码排序 */
-export function pagesWithImages(pages) {
-  return pages
-    .map((p) => {
-      const version = (p.versions || []).find((v) => v.id === p.currentVersionId) || (p.versions || []).slice(-1)[0];
-      return version?.image ? { image: version.image, index: p.index, title: p.title } : null;
-    })
-    .filter(Boolean)
-    .sort((a, b) => a.index - b.index);
+/** 收集可导出的页面：每页一张图，按页码排序 */
+export function pagesWithImages(items) {
+  return (items || [])
+    .filter((it) => it?.image)
+    .map((it) => ({ image: it.image, index: it.index, title: it.title }))
+    .sort((a, b) => (a.index || 0) - (b.index || 0));
 }
 
 /** 竖向拼接成一张长图 */

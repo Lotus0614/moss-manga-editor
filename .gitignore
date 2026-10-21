@@ -8,3 +8,7 @@ data/
 .DS_Store
 Thumbs.db
 *.log
+
+# 依赖（用 npm run vendor 抓取，也可不提交）
+node_modules/
+assets/*.tmp

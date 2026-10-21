@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>风格 A · 网点纸</title>
+<style>
+  :root{
+    --ink:#0e0e0e; --paper:#ffffff; --mist:#f4f2ed; --line:#0e0e0e;
+    --shadow:4px 4px 0 var(--ink);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--mist); color:var(--ink);
+    font-family:"Georgia","Songti SC","Noto Serif SC",serif;
+    font-size:14px; line-height:1.6;
+    /* 纸张网点 */
+    background-image:radial-gradient(var(--ink) 0.5px, transparent 0.5px);
+    background-size:5px 5px; background-color:#faf9f6;
+  }
+  .app{display:grid; grid-template-columns:148px 1fr 360px; height:100vh; gap:0}
+
+  /* 顶栏 */
+  .topbar{grid-column:1/-1; display:flex; align-items:center; gap:16px;
+    padding:10px 18px; background:var(--paper); border-bottom:3px solid var(--ink)}
+  .brand{font-weight:700; font-size:19px; letter-spacing:.14em}
+  .brand span{display:inline-block; background:var(--ink); color:var(--paper);
+    padding:1px 7px; margin-left:6px; font-size:11px; letter-spacing:.2em; vertical-align:2px}
+  .proj{font-size:12px; letter-spacing:.08em; color:#5a5a5a}
+  .spacer{flex:1}
+  .btn{border:2px solid var(--ink); background:var(--paper); color:var(--ink);
+    padding:5px 12px; font:inherit; font-size:12px; letter-spacing:.1em; cursor:pointer;
+    box-shadow:2px 2px 0 var(--ink); transition:transform .08s, box-shadow .08s}
+  .btn:hover{transform:translate(-1px,-1px); box-shadow:3px 3px 0 var(--ink)}
+  .btn:active{transform:translate(2px,2px); box-shadow:0 0 0 var(--ink)}
+  .btn.solid{background:var(--ink); color:var(--paper)}
+
+  /* 左：页序 */
+  .rail{background:var(--paper); border-right:3px solid var(--ink); padding:12px 10px; overflow:auto}
+  .rail h4{margin:2px 0 10px; font-size:11px; letter-spacing:.24em; font-weight:400; color:#6b6b6b}
+  .pg{display:flex; gap:9px; align-items:center; padding:7px; margin-bottom:9px;
+    border:2px solid var(--ink); background:var(--paper); cursor:pointer}
+  .pg .n{font-size:11px; font-family:ui-monospace,monospace; width:16px; text-align:right}
+  .pg .thumb{flex:1; aspect-ratio:3/5; border:1px solid var(--ink);
+    background:repeating-linear-gradient(0deg,#e8e6e0 0 5px,#fff 5px 10px); position:relative}
+  .pg .thumb::after{content:""; position:absolute; inset:12% 10% 30% 10%;
+    border:1px solid #9a9a9a}
+  .pg.on{box-shadow:var(--shadow); transform:translate(-1px,-1px)}
+  .pg.on .thumb{background:repeating-linear-gradient(0deg,#111 0 5px,#fff 5px 10px)}
+
+  /* 中：画布 */
+  .stage{position:relative; padding:26px; overflow:auto; display:flex;
+    align-items:flex-start; justify-content:center}
+  .page{width:352px; aspect-ratio:768/1280; background:var(--paper);
+    border:3px solid var(--ink); box-shadow:8px 8px 0 rgba(14,14,14,.9);
+    position:relative; overflow:hidden}
+  .panel{position:absolute; border:2.5px solid var(--ink); background:#fff;
+    display:flex; align-items:flex-end; padding:6px}
+  .panel .cap{font-family:ui-monospace,monospace; font-size:8px; letter-spacing:.06em;
+    color:#7a7a7a; background:#fff; padding:1px 3px}
+  .panel.slant{clip-path:polygon(0 0,100% 6%,100% 100%,0 100%)}
+  .panel.bleed{border-width:0; border-bottom:2.5px solid var(--ink);
+    background:repeating-linear-gradient(45deg,#f0eee8 0 7px,#fff 7px 14px)}
+  .panel.sel{outline:2px dashed var(--ink); outline-offset:4px}
+  .h{position:absolute; width:9px; height:9px; background:var(--paper);
+    border:2px solid var(--ink); margin:-5px}
+  .bub{position:absolute; background:var(--paper); border:2px solid var(--ink);
+    border-radius:50%; display:grid; place-items:center; text-align:center;
+    font-size:9px; line-height:1.45; padding:6px}
+  .bub::after{content:""; position:absolute; bottom:-11px; left:38%;
+    width:0; height:0; border:7px solid transparent; border-top-color:var(--ink)}
+  .bub.cloud{border-radius:46% 54% 50% 50%/52% 48% 54% 46%}
+  .bub.cloud::after{display:none}
+  .ruler{position:absolute; left:0; top:0; bottom:0; width:3px;
+    background:repeating-linear-gradient(0deg,var(--ink) 0 1px,transparent 1px 14px)}
+
+  /* 右：对话 */
+  .chat{background:var(--paper); border-left:3px solid var(--ink);
+    display:flex; flex-direction:column; min-height:0}
+  .chat-h{padding:9px 14px; border-bottom:2px solid var(--ink);
+    display:flex; align-items:center; gap:8px; font-size:11px; letter-spacing:.18em}
+  .mode{font-family:ui-monospace,monospace; font-size:10px; border:1.5px solid var(--ink);
+    padding:1px 6px}
+  .msgs{flex:1; overflow:auto; padding:14px; display:flex; flex-direction:column; gap:12px}
+  .m{max-width:90%; font-size:12.5px}
+  .m .who{font-size:9.5px; letter-spacing:.2em; color:#7d7d7d; margin-bottom:3px}
+  .m .body{border:2px solid var(--ink); padding:8px 10px; background:#fff; position:relative}
+  .m.me{align-self:flex-end}
+  .m.me .body{background:var(--ink); color:var(--paper)}
+  .m.me .who{text-align:right}
+  .tool{border:1.5px dashed var(--ink); padding:6px 8px; font-family:ui-monospace,monospace;
+    font-size:10px; color:#4a4a4a; background:#fcfbf8}
+  .tool b{color:var(--ink)}
+  .composer{border-top:2px solid var(--ink); padding:10px}
+  .composer textarea{width:100%; height:62px; resize:none; border:2px solid var(--ink);
+    font:inherit; font-size:12.5px; padding:8px; background:#fff; outline:none}
+  .composer textarea:focus{box-shadow:var(--shadow)}
+  .row{display:flex; gap:8px; margin-top:8px; align-items:center}
+  .chip{font-family:ui-monospace,monospace; font-size:10px; border:1.5px solid var(--ink);
+    padding:2px 7px; cursor:pointer; background:#fff}
+  .chip.on{background:var(--ink); color:#fff}
+
+  /* 固定设置 */
+  .fab{position:fixed; right:378px; bottom:20px; z-index:9}
+  .fab button{width:46px; height:46px; border-radius:50%; border:2.5px solid var(--ink);
+    background:var(--paper); box-shadow:var(--shadow); font-size:19px; cursor:pointer;
+    display:grid; place-items:center}
+  .fab button:hover{transform:translate(-1px,-1px)}
+  @media(max-width:1100px){.app{grid-template-columns:110px 1fr 300px} .fab{right:318px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand">MOSS<span>漫画工坊</span></div>
+    <div class="proj">项目 / 第一话 · 雨中的便利店 &nbsp;|&nbsp; 8 页</div>
+    <div class="spacer"></div>
+    <button class="btn">导出</button>
+    <button class="btn solid">生成本页</button>
+  </div>
+
+  <aside class="rail">
+    <h4>页 / PAGE</h4>
+    <div class="pg"><span class="n">1</span><div class="thumb"></div></div>
+    <div class="pg on"><span class="n">2</span><div class="thumb"></div></div>
+    <div class="pg"><span class="n">3</span><div class="thumb"></div></div>
+    <div class="pg"><span class="n">4</span><div class="thumb"></div></div>
+    <div class="pg"><span class="n">5</span><div class="thumb"></div></div>
+    <div class="pg"><span class="n">6</span><div class="thumb"></div></div>
+  </aside>
+
+  <main class="stage">
+    <div class="page">
+      <div class="ruler"></div>
+      <div class="panel" style="left:4%;top:2%;width:92%;height:22%">
+        <span class="cap">panel-1 · 全景</span>
+      </div>
+      <div class="panel slant sel" style="left:4%;top:26%;width:44%;height:26%">
+        <span class="cap">panel-2 · 反应</span>
+        <i class="h" style="left:0;top:0"></i><i class="h" style="right:0;top:0"></i>
+        <i class="h" style="left:0;bottom:0"></i><i class="h" style="right:0;bottom:0"></i>
+      </div>
+      <div class="panel" style="left:52%;top:26%;width:44%;height:26%">
+        <span class="cap">panel-3 · 发生</span>
+      </div>
+      <div class="panel bleed" style="left:0;top:54%;width:100%;height:46%">
+        <span class="cap">panel-4 · 满版落点</span>
+      </div>
+      <div class="bub" style="left:56%;top:60%;width:34%;height:11%">…今天也要，<br>撑过去。</div>
+      <div class="bub cloud" style="left:8%;top:74%;width:34%;height:12%">挤成这样……<br>其实我，并不讨厌。</div>
+    </div>
+  </main>
+
+  <aside class="chat">
+    <div class="chat-h">AGENT <span class="mode">主 Agent</span><div class="spacer" style="flex:1"></div>⟳</div>
+    <div class="msgs">
+      <div class="m"><div class="who">主 AGENT</div><div class="body">
+        第 2 页已排好：4 格横带式，右→左阅读。人物我沿用了设定卡里的「水科 小春」。<br>要我把第 3 页的气泡密度降下来吗？
+      </div></div>
+      <div class="m"><div class="who">TOOL CALL</div><div class="tool">
+        <b>update_page</b>(page=2, panels=4)<br>
+        <b>compile_layout</b> → moss-json 1.2kb ✓
+      </div></div>
+      <div class="m me"><div class="who">我</div><div class="body">
+        底部那格再大一点，气泡别压脸。顺便把她的台词改短。
+      </div></div>
+      <div class="m"><div class="who">主 AGENT</div><div class="body">
+        底部满版扩到 46%，台词拆成两列、每列 7 字；气泡右移到空白区。子 Agent「第2页」已接到指令。
+      </div></div>
+    </div>
+    <div class="composer">
+      <textarea placeholder="描述你想改什么，或直接贴参考图…"></textarea>
+      <div class="row">
+        <span class="chip on">单 Agent</span>
+        <span class="chip">子 Agent</span>
+        <div class="spacer" style="flex:1"></div>
+        <button class="btn solid">发送</button>
+      </div>
+    </div>
+  </aside>
+</div>
+<div class="fab"><button title="设置">⚙</button></div>
+</body>
+</html>

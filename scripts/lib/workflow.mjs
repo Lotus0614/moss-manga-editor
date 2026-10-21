@@ -1,10 +1,15 @@
-// 工作流：读取、导入、占位符填充、参数取值。
-// 工作流文件可以有多个：存档里的 <archive>/workflows 优先，技能自带的 workflows/ 兜底。
+// 工作流文件管理：读写、校验、参数清单。
+//
+// 工作流是**全局配置**，放在 <配置根>/workflows/（默认 ~/.moss-manga/workflows），
+// 跟存档无关；技能自带的 workflows/ 作为兜底模板。
+//
+// 这里不做任何「猜哪个节点是提示词」的自动替换：工作流可能很复杂，
+// 由调用方（AI）读懂 JSON 后自己写好占位符，再用 workflow save 落盘 + check 校验。
 
-import { readFile, readdir, mkdir, writeFile, access } from 'node:fs/promises';
+import { readFile, readdir, mkdir, writeFile, access, copyFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { describeWorkflow, fillGraph, MissingParam } from '../../core/placeholders.mjs';
-import { detectBindings, applyBindings, parseExpose } from './bind.mjs';
+import { workflowsDir, stripBom } from './config.mjs';
 
 export const BUILTIN_DIR = resolve(import.meta.dirname, '..', '..', 'workflows');
 
@@ -25,12 +30,12 @@ async function listDir(dir) {
   }
 }
 
-/** 列出所有可用工作流（存档里的在前，重名时存档优先） */
-export async function listWorkflows(archiveDir) {
+/** 列出所有可用工作流（配置根优先，重名时配置根胜出） */
+export async function listWorkflows(configDir) {
   const seen = new Set();
   const out = [];
   for (const [dir, source] of [
-    [join(archiveDir, 'workflows'), 'archive'],
+    [workflowsDir(configDir), 'config'],
     [BUILTIN_DIR, 'builtin'],
   ]) {
     for (const file of await listDir(dir)) {
@@ -44,71 +49,75 @@ export async function listWorkflows(archiveDir) {
   return out;
 }
 
-/** 读工作流文本；先找存档，再找内置；都找不到就用内置的通用模板兜底 */
-export async function readWorkflow(archiveDir, name) {
+/** 读工作流文本；先找配置根，再找内置；都没有就用内置通用模板兜底 */
+export async function readWorkflow(configDir, name) {
   const safe = basename(String(name || 'default.json'));
-  const candidates = [safe, 'moss-image.api.json'];
-  for (const candidate of candidates) {
-    for (const dir of [join(archiveDir, 'workflows'), BUILTIN_DIR]) {
+  for (const candidate of [safe, 'moss-image.api.json']) {
+    for (const dir of [workflowsDir(configDir), BUILTIN_DIR]) {
       const file = join(dir, candidate);
       if (await exists(file)) return { name: basename(candidate), raw: await readFile(file, 'utf8'), file };
     }
   }
-  throw new Error(`找不到工作流 ${safe}（存档 workflows/ 与内置 workflows/ 都没有）`);
+  throw new Error(`找不到工作流 ${safe}（配置根 workflows/ 与内置 workflows/ 都没有）`);
 }
 
 /**
- * 导入用户从 ComfyUI 导出的 API JSON。
- * 默认自动绑定 prompt / width / height（用户不需要自己写占位符），
- * 其余可暴露的参数作为 candidates 返回，由 Agent 问用户要不要开。
+ * 校验一份工作流文本，报告它是否满足生成的最低要求。
+ * 不做替换，只诊断。
  */
-export async function importWorkflow(archiveDir, raw, name = 'default.json', { bind = true, expose = [] } = {}) {
-  let text = typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2);
-  let graph;
-  try {
-    graph = JSON.parse(text);
-  } catch (err) {
-    throw new Error(`工作流 JSON 解析失败：${err.message}`);
-  }
+export function checkWorkflow(raw) {
+  const desc = describeWorkflow(raw);
+  if (!desc.ok) return { ok: false, error: desc.error, nodeCount: 0, params: [], missing: [], warnings: [] };
 
-  const detected = detectBindings(graph);
-  const bindings = [...detected.required, ...parseExpose(expose)];
-  let applied = [];
-  if (bind) {
-    const result = applyBindings(graph, bindings);
-    graph = result.graph;
-    applied = result.applied;
-    text = JSON.stringify(graph, null, 2);
-  }
+  const names = new Set(desc.params.map((p) => p.name));
+  const missing = ['prompt', 'width', 'height'].filter((key) => !names.has(key));
+  const warnings = [];
+  if (missing.includes('prompt')) warnings.push('没有 {{prompt}}：生成的图不会带分格布局，只是普通文生图');
+  if (missing.includes('width')) warnings.push('没有 {{width}}：宽度写死在文件里，改不了画布');
+  if (missing.includes('height')) warnings.push('没有 {{height}}：高度写死在文件里，改不了画布');
+  if (!names.has('seed')) warnings.push('没有 {{seed}}：每次出图不可复现，也没法换 seed 重出');
 
-  const desc = describeWorkflow(graph);
-  if (!desc.ok) throw new Error(desc.error);
-
-  const safe = basename(String(name).endsWith('.json') ? name : `${name}.json`);
-  const dir = join(archiveDir, 'workflows');
-  await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, safe), `${text.endsWith('\n') ? text : `${text}\n`}`, 'utf8');
+  const text = JSON.stringify(desc.params.map((p) => p.name));
+  if (!/ckpt/.test(text)) warnings.push('没有 {{ckpt}}：检查点写死在文件里，设置页选 ckpt 不会生效');
 
   return {
-    name: safe,
-    ...desc,
-    applied,
-    required: detected.required,
-    candidates: detected.candidates.filter((c) => !applied.some((a) => a.param === c.param)),
-    warnings: detected.warnings,
+    ok: missing.length === 0,
+    error: '',
+    nodeCount: desc.nodeCount,
+    params: desc.params,
+    missing,
+    warnings,
   };
 }
 
-/** 给已有工作流追加绑定（改占位符），不重新导入 */
-export async function exposeParams(archiveDir, name, expressions) {
-  const wf = await readWorkflow(archiveDir, name);
-  const graph = JSON.parse(wf.raw);
-  const result = applyBindings(graph, parseExpose(expressions));
-  if (!result.applied.length) throw new Error('没有任何字段被替换（可能已经是占位符，或节点/输入名不对）');
-  const text = JSON.stringify(result.graph, null, 2);
-  await writeFile(join(archiveDir, 'workflows', wf.name), `${text}\n`, 'utf8');
-  const desc = describeWorkflow(text);
-  return { name: wf.name, applied: result.applied, params: desc.params || [] };
+/**
+ * 保存工作流：校验格式后写到 <配置根>/workflows/<name>。
+ * source 可以是文件路径或 JSON 文本。
+ */
+export async function saveWorkflow(configDir, source, name = 'default.json') {
+  const rawText =
+    typeof source === 'string' && source.trim().startsWith('{') ? source : await readFile(resolve(String(source)), 'utf8');
+  const raw = stripBom(rawText).trim();
+  const desc = describeWorkflow(raw);
+  if (!desc.ok) throw new Error(desc.error);
+
+  const safe = basename(String(name).endsWith('.json') ? name : `${name}.json`);
+  const dir = workflowsDir(configDir);
+  await mkdir(dir, { recursive: true });
+  const text = `${raw.trim()}\n`;
+  await writeFile(join(dir, safe), text, 'utf8');
+  return { name: safe, ...checkWorkflow(text), raw: text, desc };
+}
+
+/** 把内置模板复制到配置根，保证开箱有可用工作流 */
+export async function installBuiltin(configDir, name = 'default.json') {
+  const builtin = join(BUILTIN_DIR, 'moss-image.api.json');
+  if (!(await exists(builtin))) throw new Error('内置工作流缺失');
+  const dir = workflowsDir(configDir);
+  await mkdir(dir, { recursive: true });
+  const target = join(dir, name);
+  await copyFile(builtin, target);
+  return { name, file: target };
 }
 
 /**

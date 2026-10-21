@@ -6,7 +6,8 @@
 
 | 参数 | 作用 |
 |---|---|
-| `--dir <路径>` | 存档目录，默认 `~/.moss-manga`（或环境变量 `MOSS_ARCHIVE`） |
+| `--config <路径>` | 配置根，默认 `~/.moss-manga`（或环境变量 `MOSS_CONFIG`） |
+| `--dir <路径>` | 存档目录，默认 `<配置根>/archive`（或 `config.archive` / `MOSS_ARCHIVE`） |
 | `--project <slug>` | 项目；只有一个项目时可省略 |
 | `--json` | 输出结构化 JSON |
 
@@ -37,18 +38,31 @@ manga doctor [--json]
 ## init / config / workflow
 
 ```bash
-manga init [--comfy URL] [--ckpt 文件名] [--workflow 文件]
+manga init [--comfy URL] [--ckpt 文件名] [--workflow 文件] [--archive 路径]
 manga config get [点号路径]
 manga config set 键=值 [键=值...]
+manga workflow path                    # 打印配置根与工作流目录
+manga workflow save <文件> [--name default.json]
+manga workflow check [--name default.json]
 manga workflow list
-manga workflow import <文件> [--name default.json] [--expose seed=5.seed]
-manga workflow expose seed=5.seed steps=5.steps [--name default.json]
 manga workflow show [--name default.json]
 ```
 
-`workflow import` 会自动把 `prompt` / `width` / `height` 换成占位符，并打印其余可暴露的参数。用户不需要手写占位符。
+`workflow save` 只做两件事：校验是 API 格式、复制到 `<配置根>/workflows/<name>`，然后报告占位符情况。**它不改你的文件**——`{{prompt}}` / `{{width}}` / `{{height}}` 这些由调用方（AI）读懂 JSON 后自己写进文件。
 
-`workflow expose` 用 `参数=节点id.输入名` 的形式追加；节点号从导入输出里取。
+`workflow check` 的输出：
+
+```json
+{
+  "ok": false,
+  "nodeCount": 7,
+  "params": [{ "name": "prompt", "count": 1, "type": "string" }, { "name": "width", "count": 1, "type": "number" }],
+  "missing": ["height"],
+  "warnings": ["没有 {{height}}：尺寸由工作流写死，改不了画布"]
+}
+```
+
+`ok: false` 不阻止保存，但 `doctor` 会把它列为问题。
 
 `config set` 的值会先尝试当 JSON 解析，所以 `editable.layout=true` 是布尔、`defaults.steps=30` 是数字。
 
@@ -56,6 +70,7 @@ manga workflow show [--name default.json]
 
 | 键 | 含义 |
 |---|---|
+| `archive` | 存档路径（留空 = `<配置根>/archive`） |
 | `comfy.url` | ComfyUI 地址 |
 | `comfy.timeoutMs` | 单张超时 |
 | `defaults.ckpt` | 检查点文件名 |

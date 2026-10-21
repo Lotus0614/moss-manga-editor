@@ -13,15 +13,17 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  resolveConfigDir,
   resolveArchiveDir,
-  ensureArchive,
+  ensureConfig,
   readConfig,
   writeConfig,
-  readState,
   getPath,
   setPath,
 } from './lib/config.mjs';
 import {
+  ensureArchive,
+  readState,
   listProjects,
   getProject,
   createProject,
@@ -37,7 +39,7 @@ import {
   currentRev,
   readJournal,
 } from './lib/archive.mjs';
-import { listWorkflows, importWorkflow, readWorkflow, exposeParams } from './lib/workflow.mjs';
+import { listWorkflows, readWorkflow, saveWorkflow, checkWorkflow, installBuiltin } from './lib/workflow.mjs';
 import { ComfyClient } from './lib/comfy.mjs';
 import { prepareRender, renderPage } from './lib/render.mjs';
 import { compilePage } from '../core/compile.mjs';
@@ -79,7 +81,9 @@ function parseArgs(argv) {
 const { positional, flags } = parseArgs(process.argv.slice(2));
 const command = positional[0] || 'help';
 const JSON_MODE = Boolean(flags.json);
-const DIR = resolveArchiveDir(flags.dir);
+const CONFIG_DIR = resolveConfigDir(flags.config);
+const CONFIG = await readConfig(CONFIG_DIR);
+const DIR = resolveArchiveDir(CONFIG, flags.dir || flags.archive);
 
 function out(payload, human) {
   if (JSON_MODE) {
@@ -123,10 +127,12 @@ async function needPage(project) {
 // ---------------------------------------------------------------- 命令
 
 async function cmdDoctor() {
-  const archiveExists = existsSync(join(DIR, 'config.json'));
+  const configExists = existsSync(join(CONFIG_DIR, 'config.json'));
+  const archiveExists = existsSync(join(DIR, 'state.json'));
   const result = {
     ok: true,
     configured: false,
+    configDir: CONFIG_DIR,
     archive: DIR,
     archiveExists,
     version: VERSION,
@@ -137,13 +143,16 @@ async function cmdDoctor() {
     problems: [],
   };
 
-  if (!archiveExists) {
-    result.problems.push('还没有初始化存档：先运行 `manga init`');
-    out(result, ['未初始化', `存档位置：${DIR}`, '下一步：manga init --comfy http://127.0.0.1:8188'].join('\n'));
+  if (!configExists) {
+    result.problems.push('还没有初始化：先运行 `manga init`');
+    out(
+      result,
+      ['未初始化', `配置根：${CONFIG_DIR}`, `存档：${DIR}`, '下一步：manga init --comfy http://127.0.0.1:8188'].join('\n')
+    );
     return;
   }
 
-  const config = await readConfig(DIR);
+  const config = await readConfig(CONFIG_DIR);
   result.comfy.url = config.comfy.url;
   result.ckpt = config.defaults.ckpt;
   result.workflow.name = config.workflow.name;
@@ -168,11 +177,18 @@ async function cmdDoctor() {
   }
 
   try {
-    const workflows = await listWorkflows(DIR);
+    const workflows = await listWorkflows(CONFIG_DIR);
     const picked = workflows.find((w) => w.name === config.workflow.name) || workflows[0];
     if (picked) {
       result.workflow = { name: picked.name, ok: picked.ok, params: picked.params.map((p) => p.name), error: picked.error };
       if (!picked.ok) result.problems.push(`工作流有问题：${picked.error}`);
+      else {
+        const wf = await readWorkflow(CONFIG_DIR, picked.name).catch(() => null);
+        if (wf) {
+          const checked = checkWorkflow(wf.raw);
+          if (!checked.ok) result.problems.push(`工作流缺占位符：${checked.missing.map((m) => `{{${m}}}`).join('、')}（manga workflow check）`);
+        }
+      }
     } else {
       result.workflow.ok = false;
       result.problems.push('没有可用的工作流文件');
@@ -181,13 +197,15 @@ async function cmdDoctor() {
     result.problems.push(`读取工作流失败：${err.message}`);
   }
 
-  const projects = await listProjects(DIR);
+  const projects = await listProjects(DIR).catch(() => []);
   result.projects = projects.length;
+  if (!archiveExists) result.problems.push(`存档还没建立：${DIR}（运行 manga init 会自动建）`);
   result.configured = result.comfy.reachable && Boolean(result.ckpt) && result.workflow.ok && result.problems.length === 0;
 
   out(
     result,
     [
+      `配置根：${CONFIG_DIR}`,
       `存档：${DIR}`,
       `ComfyUI：${config.comfy.url} ${result.comfy.reachable ? `✓ ${result.comfy.version}` : '✗ 连不上'}`,
       `检查点：${result.ckpt || '（未设置）'}`,
@@ -200,25 +218,26 @@ async function cmdDoctor() {
 }
 
 async function cmdInit() {
+  await ensureConfig(CONFIG_DIR);
   await ensureArchive(DIR);
   const patch = {};
+  if (flags.archive) patch.archive = resolve(String(flags.archive));
   if (flags.comfy) patch.comfy = { url: String(flags.comfy) };
   if (flags.ckpt) patch.defaults = { ckpt: String(flags.ckpt) };
   if (flags.workflow) {
-    const file = resolve(String(flags.workflow));
-    const imported = await importWorkflow(DIR, await readFile(file, 'utf8'), 'default.json');
-    patch.workflow = { name: imported.name, exposed: imported.params.map((p) => p.name) };
-  } else if (!existsSync(join(DIR, 'workflows', 'default.json'))) {
-    // 没指定就把内置的通用工作流放进存档，保证开箱能跑通链路
-    const builtin = await readWorkflow(DIR, 'moss-image.api.json');
-    const imported = await importWorkflow(DIR, builtin.raw, 'default.json');
-    patch.workflow = { name: imported.name, exposed: imported.params.map((p) => p.name) };
+    const saved = await saveWorkflow(CONFIG_DIR, String(flags.workflow), 'default.json');
+    patch.workflow = { name: saved.name };
+  } else if (!existsSync(join(CONFIG_DIR, 'workflows', 'default.json'))) {
+    // 没指定就把内置通用工作流放进配置根，保证开箱能跑通链路
+    const installed = await installBuiltin(CONFIG_DIR, 'default.json');
+    patch.workflow = { name: installed.name };
   }
-  const config = Object.keys(patch).length ? await writeConfig(DIR, patch) : await readConfig(DIR);
+  const config = Object.keys(patch).length ? await writeConfig(CONFIG_DIR, patch) : await readConfig(CONFIG_DIR);
   out(
-    { ok: true, archive: DIR, config },
+    { ok: true, configDir: CONFIG_DIR, archive: DIR, config },
     [
-      `存档已就绪：${DIR}`,
+      `配置：${CONFIG_DIR}`,
+      `存档：${DIR}`,
       `ComfyUI：${config.comfy.url}`,
       `工作流：${config.workflow.name}`,
       config.defaults.ckpt ? `检查点：${config.defaults.ckpt}` : '检查点：还没选（manga config set defaults.ckpt <文件名>）',
@@ -229,7 +248,7 @@ async function cmdInit() {
 async function cmdConfig() {
   const action = positional[1] || 'get';
   if (action === 'get') {
-    const config = await readConfig(DIR);
+    const config = await readConfig(CONFIG_DIR);
     const key = positional[2];
     if (key) {
       const value = getPath(config, key);
@@ -239,7 +258,7 @@ async function cmdConfig() {
   }
   if (action !== 'set') fail('用法：manga config get [键] | manga config set 键=值 [键=值...]');
 
-  let config = await readConfig(DIR);
+  let config = await readConfig(CONFIG_DIR);
   const pairs = positional.slice(2);
   if (!pairs.length) fail('至少给一个 键=值');
   for (const pair of pairs) {
@@ -255,14 +274,14 @@ async function cmdConfig() {
     }
     config = setPath(config, key, value);
   }
-  await writeConfig(DIR, config);
+  await writeConfig(CONFIG_DIR, config);
   out({ ok: true, config }, `已更新：${pairs.join('，')}`);
 }
 
 async function cmdWorkflow() {
   const action = positional[1] || 'list';
   if (action === 'list') {
-    const workflows = await listWorkflows(DIR);
+    const workflows = await listWorkflows(CONFIG_DIR);
     return out(
       { ok: true, workflows },
       table(
@@ -271,45 +290,51 @@ async function cmdWorkflow() {
       )
     );
   }
-  if (action === 'import') {
-    const file = positional[2] || flags.file;
-    if (!file) fail('用法：manga workflow import <API JSON 文件> [--name default.json] [--expose seed=3.seed,steps=3.steps]');
-    const raw = await readFile(resolve(String(file)), 'utf8');
-    const name = String(flags.name || 'default.json');
-    const expose = flags.expose ? String(flags.expose).split(',').filter(Boolean) : [];
-    const imported = await importWorkflow(DIR, raw, name, { expose });
-    await writeConfig(DIR, { workflow: { name: imported.name, exposed: imported.params.map((p) => p.name) } });
-    const lines = [`已导入 ${imported.name}（${imported.nodeCount} 个节点）`];
-    lines.push(
-      imported.applied.length
-        ? `已自动绑定：${imported.applied.map((b) => `${b.param}（节点 ${b.node}.${b.input}）`).join('、')}`
-        : '没有需要自动绑定的字段（可能已经带占位符）'
-    );
-    if (imported.candidates.length) {
-      lines.push(`还可以暴露（问用户要不要）：${imported.candidates.map((c) => `${c.param}${c.note ? ` ${c.note}` : ''}`).join('、')}`);
-      lines.push(`  命令：manga workflow expose ${imported.candidates.slice(0, 3).map((c) => `${c.param}=${c.node}.${c.input}`).join(' ')}`);
-    }
-    for (const w of imported.warnings || []) lines.push(`  注意：${w}`);
-    return out({ ok: true, workflow: imported }, lines.join('\n'));
-  }
-  if (action === 'expose') {
-    const config = await readConfig(DIR);
-    const name = String(flags.name || config.workflow.name);
-    const pairs = positional.slice(2);
-    if (!pairs.length) fail('用法：manga workflow expose seed=3.seed steps=3.steps [--name default.json]');
-    const result = await exposeParams(DIR, name, pairs);
-    await writeConfig(DIR, { workflow: { name: config.workflow.name, exposed: result.params.map((p) => p.name) } });
+  if (action === 'path') {
     return out(
-      { ok: true, ...result },
+      { ok: true, configDir: CONFIG_DIR, workflowsDir: join(CONFIG_DIR, 'workflows'), current: CONFIG.workflow.name, archive: DIR },
       [
-        `已暴露：${result.applied.map((b) => `{{${b.param}}}（节点 ${b.node}.${b.input}）`).join('、')}`,
-        `当前参数：${result.params.map((p) => p.name).join(', ')}`,
+        `配置根：${CONFIG_DIR}`,
+        `工作流目录：${join(CONFIG_DIR, 'workflows')}`,
+        `当前工作流：${CONFIG.workflow.name}`,
+        '把改好的工作流 JSON 写到上面目录里的同名文件，或运行 manga workflow save <文件>。',
       ].join('\n')
     );
   }
+  if (action === 'save' || action === 'import') {
+    const file = positional[2] || flags.file;
+    if (!file) fail('用法：manga workflow save <API JSON 文件> [--name default.json]');
+    const name = String(flags.name || 'default.json');
+    const saved = await saveWorkflow(CONFIG_DIR, String(file), name);
+    await writeConfig(CONFIG_DIR, { workflow: { name: saved.name } });
+    const lines = [
+      `已保存 ${saved.name}（${saved.nodeCount} 个节点，${saved.params.length} 个占位符）`,
+      `参数：${saved.params.map((p) => `{{${p.name}}}`).join(' ') || '（没有占位符）'}`,
+      saved.ok ? '三项关键占位符齐全（prompt / width / height）。' : `缺：${saved.missing.map((m) => `{{${m}}}`).join('、')}`,
+    ];
+    for (const w of saved.warnings) lines.push(`  提醒：${w}`);
+    return out({ ok: saved.ok, workflow: { name: saved.name, params: saved.params, missing: saved.missing, warnings: saved.warnings } }, lines.join('\n'));
+  }
+  if (action === 'check') {
+    const name = String(flags.name || CONFIG.workflow.name);
+    const wf = await readWorkflow(CONFIG_DIR, name);
+    const result = checkWorkflow(wf.raw);
+    if (!result.error) result.file = wf.file;
+    return out(
+      { ok: result.ok, ...result, name: wf.name },
+      result.error
+        ? `解析失败：${result.error}`
+        : [
+            `${wf.name}：${result.nodeCount} 个节点`,
+            `占位符：${result.params.map((p) => `{{${p.name}}}`).join(' ') || '（没有）'}`,
+            result.ok ? '可以直接生成。' : `缺：${result.missing.map((m) => `{{${m}}}`).join('、')}`,
+            ...result.warnings.map((w) => `  提醒：${w}`),
+          ].join('\n')
+    );
+  }
   if (action === 'show') {
-    const name = String(flags.name || (await readConfig(DIR)).workflow.name);
-    const wf = await readWorkflow(DIR, name);
+    const name = String(flags.name || (await readConfig(CONFIG_DIR)).workflow.name);
+    const wf = await readWorkflow(CONFIG_DIR, name);
     return out({ ok: true, ...wf }, wf.raw);
   }
   fail('用法：manga workflow list | import <文件> | show');
@@ -384,7 +409,7 @@ async function cmdPage() {
 
     const next = applyPatch(page, patch, { replace: Boolean(flags.replace) });
     const ops = diffPage(page, next);
-    const refused = checkScope(await readConfig(DIR), ops);
+    const refused = checkScope(await readConfig(CONFIG_DIR), ops);
     if (refused.length) {
       fail(`这些改动超出了允许范围（${refused.join('、')}）：${ops.map(describeOp).join('；')}`, 'scope');
     }
@@ -479,7 +504,7 @@ async function cmdCompile() {
 async function cmdRender() {
   const project = await needProject();
   const page = await needPage(project);
-  const config = await readConfig(DIR);
+  const config = await readConfig(CONFIG_DIR);
 
   if (flags['dry-run']) {
     const prepared = await prepareRender({ dir: DIR, project, page, config, opts: flags });
@@ -607,10 +632,13 @@ function cmdHelp() {
   process.stdout.write(`moss-manga CLI v${VERSION}
 
   配置
-    manga doctor                          检查配置与 ComfyUI 连通性
-    manga init [--comfy URL] [--ckpt NAME] [--workflow FILE]
+    manga doctor                          检查配置、ComfyUI、工作流
+    manga init [--comfy URL] [--ckpt NAME] [--workflow FILE] [--archive DIR]
     manga config get [键] | config set 键=值 ...
-    manga workflow list | import <文件> [--name default.json]
+    manga workflow path                   打印工作流该放哪（配置根）
+    manga workflow save <文件> [--name default.json]
+    manga workflow check [--name default.json]
+    manga workflow list | show
 
   项目与页面
     manga project new --name "名字" [--size page]

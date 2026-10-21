@@ -14,10 +14,31 @@ import { mkdir, readdir, rm, appendFile, stat, readFile, writeFile } from 'node:
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { now, normalizePage, createPage as makePage, pageSize } from '../../core/manga-doc.mjs';
-import { resolveArchiveDir, readJson, writeJson, readState, writeState, readConfig } from './config.mjs';
+import { readJson, writeJson } from './config.mjs';
 import { diffPage } from './diff.mjs';
 
-export { resolveArchiveDir, readConfig };
+const statePath = (dir) => join(dir, 'state.json');
+
+export function defaultState() {
+  return { rev: 0, ackedRev: 0, updatedAt: now() };
+}
+
+export async function readState(dir) {
+  return (await readJson(statePath(dir), null)) || defaultState();
+}
+
+export async function writeState(dir, state) {
+  const next = { ...state, updatedAt: now() };
+  await writeJson(statePath(dir), next);
+  return next;
+}
+
+/** 存档只建「项目数据」这半边，配置不在这里 */
+export async function ensureArchive(dir) {
+  await mkdir(join(dir, 'projects'), { recursive: true });
+  if (!(await readJson(statePath(dir), null))) await writeJson(statePath(dir), defaultState());
+  return dir;
+}
 
 const projectsDir = (dir) => join(dir, 'projects');
 const projectDir = (dir, slug) => join(projectsDir(dir), slug);

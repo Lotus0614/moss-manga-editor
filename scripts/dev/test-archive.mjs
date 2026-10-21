@@ -2,12 +2,22 @@
 //   node scripts/dev/test-archive.mjs
 
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+const exists = async (file) => {
+  try {
+    await access(file);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 import { diffPage } from '../lib/diff.mjs';
 import {
+  ensureArchive,
   createProject,
   createPage,
   getPage,
@@ -16,8 +26,9 @@ import {
   changes,
   ack,
   readJournal,
+  readState,
 } from '../lib/archive.mjs';
-import { ensureArchive, readState, readConfig, writeConfig } from '../lib/config.mjs';
+import { ensureConfig, readConfig, writeConfig } from '../lib/config.mjs';
 
 let passed = 0;
 const failures = [];
@@ -62,14 +73,18 @@ await test('没有改动就不产生操作', () => {
 // ---------------------------------------------------------------- 存档
 
 const dir = await mkdtemp(join(tmpdir(), 'moss-test-'));
+const configDir = await mkdtemp(join(tmpdir(), 'moss-config-'));
 
-await test('ensureArchive 建立 config 与 state', async () => {
+await test('配置根与存档是两棵树', async () => {
+  await ensureConfig(configDir);
   await ensureArchive(dir);
-  const config = await readConfig(dir);
-  assert.equal(config.version, 2);
+  const config = await readConfig(configDir);
+  assert.equal(config.version, 3);
   assert.ok(config.comfy.url.startsWith('http'));
   const state = await readState(dir);
   assert.equal(state.rev, 0);
+  // 存档里不应该有 config.json
+  assert.equal(await exists(join(dir, 'config.json')), false);
 });
 
 await test('建项目 / 建页 / rev 递增', async () => {
@@ -116,7 +131,7 @@ await test('changes 按页聚合，ack 之后清空', async () => {
 });
 
 await test('配置写入是深合并且不丢默认值', async () => {
-  const saved = await writeConfig(dir, { defaults: { ckpt: 'x.safetensors' } });
+  const saved = await writeConfig(configDir, { defaults: { ckpt: 'x.safetensors' } });
   assert.equal(saved.defaults.ckpt, 'x.safetensors');
   assert.equal(saved.defaults.steps, 28);
   assert.equal(typeof saved.comfy.url, 'string');
@@ -125,6 +140,7 @@ await test('配置写入是深合并且不丢默认值', async () => {
 // ---------------------------------------------------------------- 汇总
 
 await rm(dir, { recursive: true, force: true });
+await rm(configDir, { recursive: true, force: true });
 
 console.log(`\n${passed} 通过，${failures.length} 失败`);
 if (failures.length) {

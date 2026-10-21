@@ -40,29 +40,42 @@ node scripts/manga.mjs init --comfy <地址>
 
 **1.2 要 Moss 的工作流**
 
-> 「这个工具需要 MOSS 模型的工作流。如果你已经有，请在 ComfyUI 里打开它，点『工作流 → 导出 (API)』，把生成的 JSON 原样发我（贴文本或者给文件路径都行），**不用改任何东西**。」
+> 「这个工具需要 MOSS 模型的工作流。请在 ComfyUI 里打开它，点『工作流 → 导出 (API)』，把 JSON 原样发我（贴文本或给路径都行），**不用改任何东西**。」
 
-收到后直接导入，占位符由你负责加：
+拿到之后：
 
-```bash
-node scripts/manga.mjs workflow import <文件路径> --name default.json
-```
-
-它会自动把 `prompt`（正向提示词节点的 text）、`width` / `height`（latent 节点的尺寸）换成占位符，并列出其余**可以**暴露的参数。
-
-然后问用户：
-
-> 「这几项我默认可以改：提示词、尺寸。另外还能开放：随机种子、步数、CFG、采样器、负面提示词、检查点——要放开哪些？不确定就保持默认，只开种子。」
-
-按回答追加：
+1. 先问路径，知道该写到哪：
 
 ```bash
-node scripts/manga.mjs workflow expose seed=5.seed steps=5.steps
+node scripts/manga.mjs workflow path --json
 ```
 
-（节点号用导入时打印出来的那个，别自己编。）
+2. **你自己读这份 JSON**，判断哪个节点的文本输入接的是正向提示词、哪个 latent 节点的 `width`/`height` 是画布尺寸（看 `class_type` 和 `inputs` 里的连线，不要照抄任何示例节点号）。
+3. 把这三处换成占位符，生成**完整的新文件**（不是片段）：`{{prompt}}`、`{{width}}`、`{{height}}`。写法是直接把值改成占位符字符串，连线保持原样：
 
-如果导入报「没有找到采样器节点 / 没有找到带 width/height 的 latent 节点」，说明不是标准文生图工作流，直接把报错原文告诉用户，让他确认导出的是不是画图那条链路。
+```jsonc
+"6": { "class_type": "CLIPTextEncode", "inputs": { "text": "{{prompt}}", "clip": ["1", 1] } },
+"5": { "class_type": "EmptyLatentImage", "inputs": { "width": "{{width}}", "height": "{{height}}", "batch_size": 1 } }
+```
+
+4. 保存并校验：
+
+```bash
+node scripts/manga.mjs workflow save <你写好的文件> --name default.json
+node scripts/manga.mjs workflow check
+```
+
+`save` 会写到配置根的 `workflows/` 并报告缺哪几项；`check` 打印当前工作流的全部占位符。
+
+5. 然后问用户：
+
+> 「提示词和尺寸我固定可以改。另外这些也能开：随机种子（换一版重出）、步数、CFG、采样器、负面提示词、检查点——要放开哪些？」
+
+要开的，在文件里同样改成 `{{seed}}` / `{{steps}}` 这类占位符（会自动填，见 `references/WORKFLOW.md` 的对照表），再 `workflow save` 一次。
+
+**注意**：工作流是全局配置，和存档无关。换存档、换机器都不影响它。
+
+如果 `check` 报「缺 {{prompt}}」之类的，说明你改写时漏了，回去补——不要靠脚本猜。
 
 **1.3 哪些部分允许你改**
 
@@ -86,9 +99,17 @@ node scripts/manga.mjs config set defaults.ckpt <模型文件名>
 
 **1.5 存档放哪**
 
-> 「生成的内容存在哪？默认 `~/.moss-manga`，你可以指定别的目录。」
+> 「生成的内容存在哪？默认 `~/.moss-manga/archive`，你可以指定别的目录（比如放到某个项目文件夹里）。」
 
-默认就用默认；要改就每次命令带 `--dir <路径>`（或设环境变量 `MOSS_ARCHIVE`）。
+先解释一句：**配置和工作流存在 `~/.moss-manga`，跟档案件是分开的**，换存档不会丢配置。
+
+默认就用默认；要改：
+
+```bash
+node scripts/manga.mjs config set archive=/path/to/archive
+```
+
+（临时的用 `--dir <路径>`，或环境变量 `MOSS_ARCHIVE`。）
 
 **1.6 复检**
 
@@ -192,8 +213,8 @@ node scripts/manga.mjs ack
 |---|---|
 | 检查配置 | `manga doctor` |
 | 初始化 | `manga init --comfy URL [--ckpt 名] [--workflow 文件]` |
-| 导入工作流 | `manga workflow import <文件>`（自动绑定 prompt/width/height） |
-| 开更多参数 | `manga workflow expose seed=5.seed steps=5.steps` |
+| 导入工作流 | `manga workflow path` 拿目录，改写后 `manga workflow save <文件>` |
+| 校验工作流 | `manga workflow check` |
 | 改配置 | `manga config set defaults.ckpt=xxx editable.text=true` |
 | 看配置 | `manga config get defaults` |
 | 建项目 | `manga project new --name "名字" [--size page]` |
@@ -219,12 +240,13 @@ node scripts/manga.mjs ack
 1. **不读 `scripts/` 源码**，要细节读 `references/`。
 2. **不改 `scripts/` 代码**——只有用户明确要求「修 bug」或「加功能」时才动，改完要跑 `npm test`。
 3. **不手写 Moss JSON**，那是 `compile` 的产物；你只写页面文档。
-4. **不让用户手写占位符**：工作流 import 会自动绑定 `prompt` / `width` / `height`，其余用 `workflow expose` 加。
-5. **不猜坐标**：先 `page show --summary`，再基于现有 bbox 改。
-6. **不跳过 compile**：有 error 就渲染不了，浪费一次排队。
-7. **一次只问一个问题**，配置阶段尤其如此。
-8. **用户没说「开始」就不要渲染**。
-9. 生成失败先看错误信息：`连不上 ComfyUI` 是环境问题，`节点错误` 是工作流问题，`这一页还有错误` 是内容问题。
+4. **工作流占位符由你改写文件完成**：读用户给的 API JSON → 自己判断节点 → 生成完整新文件 → `workflow save` → `workflow check`。不要让用户手写占位符，也不要指望脚本猜节点。
+5. **可以读工作流 JSON**（那是用户给你的产物），但**不要读 `scripts/` 源码**。
+6. **不猜坐标**：先 `page show --summary`，再基于现有 bbox 改。
+7. **不跳过 compile**：有 error 就渲染不了，浪费一次排队。
+8. **一次只问一个问题**，配置阶段尤其如此。
+9. **用户没说「开始」就不要渲染**。
+10. 生成失败先看错误信息：`连不上 ComfyUI` 是环境问题，`节点错误` 是工作流问题，`这一页还有错误` 是内容问题。
 
 ---
 

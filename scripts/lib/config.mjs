@@ -1,23 +1,40 @@
-// 存档配置与全局状态（config.json / state.json）。
-// 存档位置解析顺序：--dir > 环境变量 MOSS_ARCHIVE > ~/.moss-manga
+// 全局配置：只放「跟项目无关」的东西——ComfyUI 地址、当前工作流、默认参数、编辑范围。
+//
+// 位置固定在 <配置根>，默认 ~/.moss-manga（MOSS_CONFIG 可覆盖）；
+// 工作流文件也在配置根下的 workflows/，跟存档没有任何关系。
+//
+// 存档（项目、图片、state、journal）是另一棵树，默认 <配置根>/archive，可自定义。
 
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { now } from '../../core/manga-doc.mjs';
 
-export const DEFAULT_ARCHIVE = join(homedir(), '.moss-manga');
+export const DEFAULT_CONFIG_DIR = join(homedir(), '.moss-manga');
 
-export function resolveArchiveDir(dir) {
-  const picked = dir || process.env.MOSS_ARCHIVE || DEFAULT_ARCHIVE;
-  return resolve(picked.replace(/^~(?=$|[\\/])/, homedir()));
+/** 配置根：--config > MOSS_CONFIG > ~/.moss-manga */
+export function resolveConfigDir(dir) {
+  const picked = dir || process.env.MOSS_CONFIG || DEFAULT_CONFIG_DIR;
+  return resolve(picked);
 }
 
-export function defaultConfig() {
+/**
+ * 存档根：--dir > MOSS_ARCHIVE > config.archive > <配置根>/archive
+ * 存档路径属于配置的一部分，所以换存档不会丢配置，换配置也不会搬数据。
+ */
+export function resolveArchiveDir(config, override) {
+  if (override) return resolve(override);
+  if (process.env.MOSS_ARCHIVE) return resolve(process.env.MOSS_ARCHIVE);
+  if (config?.archive) return resolve(config.archive);
+  return join(resolveConfigDir(process.env.MOSS_CONFIG), 'archive');
+}
+
+export function defaultConfig(configDir = DEFAULT_CONFIG_DIR) {
   return {
-    version: 2,
+    version: 3,
+    archive: '', // 空 = <配置根>/archive
     comfy: { url: 'http://127.0.0.1:8188', timeoutMs: 180000 },
-    workflow: { name: 'default.json', exposed: ['seed', 'steps', 'cfg'] },
+    workflow: { name: 'default.json' },
     defaults: {
       ckpt: '',
       steps: 28,
@@ -38,13 +55,17 @@ export function defaultConfig() {
   };
 }
 
-export function defaultState() {
-  return { rev: 0, ackedRev: 0, updatedAt: now() };
+export const configPath = (configDir) => join(configDir, 'config.json');
+export const workflowsDir = (configDir) => join(configDir, 'workflows');
+
+/** 去 BOM：Windows 下用记事本/PowerShell 存的 JSON 常带 BOM，JSON.parse 会直接失败 */
+export function stripBom(text) {
+  return typeof text === 'string' && text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 }
 
 export async function readJson(file, fallback = null) {
   try {
-    return JSON.parse(await readFile(file, 'utf8'));
+    return JSON.parse(stripBom(await readFile(file, 'utf8')));
   } catch (err) {
     if (err.code === 'ENOENT') return fallback;
     throw err;
@@ -58,20 +79,17 @@ export async function writeJson(file, value) {
   await rename(tmp, file);
 }
 
-export const configPath = (dir) => join(dir, 'config.json');
-export const statePath = (dir) => join(dir, 'state.json');
-
-export async function ensureArchive(dir) {
-  await mkdir(join(dir, 'projects'), { recursive: true });
-  await mkdir(join(dir, 'workflows'), { recursive: true });
-  if (!(await readJson(configPath(dir), null))) await writeJson(configPath(dir), defaultConfig());
-  if (!(await readJson(statePath(dir), null))) await writeJson(statePath(dir), defaultState());
-  return dir;
+export async function ensureConfig(configDir) {
+  await mkdir(workflowsDir(configDir), { recursive: true });
+  if (!(await readJson(configPath(configDir), null))) {
+    await writeJson(configPath(configDir), defaultConfig(configDir));
+  }
+  return configDir;
 }
 
-export async function readConfig(dir) {
-  const saved = (await readJson(configPath(dir), null)) || {};
-  const base = defaultConfig();
+export async function readConfig(configDir) {
+  const saved = (await readJson(configPath(configDir), null)) || {};
+  const base = defaultConfig(configDir);
   return {
     ...base,
     ...saved,
@@ -86,8 +104,8 @@ export async function readConfig(dir) {
   };
 }
 
-export async function writeConfig(dir, patch) {
-  const current = await readConfig(dir);
+export async function writeConfig(configDir, patch) {
+  const current = await readConfig(configDir);
   const next = {
     ...current,
     ...patch,
@@ -100,17 +118,7 @@ export async function writeConfig(dir, patch) {
       params: { ...current.editable.params, ...(patch.editable?.params || {}) },
     },
   };
-  await writeJson(configPath(dir), next);
-  return next;
-}
-
-export async function readState(dir) {
-  return (await readJson(statePath(dir), null)) || defaultState();
-}
-
-export async function writeState(dir, state) {
-  const next = { ...state, updatedAt: now() };
-  await writeJson(statePath(dir), next);
+  await writeJson(configPath(configDir), next);
   return next;
 }
 

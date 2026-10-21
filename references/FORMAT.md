@@ -1,13 +1,15 @@
 # 存档格式
 
-存档是一个普通目录，全部是 JSON 文件，可以直接用编辑器打开、也可以用 git 管。
+**配置和存档是两棵树**：配置（含工作流）放在固定的配置根，存档只放项目数据。换存档不会丢配置，换机器只要拷配置根。
 
 ```
-<存档>/
-├── config.json                 # 全局配置（CLI 的 config 命令读写）
+<配置根>  默认 ~/.moss-manga（MOSS_CONFIG 可覆盖）
+├── config.json                 # ComfyUI 地址、当前工作流、默认参数、编辑范围
+└── workflows/                  # 全局工作流（跟存档无关）
+
+<存档>    默认 <配置根>/archive（config.archive 或 --dir 可改）
 ├── state.json                  # { rev, ackedRev } 变更版本号
 ├── journal.jsonl               # 变更日志，一行一条
-├── workflows/                  # 导入的 ComfyUI 工作流
 └── projects/<slug>/
     ├── project.json            # 项目 + 人物设定 + 页序
     ├── pages/p01.json          # 一页一个文件，唯一可编辑真源
@@ -15,6 +17,8 @@
     ├── versions/<id>.json      # 每次渲染喂进去的 Moss JSON 快照（只读）
     └── images/<sha256>.png     # 图片，内容寻址，重复自动去重
 ```
+
+存档里**没有** `config.json`：配置是全局的，不属于某个项目集合。
 
 ## project.json
 

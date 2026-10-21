@@ -11,7 +11,8 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, join, resolve, sep } from 'node:path';
 import { EventEmitter } from 'node:events';
 
-import { resolveArchiveDir, readConfig, writeConfig, readState, ensureArchive } from './scripts/lib/config.mjs';
+import { resolveConfigDir, resolveArchiveDir, ensureConfig, readConfig, writeConfig } from './scripts/lib/config.mjs';
+import { ensureArchive, readState } from './scripts/lib/archive.mjs';
 import {
   listProjects,
   getProject,
@@ -29,7 +30,7 @@ import {
   changes,
   ack,
 } from './scripts/lib/archive.mjs';
-import { listWorkflows, readWorkflow, importWorkflow } from './scripts/lib/workflow.mjs';
+import { listWorkflows, readWorkflow, saveWorkflow } from './scripts/lib/workflow.mjs';
 import { renderPage } from './scripts/lib/render.mjs';
 import { compilePage } from './core/compile.mjs';
 import { compileContext } from './core/bible.mjs';
@@ -38,7 +39,9 @@ import { ComfyClient } from './scripts/lib/comfy.mjs';
 
 const PORT = Number(process.env.PORT || 5123);
 const HOST = process.env.HOST || '127.0.0.1';
-const ARCHIVE = resolveArchiveDir(process.env.MOSS_ARCHIVE);
+const CONFIG_DIR = resolveConfigDir();
+const CONFIG = await readConfig(CONFIG_DIR);
+const ARCHIVE = resolveArchiveDir(CONFIG, process.env.MOSS_ARCHIVE);
 const WEB = resolve(import.meta.dirname, 'web');
 const CORE = resolve(import.meta.dirname, 'core');
 
@@ -128,12 +131,12 @@ async function route(req, res, url) {
   if (path === '/api/health') return json(res, 200, { ok: true, archive: ARCHIVE, version: '2.0.0' });
 
   if (path === '/api/config') {
-    if (method === 'GET') return json(res, 200, await readConfig(ARCHIVE));
-    if (method === 'PUT') return json(res, 200, await writeConfig(ARCHIVE, await body(req)));
+    if (method === 'GET') return json(res, 200, await readConfig(CONFIG_DIR));
+    if (method === 'PUT') return json(res, 200, await writeConfig(CONFIG_DIR, await body(req)));
   }
 
   if (path === '/api/comfy/models' && method === 'GET') {
-    const config = await readConfig(ARCHIVE);
+    const config = await readConfig(CONFIG_DIR);
     const client = new ComfyClient({ url: config.comfy.url });
     try {
       const info = await client.objectInfo();
@@ -148,19 +151,19 @@ async function route(req, res, url) {
     }
   }
 
-  if (path === '/api/workflows' && method === 'GET') return json(res, 200, { workflows: await listWorkflows(ARCHIVE) });
+  if (path === '/api/workflows' && method === 'GET') return json(res, 200, { workflows: await listWorkflows(CONFIG_DIR) });
 
   const wfMatch = path.match(/^\/api\/workflows\/([^/]+)$/);
   if (wfMatch) {
     const name = safe(wfMatch[1]);
     if (method === 'GET') {
-      const wf = await readWorkflow(ARCHIVE, name);
+      const wf = await readWorkflow(CONFIG_DIR, name);
       return json(res, 200, wf);
     }
     if (method === 'PUT') {
       const payload = await body(req);
       const raw = typeof payload.raw === 'string' ? payload.raw : JSON.stringify(payload.raw, null, 2);
-      const imported = await importWorkflow(ARCHIVE, raw, name);
+      const imported = await saveWorkflow(CONFIG_DIR, raw, name);
       return json(res, 200, imported);
     }
   }
@@ -276,7 +279,7 @@ async function route(req, res, url) {
 
       if (action === 'render' && method === 'POST') {
         const payload = await body(req);
-        const config = await readConfig(ARCHIVE);
+        const config = await readConfig(CONFIG_DIR);
         const job = { id: `job_${Date.now().toString(36)}`, page: page.id, index: page.index, status: 'running', progress: 0, at: new Date().toISOString() };
         jobs.push(job);
         if (jobs.length > 60) jobs.shift();
@@ -380,12 +383,14 @@ const server = createServer(async (req, res) => {
   }
 });
 
+await ensureConfig(CONFIG_DIR);
 await ensureArchive(ARCHIVE);
 server.listen(PORT, HOST, async () => {
-  const config = await readConfig(ARCHIVE);
+  const config = await readConfig(CONFIG_DIR);
   const state = await readState(ARCHIVE);
   console.log('');
   console.log(`  MOSS 漫画预览  http://${HOST}:${PORT}`);
+  console.log(`  配置 ${CONFIG_DIR}`);
   console.log(`  存档 ${ARCHIVE}（rev ${state.rev}）`);
   console.log(`  ComfyUI ${config.comfy.url} · 工作流 ${config.workflow.name} · ckpt ${config.defaults.ckpt || '未设置'}`);
   console.log('');

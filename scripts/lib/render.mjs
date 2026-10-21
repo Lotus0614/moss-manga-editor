@@ -32,7 +32,13 @@ export async function prepareRender({ dir, configDir = dir, project, page, confi
     return { ok: false, error: err.message, warnings: compiled.warnings };
   }
 
-  const values = buildValues({ page, project, config, opts });
+  // 生图参数：项目级覆盖全局，没填就跟随全局
+  const generation = project?.generation || {};
+  const effective = {
+    ...config,
+    defaults: { ...config.defaults, ...Object.fromEntries(Object.entries(generation).filter(([, v]) => v !== '' && v !== undefined && v !== null)) },
+  };
+  const values = buildValues({ page, project, config: effective, opts });
   values.prompt = compiled.json;
 
   // 工作流用到哪些参数，就必须填哪些；没用到的一个都不要求

@@ -249,7 +249,7 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
               : html`<span class="hint">${form.workflow.name ? '这个工作流没有可调参数。' : '先选工作流，这里只显示它实际用到的参数。'}</span>`}
             ${custom.length
               ? html`<div class="row wrap">
-                  <span class="hint">工作流里的自定义占位符（用 `manga config set params.名字=值` 提供）：</span>
+                  <span class="hint">工作流里的自定义占位符（用 manga config set params.名字=值 提供）：</span>
                   ${custom.map((name) => html`<span class="chip ghost">{{${name}}}</span>`)}
                 </div>`
               : null}

@@ -229,7 +229,8 @@ async function route(req, res, url) {
     }
     if (method === 'POST') {
       const payload = await body(req);
-      const project = await createProject(ARCHIVE, { name: payload.name, size: payload.size });
+      const cfg = await readConfig(CONFIG_DIR);
+      const project = await createProject(ARCHIVE, { name: payload.name, size: payload.size, canvas: payload.canvas || cfg.defaults.canvas });
       if (payload.withSamplePage) {
         await createPage(ARCHIVE, project.slug, {});
       }

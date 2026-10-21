@@ -199,6 +199,35 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
           </div>
         </section>
 
+        <!-- 新建项目的默认画布 -->
+        <section class="panel-box">
+          <header>新建项目默认画布</header>
+          <div class="body">
+            <div class="row2">
+              <div class="field">
+                <label>宽（16 的倍数）</label>
+                <input
+                  class="input"
+                  type="number"
+                  step="16"
+                  value=${(form.defaults.canvas || [768, 1280])[0]}
+                  onInput=${(e) => patchDefaults({ canvas: [Number(e.currentTarget.value) || 768, (form.defaults.canvas || [768, 1280])[1]] })}
+                />
+              </div>
+              <div class="field">
+                <label>高（16 的倍数）</label>
+                <input
+                  class="input"
+                  type="number"
+                  step="16"
+                  value=${(form.defaults.canvas || [768, 1280])[1]}
+                  onInput=${(e) => patchDefaults({ canvas: [(form.defaults.canvas || [768, 1280])[0], Number(e.currentTarget.value) || 1280] })}
+                />
+              </div>
+            </div>
+            <span class="hint">只影响之后新建的项目；已有项目的画布在项目里固定。</span>
+          </div>
+        </section>
         <!-- 出图参数：只显示工作流里真实存在的占位符 -->
         <section class="panel-box">
           <header>出图参数</header>

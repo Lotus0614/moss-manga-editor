@@ -85,7 +85,7 @@ export async function saveProject(dir, project) {
   return project;
 }
 
-export async function createProject(dir, { name, size = 'page', bible } = {}) {
+export async function createProject(dir, { name, size = 'page', bible, canvas } = {}) {
   const base = slugify(name);
   let slug = base;
   let n = 2;
@@ -95,6 +95,7 @@ export async function createProject(dir, { name, size = 'page', bible } = {}) {
     slug,
     name: String(name || slug),
     size,
+    canvas: Array.isArray(canvas) ? canvas : [768, 1280],
     pages: [],
     bible: bible || { characters: [], scene: '' },
     createdAt: now(),
@@ -169,7 +170,7 @@ export async function createPage(dir, slug, { title = '', size, items } = {}) {
   const pages = await listPages(dir, slug);
   const id = await nextPageId(dir, slug);
   const sizes = { page: [768, 1280], 'page-hd': [1152, 1920], square: [1024, 1024], wide: [1536, 1024] };
-  const pageSize = size || sizes[project.size] || sizes.page;
+  const pageSize = size || (Array.isArray(project.canvas) ? project.canvas : null) || sizes[project.size] || sizes.page;
   const initialItems =
     items ||
     [

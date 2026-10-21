@@ -47,6 +47,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const [fitScale, setFitScale] = useState(0.55);
   const [zoom, setZoom] = useState(1);
   const [showBoxes, setShowBoxes] = useState(true);
+  const [grid, setGrid] = useState(4);
   const [opacity, setOpacity] = useState(0.55);
   const [changes, setChanges] = useState(null);
   const [showExport, setShowExport] = useState(false);
@@ -467,6 +468,11 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         <button class="btn" onClick=${() => addItem('panel')}>＋ 分格</button>
         <button class="btn" onClick=${() => addItem('bubble')}>＋ 文字</button>
         <button class="btn" onClick=${() => addItem('native')}>＋ 原生</button>
+        <label class="meta" style="display:flex;align-items:center;gap:4px">网格
+          <select class="select" style="width:56px;padding:1px 14px 1px 4px;font-size:11px" value=${grid} onChange=${(e) => setGrid(Number(e.currentTarget.value))}>
+            ${[1, 2, 4, 8, 16].map((n) => html`<option value=${n}>${n}px</option>`)}
+          </select>
+        </label>
         <button class=${cls('btn ghost', !showBoxes && 'inv')} onClick=${() => setShowBoxes((v) => !v)}>${showBoxes ? '隐藏框' : '显示框'}</button>
         <button class="btn ghost" onClick=${() => setZoom((z) => Math.max(0.5, Number((z - 0.15).toFixed(2))))}>－</button>
         <button class="btn ghost" onClick=${() => setZoom(1)}>适应</button>
@@ -507,6 +513,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
           image=${image}
           imageOpacity=${opacity}
           showBoxes=${showBoxes}
+          grid=${grid}
           scale=${scale}
           selection=${selection}
           onSelect=${setSelection}

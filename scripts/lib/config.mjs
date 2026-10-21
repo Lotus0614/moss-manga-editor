@@ -46,6 +46,7 @@ export function defaultConfig(configDir = DEFAULT_CONFIG_DIR) {
       negative: '',
       lora: '',
       seed: '',
+      canvas: [768, 1280],
     },
     editable: {
       layout: true,

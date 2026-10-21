@@ -137,7 +137,7 @@ function ItemBox({ item, page, index, selected, onSelect, onDragStart, onBegin }
   </g>`;
 }
 
-export default function Canvas({ page, image, imageOpacity = 1, showBoxes = true, scale, selection, onSelect, onBegin, onChange, onCommit }) {
+export default function Canvas({ page, image, imageOpacity = 1, showBoxes = true, grid = 4, scale, selection, onSelect, onBegin, onChange, onCommit }) {
   const [W, H] = page.size;
   const svgRef = useRef(null);
   const dragRef = useRef(null);
@@ -221,8 +221,10 @@ export default function Canvas({ page, image, imageOpacity = 1, showBoxes = true
     }
 
     drag.moved = true;
-    onChange(drag.id, bbox.map((v) => Math.round(v)));
+    const step = Math.max(1, Number(grid) || 4);
+    onChange(drag.id, bbox.map((v) => Math.round(v / step) * step));
   }
+
 
   function onUp() {
     const drag = dragRef.current;

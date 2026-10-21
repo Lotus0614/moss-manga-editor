@@ -153,7 +153,7 @@ manga render --page 3 [--seed 123] [--steps 20] [--cfg 5] [--dry-run] [--json]
 
 ---
 
-## changes / ack
+## changes / ack（人类用，Agent 不用）
 
 ```bash
 manga changes [--since 12] [--json]
@@ -176,9 +176,9 @@ manga ack
 }
 ```
 
-`--since` 不传就用上次 `ack` 的位置。`op` 取值：`create` `add` `remove` `bbox` `text` `field` `page`。
+**Agent 不要用这两个命令**：直接读 `<存档>/projects/<slug>/pages/pNN.json` 即可，源文件信息量更大。这两个是给网页端「变更」页签用的。`--since` 不传就用上次 `ack` 的位置。`op` 取值：`create` `add` `remove` `bbox` `text` `field` `page`。
 
-**读完差异后务必 `ack`**，否则下次还会返回同一批。
+网页端看完「变更」页签会自己 ack；Agent 不需要这套流程。
 
 ---
 

@@ -218,19 +218,17 @@ node scripts/manga.mjs serve --open
 
 ## 第 5 步：修改循环（最重要）
 
-用户改完页面后，**不要重新读所有页**：
+用户改完页面后，**直接读页面源文件**，不要看 diff：
 
 ```bash
-node scripts/manga.mjs changes --json
+# 源文件就是唯一真相，纯 JSON，直接读
+# <存档>/projects/<slug>/pages/pNN.json
+node scripts/manga.mjs page show --page N --summary   # 想先看紧凑大纲也可以
 ```
 
-它只返回「自上次确认以来被改过的页 + 具体操作」（哪个格子挪了、哪句台词改了、哪条气泡加了）。根据 ops 决定改什么，改完 `render` 重出，最后：
-
-```bash
-node scripts/manga.mjs ack
-```
-
-`ack` 之前 changes 会一直返回同一批差异，所以**每次同步完都要 ack**。
+- **不要用 `manga changes` / `manga ack`**——那是流水账，信息量远不如源文件；这两个命令保留给网页端的「变更」页签，Agent 不用。
+- 读完源文件，直接改你不满意的地方（或按用户说的改），然后 `render` 重出。
+- 想只改一条文字/一个框，用 `page set --file patch.json`（items 按 id 合并），不用整页重写。
 
 ---
 
@@ -254,8 +252,8 @@ node scripts/manga.mjs ack
 | 改版面 | `manga page set --page N --file patch.json`（items 按 id 合并） |
 | 编译 | `manga compile --page N` |
 | 出图 | `manga render --page N [--seed S] [--steps N] [--dry-run]` |
-| 看变更 | `manga changes [--since rev]` |
-| 确认 | `manga ack` |
+| 看变更（人用，Agent 不用） | 直接读 `pages/pNN.json` |
+| 确认 | 不需要，改完直接渲染 |
 | 预览 | `manga serve [--port 5123] [--open]` / `manga stop` |
 
 全局参数：`--dir <存档>`、`--project <slug>`、`--json`。

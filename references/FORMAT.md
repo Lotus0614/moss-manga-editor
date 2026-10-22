@@ -174,7 +174,7 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 
 ## 加一个新类型
 
-类型、字段、编译规则都在 `core/registry.mjs`。往 `ITEM_TYPES` 里加一项即可，编译、校验、编辑器表单、画布按钮和配色全部自动认得。
+类型、字段、编译规则都在 `config/types.mjs`。往导出的数组里加一项即可，编译、校验、编辑器表单、画布按钮和配色全部自动认得。
 
 ```js
 {
@@ -205,7 +205,7 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 { key: 'shape',  type: 'enum', label: '形状', options: 'PANEL_SHAPES', canvas: true },
 ```
 
-生成规则（`core/registry.mjs` 的 `labelOf`）：
+生成规则（`config/ui.mjs` 的 `labelOf`）：
 
 1. 类型名开头，`panel` 带序号（`面板3`），其它不带
 2. 遍历该类型字段，**只有 `canvas: true` 的才出现**，空值跳过
@@ -284,16 +284,16 @@ export default [
 | 目录 | 有什么 | 谁改 |
 |---|---|---|
 | `core/` | 坐标换算、遍历、JSON 形状、校验、占位符引擎 | 不动 |
-| `defaults/` | 漫画方言：词表、气泡文案、类型、排版辅助函数 | 复制到配置根后随便改 |
+| `config/` | 漫画方言：词表、类型、排版辅助函数、展示规则 | 直接改 |
 
-`defaults/` 四个文件：
+`config/` 下的方言文件：
 
 | 文件 | 内容 |
 |---|---|
 | `prompts.mjs` | 词表、短语、句子模板 |
-| `bubbles.mjs` | 8 种气泡描述 + `bubblePhrase()` |
-| `helpers.mjs` | `panelsOf` / `readingOrder` / `panelNumber` / `locateInPanel` / `placementOf` / `textLayoutOf` |
+| `helpers.mjs` | `panelsOf` / `readingOrder` / `panelNumber` / `locateInPanel` / `placementOf` / `textLayoutOf` / `bubblePhrase` |
 | `types.mjs` | 类型数组（含 `compile`）+ `buildSummary` |
+| `ui.mjs` | 表单字段、画布标签、类型配色 |
 
 ## types.mjs 的固定导出
 

@@ -16,6 +16,8 @@ import {
   PROMPT_SNIPPETS,
 } from '../../core/prompt-templates.mjs';
 import { applyTemplates } from '../../core/templates-store.mjs';
+import { applyTypes } from '../../core/registry.mjs';
+import { pathToFileURL } from 'node:url';
 
 export const templatesPath = (configDir) => join(configDir, 'prompt-templates.json');
 
@@ -54,5 +56,36 @@ export async function loadTemplates(configDir) {
     return { file, applied: true, data };
   } catch {
     return { file, applied: false };
+  }
+}
+
+export const typesPath = (configDir) => join(configDir, 'types.mjs');
+
+/** 把默认类型文件复制到配置根（已存在就不覆盖） */
+export async function exportTypes(configDir, { force = false } = {}) {
+  await mkdir(configDir, { recursive: true });
+  const target = typesPath(configDir);
+  if (!force) {
+    try {
+      await access(target);
+      return { file: target, written: false };
+    } catch {}
+  }
+  const source = new URL('../../defaults/types.mjs', import.meta.url);
+  await writeFile(target, await readFile(source, 'utf8'), 'utf8');
+  return { file: target, written: true };
+}
+
+/** 载入配置根里的 types.mjs（没有就用默认） */
+export async function loadTypes(configDir) {
+  const file = typesPath(configDir);
+  try {
+    const url = pathToFileURL(file).href + '?t=' + Date.now();
+    const mod = await import(url);
+    const list = mod.TYPES || mod.default || [];
+    applyTypes(list);
+    return { file, applied: true, count: list.length };
+  } catch {
+    return { file, applied: false, count: 0 };
   }
 }

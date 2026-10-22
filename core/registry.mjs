@@ -10,79 +10,19 @@ import { bubblePhrase, BUBBLE_TYPES } from './bubbles.mjs';
 import { PROMPT_SNIPPETS as S } from './prompt-templates.mjs';
 import { T } from './templates-store.mjs';
 
-export const ITEM_TYPES = [
-  {
-    key: 'panel',
-    label: '面板',
-    fields: [
-      { key: 'caption', type: 'longtext', label: '画面描述', required: true },
-      { key: 'camera', type: 'enum', label: '机位', options: 'CAMERAS', default: 'medium', canvas: true },
-      { key: 'shape', type: 'enum', label: '形状', options: 'PANEL_SHAPES', default: 'rect', canvas: true },
-      { key: 'frame', type: 'enum', label: '边框', options: 'FRAME_STYLES', default: 'border' },
-      { key: 'tags', type: 'tags', label: 'tags' },
-      { key: 'palette', type: 'palette', label: 'palette' },
-    ],
-    compile({ item, ctx }) {
-      const shapes = T.panelShapes || PANEL_SHAPES;
-      const frames = T.frameStyles || FRAME_STYLES;
-      const shapesAll = shapes;
-      const shape = shapesAll[item.shape] || shapesAll.rect;
-      const frame = frames[item.frame] || frames.border;
-      const camera = (T.cameras || CAMERAS)[item.camera];
-      const parts = [shape.phrase];
-      if (!String(item.shape || '').startsWith('bleed')) parts.push(frame.phrase);
-      if (camera) parts.push(camera.phrase);
-      const body = (item.caption || '').trim();
-      const tag = ctx.number ? 'PANEL ' + ctx.number : '';
-      const snippets = T.snippets || S;
-      if (body || tag) parts.push(snippets.boxPrefix + ' ' + [tag, body].filter(Boolean).join(', '));
-      if (ctx.guard) parts.push(ctx.guard);
-      return { label: 'object', caption: parts.join(', ') };
-    },
-  },
-  {
-    key: 'bubble',
-    label: '气泡',
-    fields: [
-      { key: 'text', type: 'longtext', label: '文字', required: true },
-      { key: 'kind', type: 'enum', label: '类型', options: 'BUBBLE_TYPES', default: 'speech', canvas: true },
-      { key: 'tail', type: 'enum', label: '尾巴', options: 'TAIL_DIRECTIONS', default: 'down-left' },
-      { key: 'caption', type: 'text', label: '补充说明（特殊文字用）' },
-      { key: 'tags', type: 'tags', label: 'tags' },
-      { key: 'palette', type: 'palette', label: 'palette' },
-    ],
-    compile({ item, ctx }) {
-      const parts = [bubblePhrase(item)];
-      const where = ctx.locate(item);
-      if (where) parts.push(where);
-      if (item.caption) parts.push(String(item.caption));
-      parts.push(ctx.placement(item.bbox));
-      parts.push(ctx.textLayout(item, ctx.vertical));
-      if (ctx.guard) parts.push(ctx.guard);
-      return { label: 'text', caption: parts.join(', '), ...(item.text ? { text: item.text } : {}) };
-    },
-  },
-  {
-    key: 'native',
-    label: '原生',
-    fields: [
-      { key: 'label', type: 'enum', label: 'label', options: 'MOSS_LABELS', default: 'object', canvas: true },
-      { key: 'caption', type: 'longtext', label: 'caption', required: true },
-      { key: 'text', type: 'longtext', label: 'text（label=text 时必填）' },
-      { key: 'tags', type: 'tags', label: 'tags' },
-      { key: 'palette', type: 'palette', label: 'palette' },
-    ],
-    compile({ item, ctx }) {
-      return {
-        label: item.label || 'object',
-        caption: [item.caption, ctx.guard].filter(Boolean).join(', '),
-        ...(item.text ? { text: item.text } : {}),
-      };
-    },
-  },
-];
+import defaultTypes from '../defaults/types.mjs';
 
-export const ITEM_TYPE_MAP = Object.fromEntries(ITEM_TYPES.map((t) => [t.key, t]));
+/** 运行时可替换的类型表：配置文件覆盖后立即生效 */
+export let ITEM_TYPES = defaultTypes;
+export let ITEM_TYPE_MAP = Object.fromEntries(ITEM_TYPES.map((t) => [t.key, t]));
+
+/** 用配置里的类型表替换默认值 */
+export function applyTypes(list) {
+  if (!Array.isArray(list) || !list.length) return ITEM_TYPES;
+  ITEM_TYPES = list;
+  ITEM_TYPE_MAP = Object.fromEntries(list.map((t) => [t.key, t]));
+  return ITEM_TYPES;
+}
 
 /** 枚举词表：字段声明里的 options 指向这里 */
 export const ENUM_SOURCES = {
@@ -114,6 +54,16 @@ export const PAGE_FIELDS = [
   { key: 'scene', type: 'text', label: '场景' },
   { key: 'note', type: 'text', label: '补充说明' },
 ];
+
+export function enumOptions(name) {
+  const fromRuntime = T[name];
+  if (fromRuntime) {
+    return Array.isArray(fromRuntime)
+      ? Object.fromEntries(fromRuntime.map((x) => [x.key, x.name || x.key]))
+      : Object.fromEntries(Object.entries(fromRuntime).map(([k, v]) => [k, v.name || k]));
+  }
+  return ENUM_SOURCES[name] || {};
+}
 
 export function itemType(key) {
   return ITEM_TYPE_MAP[key] || null;

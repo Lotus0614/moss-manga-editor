@@ -2,7 +2,7 @@
 // 加一个新类型/新字段，这里自动多出对应控件。
 
 import { html, cls } from '../lib.mjs';
-import { fieldsOf, itemType, ENUM_SOURCES } from '../../core/registry.mjs';
+import { fieldsOf, itemType, enumOptions } from '../../core/registry.mjs';
 
 const TYPE_LABEL = (key) => itemType(key)?.label || key;
 
@@ -20,7 +20,7 @@ function Field({ field, value, onChange }) {
   }
 
   if (field.type === 'enum') {
-    const options = ENUM_SOURCES[field.options] || {};
+    const options = enumOptions[field.options] || {};
     return html`<div class="field">
       ${label}
       <select class="select" value=${value ?? field.default ?? ''} onChange=${(e) => onChange(e.currentTarget.value)}>

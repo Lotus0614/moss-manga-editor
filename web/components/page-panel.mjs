@@ -1,11 +1,11 @@
 // 右栏：页面属性。字段来自 core/registry.mjs 的 PAGE_FIELDS，加字段不用改这里。
 
 import { html } from '../lib.mjs';
-import { PAGE_FIELDS, ENUM_SOURCES, itemType } from '../../core/registry.mjs';
+import { PAGE_FIELDS, enumOptions, itemType } from '../../core/registry.mjs';
 
 function Field({ field, value, onChange }) {
   if (field.type === 'enum') {
-    const options = ENUM_SOURCES[field.options] || {};
+    const options = enumOptions[field.options] || {};
     return html`<div class="field" key=${field.key}>
       <label>${field.label}</label>
       <select class="select" value=${value ?? ''} onChange=${(e) => onChange(e.currentTarget.value)}>

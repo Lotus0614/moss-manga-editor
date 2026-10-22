@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { loadTemplates, loadTypes } from './lib/templates.mjs';
+import { loadTypes } from './lib/templates.mjs';
 // moss-manga CLI —— Agent 操作漫画存档的唯一入口。
 //
 //   node scripts/manga.mjs doctor

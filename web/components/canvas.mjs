@@ -85,7 +85,7 @@ function typeColor(name) {
   let hash = 0;
   for (const ch of String(name || '')) hash = (hash * 31 + ch.codePointAt(0)) % 997;
   const hue = Math.round((hash * 137.508) % 360);
-  return { fill: 'hsla(' + hue + ', 45%, 88%, 0.85)', stroke: 'hsl(' + hue + ', 40%, 42%)' };
+  return { fill: 'hsla(' + hue + ', 45%, 87%, 0.30)', stroke: 'hsla(' + hue + ', 42%, 45%, 0.75)' };
 }
 
 function ItemBox({ item, page, index, selected, onSelect, onDragStart, onBegin }) {

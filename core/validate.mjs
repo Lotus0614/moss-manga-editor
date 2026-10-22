@@ -1,7 +1,8 @@
 // 校验：把《JSON Layout》第七节的检查清单变成代码。
 // level=error 阻止生成，level=warn 只提醒。
 
-import { pageSize, PANEL_SHAPES, ITEM_TYPES, bboxArea, panelsOf, bubblesOf } from './manga-doc.mjs';
+import { pageSize, PANEL_SHAPES, bboxArea, panelsOf, bubblesOf } from './manga-doc.mjs';
+import { ITEM_TYPE_MAP } from './registry.mjs';
 
 const ALLOWED_TOP = new Set(['summary', 'items', 'bbox_coord_space', 'bbox_format']);
 const ALLOWED_ITEM = new Set(['label', 'caption', 'bbox', 'text', 'tags', 'palette']);
@@ -24,7 +25,7 @@ export function validatePage(page, doc) {
 
   items.forEach((item, i) => {
     const name = `第 ${i + 1} 项`;
-    if (!ITEM_TYPES.includes(item.type)) {
+    if (!ITEM_TYPE_MAP[item.type]) {
       add('error', 'item.type', `${name} 的 type「${item.type}」不认识`, item.id);
       return;
     }

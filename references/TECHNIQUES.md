@@ -41,6 +41,15 @@
 
 一格承载一个信息点比较稳妥。
 
+### 出血与破格
+
+出血不是一种面板形状，而是版面关系：把一个框的 `bbox` 画到超出画布边界，超出部分自然被裁掉，看上去就是画面溢出了页面。
+
+- **整格出血**：给这一格一个越出画布的 `bbox`，`frame` 设为 `none`（无边），caption 里写 `bleeding off the bottom, left and right edges with no border`
+- **人物破格**：人物单独给一个框，`overlay: true` 让它压在其它面板之上，bbox 越出画布或越过面板边界，caption 里写 `her head and hair breaking out past the top border of the panel`
+- 一页做一次出血就够，做多了冲击力会被稀释
+- 出血框也要遵守 16 的倍数，越界部分算负数或超过画布宽高都允许
+
 ### 节奏原则
 
 1. 先排节奏再排内容：格密节奏快，格疏节奏慢，一页留一两处停顿

@@ -20,12 +20,12 @@ import {
 import Canvas from '../components/canvas.mjs';
 import PagePanel from '../components/page-panel.mjs';
 import ItemForm from '../components/item-form.mjs';
-import { ITEM_TYPES } from '../../core/registry.mjs';
+import { ITEM_TYPES, itemType } from '../../core/registry.mjs';
 import { PromptPanel, HistoryPanel, ChangesPanel } from '../components/workbench.mjs';
 import { exportLongImage, exportPdf } from '../components/export.mjs';
 import { compilePage } from '../../core/compile.mjs';
 import { compileContext } from '../../core/bible.mjs';
-import { createPanelItem, createBubbleItem, createNativeItem } from '../../core/manga-doc.mjs';
+import { createItem } from '../../core/manga-doc.mjs';
 
 const STYLE_LABELS = [
   ['mono', '黑白网点'],
@@ -406,12 +406,14 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const scale = fitScale * zoom;
 
   function addItem(type) {
-    const item =
-      type === 'bubble'
-        ? createBubbleItem({ bbox: [420, 120, 700, 320], text: '新台词' })
-        : type === 'native'
-          ? createNativeItem({ bbox: [40, 40, 400, 160], label: 'character', caption: '原生 item：直接写 label/caption' })
-          : createPanelItem({ bbox: [40, 420, 728, 780], caption: '' });
+    const def = itemType(type);
+    const patch = {};
+    for (const f of def?.fields || []) {
+      if (f.default !== undefined) patch[f.key] = f.default;
+      else if (f.type === 'tags' || f.type === 'palette') patch[f.key] = [];
+    }
+    const bbox = type === 'bubble' ? [400, 140, 680, 320] : type === 'native' ? [40, 40, 400, 160] : [40, 420, 728, 780];
+    const item = createItem(type, { bbox, ...(type === 'bubble' ? { text: '新台词' } : {}), ...patch });
     mutate((cur) => ({ ...cur, items: [...cur.items, item] }));
     setSelection({ kind: item.type, id: item.id });
     setTimeout(saveNow, 60);

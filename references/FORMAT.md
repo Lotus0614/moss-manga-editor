@@ -168,3 +168,28 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 3. 页面 id `p01`，项目 slug 是 ASCII
 4. 图片只增不改，文件名是内容 sha256
 5. item 的 `id` 稳定；改内容不要换 id，否则 diff 会当成「删了又加」
+
+## 加一个新类型
+
+类型、字段、编译规则都在 `core/registry.mjs`。往 `ITEM_TYPES` 里加一项即可，编译、校验、编辑器表单、画布按钮和配色全部自动认得。
+
+```js
+{
+  key: 'sfx',                       // 存进 page.json 的 type
+  label: '拟声',                    // 按钮和右栏标题
+  fields: [                         // 右栏表单按这个生成
+    { key: 'text', type: 'text', label: '拟声词', required: true },
+    { key: 'caption', type: 'longtext', label: '写法说明' },
+  ],
+  compile({ item, ctx }) {          // 返回合法 Moss item（不要给 bbox）
+    return { label: 'text', caption: [item.caption, ctx.guard].filter(Boolean).join(', '), text: item.text };
+  },
+}
+```
+
+- `fields[].type` 可选：`text` / `longtext` / `number` / `enum` / `bool` / `tags` / `palette`
+- `enum` 用 `options: 'CAMERAS'` 引用词表（词表在 `prompt-templates.mjs` 和 `registry.mjs` 的 `ENUM_SOURCES`）
+- `compile` 返回值只能是 `label` / `caption` / `text` / `tags` / `palette`，`bbox` 由核心补
+- 页面级字段在 `PAGE_FIELDS`，同样是数据驱动
+
+改完刷新网页就能用，不用重启服务。

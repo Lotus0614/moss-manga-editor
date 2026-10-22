@@ -244,8 +244,14 @@ function extras(raw) {
 }
 
 function normalizeItem(raw = {}, size) {
-  const type = ITEM_TYPES.includes(raw.type) ? raw.type : 'panel';
   const bbox = normalizeBbox(raw.bbox, size);
+  // 注册表里新增的类型：不认识也原样保留，别改写成 panel
+  if (!ITEM_TYPES.includes(raw.type)) {
+    if (typeof raw.type === 'string' && raw.type) {
+      return { ...raw, id: raw.id || uid('it'), bbox };
+    }
+  }
+  const type = raw.type;
   if (type === 'bubble') return normalizeBubbleItem({ ...raw, bbox });
   if (type === 'native') {
     return {

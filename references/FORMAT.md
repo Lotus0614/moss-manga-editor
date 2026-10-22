@@ -247,3 +247,32 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 - 想恢复默认：删掉这个文件再跑一次 `manga init --force`
 
 代码里的 `core/prompt-templates.mjs` 只是默认值；配置里有的键会覆盖它。
+## 类型定义（配置根里的 types.mjs）
+
+`manga init` 会把默认的 `defaults/types.mjs` 复制成 `<配置根>/types.mjs`。**加类型、改字段、改编译逻辑都改这个文件**，不要动包内代码。
+
+```js
+export default [
+  {
+    key: 'sfx',
+    label: '拟声',
+    fields: [
+      { key: 'text', type: 'text', label: '拟声词', required: true },
+      { key: 'caption', type: 'longtext', label: '写法说明' },
+    ],
+    compile({ item, ctx }) {
+      return { label: 'text', caption: `${item.caption}, in ${ctx.locate(item)}`, text: item.text };
+    },
+  },
+];
+```
+
+约定：
+
+- 导出必须是**数组**（`export default [...]` 或 `export const TYPES = [...]`）
+- 每项 `{ key, label, fields, compile }`
+- `compile({ item, ctx })` 返回 `{ label, caption, text?, tags?, palette? }`，**不要给 bbox**（核心会补）
+- `fields[].type`：`text` / `longtext` / `number` / `enum` / `bool` / `tags` / `palette`
+- `enum` 的 `options` 指向 `prompts.mjs` 里的词表（`panelShapes` / `cameras` / `bubbleTypes` …）
+- 字段加 `canvas: true` 才会出现在格子左上角标签里
+- 改完下一次 `compile` / `render` 生效；网页需要刷新

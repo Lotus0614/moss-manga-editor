@@ -5,7 +5,7 @@ import { PAGE_FIELDS, enumOptions, itemType } from '../../core/registry.mjs';
 
 function Field({ field, value, onChange }) {
   if (field.type === 'enum') {
-    const options = enumOptions[field.options] || {};
+    const options = enumOptions(field.options);
     return html`<div class="field" key=${field.key}>
       <label>${field.label}</label>
       <select class="select" value=${value ?? ''} onChange=${(e) => onChange(e.currentTarget.value)}>

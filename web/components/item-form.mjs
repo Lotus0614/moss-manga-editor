@@ -20,7 +20,7 @@ function Field({ field, value, onChange }) {
   }
 
   if (field.type === 'enum') {
-    const options = enumOptions[field.options] || {};
+    const options = enumOptions(field.options);
     return html`<div class="field">
       ${label}
       <select class="select" value=${value ?? field.default ?? ''} onChange=${(e) => onChange(e.currentTarget.value)}>

@@ -195,20 +195,11 @@ function placementWord(bbox, size) {
 }
 
 function textLayout(bubble, vertical) {
-  const [x1, y1, x2, y2] = bubble.bbox;
-  const w = Math.max(1, x2 - x1);
-  const h = Math.max(1, y2 - y1);
-  const fs = Math.max(8, Number(bubble.size) || 22);
-  if (!vertical) {
-    const cols = Math.max(1, Math.floor(w / (fs * 1.02)));
-    const rows = Math.max(1, Math.floor(h / (fs * 1.3)));
-    return `Horizontal lettering, about ${rows} lines of ${cols} characters each`;
-  }
-  const cols = Math.max(1, Math.floor(w / (fs * 1.15)));
-  const perCol = Math.max(1, Math.min(Math.floor(h / (fs * 1.35)), MAX_PER_COLUMN));
-  return `Vertical lettering in ${cols} column${cols > 1 ? 's' : ''} read right to left, about ${perCol} characters per column`;
+  // 只描述方向，不算列数/字数、不提字号：
+  // 报字数会让模型为了凑够列数把气泡画宽，报字号它也画不准。
+  if (!vertical) return 'horizontal lettering';
+  return 'vertical lettering, columns read right to left';
 }
-
 /** 供 UI 显示「这一条会写进提示词的形态描述」 */
 export function previewBubbleCaption(bubble, size) {
   return bubbleCaption(bubble, { vertical: true }, size || { width: 768, height: 1280 }, '');

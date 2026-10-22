@@ -124,10 +124,6 @@ export function PageInspector({ page, mutate, setSelection, addItem }) {
     </div>
 
     <div class="divider"></div>
-    <div class="row wrap">
-      <button class="chip" onClick=${() => addItem('panel')}>＋ 分格</button>
-      <button class="chip" onClick=${() => addItem('bubble')}>＋ 文字</button>
-      <button class="chip" onClick=${() => addItem('native')}>＋ 原生</button>
     </div>
 
     <div class="divider"></div>

@@ -332,7 +332,7 @@ a { color: inherit; }
 .rail-foot { border-top: 1px solid var(--line); padding: 8px; display: flex; gap: 6px; }
 
 /* 中间画布区 */
-.work { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.work { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; }
 .work-head {
   height: 34px;
   display: flex;
@@ -751,3 +751,17 @@ a { color: inherit; }
   background: var(--paper);
   cursor: pointer;
 }
+
+/* 画布浮层：右下添加按钮、右上缩放 */
+.canvas-ctrl { position: absolute; display: flex; gap: 6px; z-index: 6; align-items: center; }
+.canvas-ctrl.top {
+  top: 44px;
+  right: 14px;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  padding: 3px 7px;
+}
+.canvas-ctrl.bottom { right: 14px; }
+.canvas-ctrl.bottom .btn { box-shadow: 2px 2px 0 var(--ink); }
+.icon-btn.on { background: var(--ink); color: var(--paper); }
+.dock.collapsed .dock-body { display: none; }

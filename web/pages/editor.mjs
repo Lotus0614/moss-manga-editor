@@ -47,6 +47,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const [fitScale, setFitScale] = useState(0.55);
   const [zoom, setZoom] = useState(1);
   const [showBoxes, setShowBoxes] = useState(true);
+  const [dockCollapsed, setDockCollapsed] = useState(false);
   const [grid, setGrid] = useState(4);
   const [opacity, setOpacity] = useState(0.55);
   const [changes, setChanges] = useState(null);
@@ -465,18 +466,12 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
               <input type="range" min="0" max="1" step="0.05" value=${opacity} style="width:70px" onInput=${(e) => setOpacity(Number(e.currentTarget.value))} />
             </label>`
           : null}
-        <button class="btn" onClick=${() => addItem('panel')}>＋ 分格</button>
-        <button class="btn" onClick=${() => addItem('bubble')}>＋ 文字</button>
-        <button class="btn" onClick=${() => addItem('native')}>＋ 原生</button>
         <label class="meta" style="display:flex;align-items:center;gap:4px">网格
           <select class="select" style="width:56px;padding:1px 14px 1px 4px;font-size:11px" value=${grid} onChange=${(e) => setGrid(Number(e.currentTarget.value))}>
             ${[1, 2, 4, 8, 16].map((n) => html`<option value=${n}>${n}px</option>`)}
           </select>
         </label>
         <button class=${cls('btn ghost', !showBoxes && 'inv')} onClick=${() => setShowBoxes((v) => !v)}>${showBoxes ? '隐藏框' : '显示框'}</button>
-        <button class="btn ghost" onClick=${() => setZoom((z) => Math.max(0.5, Number((z - 0.15).toFixed(2))))}>－</button>
-        <button class="btn ghost" onClick=${() => setZoom(1)}>适应</button>
-        <button class="btn ghost" onClick=${() => setZoom((z) => Math.min(3, Number((z + 0.15).toFixed(2))))}>＋</button>
         <button class="btn ghost" onClick=${undo} title="Ctrl+Z">撤销</button>
         <button class="btn ghost" onClick=${() => setShowExport(true)}>导出</button>
         <button class="btn inv" disabled=${errors.length > 0 || generating} onClick=${generate}>
@@ -523,7 +518,22 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         />
       </div>
 
-      <div class="dock">
+      <div class="canvas-ctrl bottom" style=${`bottom:${dockCollapsed ? 44 : 250}px`}>
+        <button class="btn" onClick=${() => addItem('panel')}>面板</button>
+        <button class="btn" onClick=${() => addItem('bubble')}>气泡</button>
+        <button class="btn" onClick=${() => addItem('native')}>原生</button>
+      </div>
+      <div class="canvas-ctrl top">
+        <input type="range" min="0.5" max="3" step="0.05" value=${zoom} title="缩放" style="width:90px" onInput=${(e) => setZoom(Number(e.currentTarget.value))} />
+        <button class="icon-btn" title="适应画布" onClick=${() => setZoom(1)}>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6">
+            <path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9" />
+          </svg>
+        </button>
+        <button class=${cls('icon-btn', !showBoxes && 'on')} title="显示 / 隐藏框" onClick=${() => setShowBoxes((v) => !v)}>${showBoxes ? '▣' : '□'}</button>
+      </div>
+
+      <div class=${cls('dock', dockCollapsed && 'collapsed')}>
         <div class="dock-head">
           <div class=${cls('tab', tab === 'prompt' && 'on')} onClick=${() => setTab('prompt')}>
             提示词${errors.length
@@ -536,6 +546,8 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
             历史<span class="badge warn">${versions.length}</span>
           </div>
           <div class=${cls('tab', tab === 'changes' && 'on')} onClick=${() => { setTab('changes'); loadChanges(); }}>变更</div>
+          <div class="spacer"></div>
+          <button class="btn sm ghost" onClick=${() => setDockCollapsed((v) => !v)}>${dockCollapsed ? '展开' : '收起'}</button>
           <div class="spacer"></div>
           <span class="meta">${version ? `${version.id} · seed ${version.seed}` : '还没有生成过'}</span>
         </div>

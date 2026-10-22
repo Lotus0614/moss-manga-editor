@@ -100,7 +100,7 @@ function ItemBox({ item, page, index, selected, onSelect, onDragStart, onBegin }
 
   const label = labelOf(item, index);
 
-  const fs = isBubble ? Math.max(16, Math.min(Number(item.size) || 22, Math.min(w, h) / 2)) : Math.max(13, Math.min(w / 16, h / 5, 22));
+  const fs = Math.max(13, Math.min(w / 16, h / 5, 22));
   const body = isBubble ? item.text : isNative ? item.text || item.caption : item.caption;
 
   // 画布只做排版预览：文字一律横排显示，竖排设置只影响生成的提示词
@@ -116,17 +116,15 @@ function ItemBox({ item, page, index, selected, onSelect, onDragStart, onBegin }
       y=${y1}
       width=${w}
       height=${h}
-      rx=${isNative ? 2 : 0}
+      rx=${0}
     />
-    ${isBubble
-      ? html`<text class="item-tag bubble" x=${x1 + 5} y=${y1 + 13}>${label}</text>`
-      : html`<text class="item-tag" x=${x1 + 5} y=${y1 + 13}>${label}</text>`}
+        <text class="item-tag" x=${x1 + 5} y=${y1 + 13}>${label}</text>
     ${vertical
       ? cols.map((col) => html`<text class="item-text" x=${col.x} y=${col.y} font-size=${fs} text-anchor="middle">
           ${col.chars.map((ch, i) => html`<tspan x=${col.x} dy=${i === 0 ? 0 : fs * 1.1}>${ch}</tspan>`)}
         </text>`)
       : rows.map((row) => html`<text class="item-text" x=${row.x} y=${row.y} font-size=${fs} text-anchor="middle">${row.text}</text>`)}
-    ${isNative ? html`<text class="item-tag" x=${x1 + 5} y=${y2 - 6}>native · ${item.caption?.slice(0, 30) || ''}</text>` : null}
+
     <rect
       x=${x1}
       y=${y1}

@@ -712,9 +712,9 @@ a { color: inherit; }
 .panel-box label .mono { color: var(--mid); font-size: 9px; letter-spacing: 0; margin-left: 4px; }
 /* 画布 item：带标签的半透明框 */
 .item-box { fill: rgba(120,120,120,0.06); stroke: var(--ink); stroke-width: 2.5; }
-.item-box.panel { fill: rgba(198,54,48,0.14); }
-.item-box.bubble { fill: rgba(226,178,38,0.24); }
-.item-box.native { stroke-dasharray: 7 4; fill: rgba(48,104,196,0.16); }
+
+
+
 .item-box.sel { stroke-width: 4; }
 .item-tag {
   font-family: var(--mono);
@@ -724,7 +724,7 @@ a { color: inherit; }
   pointer-events: none;
   user-select: none;
 }
-.item-tag.bubble { font-weight: 700; opacity: 1; font-size: 16px; }
+
 .item-text { fill: var(--ink); pointer-events: none; user-select: none; }
 .handle { fill: var(--paper); stroke: var(--ink); stroke-width: 2; }
 

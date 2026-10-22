@@ -193,3 +193,32 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 - 页面级字段在 `PAGE_FIELDS`，同样是数据驱动
 
 改完刷新网页就能用，不用重启服务。
+## 画布标签由字段决定
+
+画布左上角那行字不是写死的，由字段声明上的 `canvas: true` 决定：
+
+```js
+{ key: 'camera', type: 'enum', label: '机位', options: 'CAMERAS', canvas: true },
+{ key: 'shape',  type: 'enum', label: '形状', options: 'PANEL_SHAPES', canvas: true },
+```
+
+生成规则（`core/registry.mjs` 的 `labelOf`）：
+
+1. 类型名开头，`panel` 带序号（`面板3`），其它不带
+2. 遍历该类型字段，**只有 `canvas: true` 的才出现**，空值跳过
+3. 枚举值按 `ENUM_SOURCES` 翻成中文
+4. 用 ` · ` 连类型和值，多个值之间用 ` / `
+
+```
+面板3 · 中景 / 矩形
+气泡 · 对话
+原生 · character
+```
+
+想加一项就把字段的 `canvas` 改成 `true`，想去掉就删掉这个属性——不用改画布代码。
+
+## 画布渲染是统一的
+
+所有类型走同一套渲染：同一个标签样式、同一个正文字号公式 `max(13, min(w/16, h/5, 22))`、同样的直角、同样的描边。颜色只按类型名推（`typeColor`），不按类型写 CSS。
+
+加新类型不需要写任何画布代码，也不该为它加特例样式。

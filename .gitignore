@@ -1,6 +1,6 @@
 node_modules/
 data/
 config/config.json
-config/prompt-templates.json
+config/workflows
 *.tmp
 .DS_Store

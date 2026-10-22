@@ -6,7 +6,7 @@
 //   buildSummary ({ page, items, prompts }) => { meta, canvas, caption }
 
 import { pageSize, toMoss } from './manga-doc.mjs';
-import { ITEM_TYPES, getBuildSummary } from './registry.mjs';
+import { ITEM_TYPES, getBuildSummary } from './runtime.mjs';
 import { T } from './templates-store.mjs';
 import { buildSummary as defaultBuildSummary } from '../config/types.mjs';
 import { validatePage } from './validate.mjs';

@@ -190,7 +190,7 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 ```
 
 - `fields[].type` 可选：`text` / `longtext` / `number` / `enum` / `bool` / `tags` / `palette`
-- `enum` 用 `options: 'CAMERAS'` 引用词表（词表在 `prompt-templates.mjs` 和 `registry.mjs` 的 `ENUM_SOURCES`）
+- `enum` 用 `options: 'CAMERAS'` 引用词表（词表在 `config/prompts.mjs`，枚举名在 `config/ui.mjs` 的 `ENUM_SOURCES`）
 - `compile` 返回值只能是 `label` / `caption` / `text` / `tags` / `palette`，`bbox` 由核心补
 - 页面级字段在 `PAGE_FIELDS`，同样是数据驱动
 
@@ -248,10 +248,10 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 - `snippets` 里的 `{name}` 是占位符（`{n}` 面板号、`{area}` 位置、`{panels}`/`{texts}` 数量），改句子时保留它们
 - 想恢复默认：删掉这个文件再跑一次 `manga init --force`
 
-代码里的 `core/prompt-templates.mjs` 只是默认值；配置里有的键会覆盖它。
+词表在 `config/prompts.mjs`，改完下一次编译生效。
 ## 类型定义（配置根里的 types.mjs）
 
-`manga init` 会把默认的 `defaults/types.mjs` 复制成 `config/types.mjs`。**加类型、改字段、改编译逻辑都改这个文件**，不要动包内代码。
+类型定义在 `config/types.mjs`。**加类型、改字段、改编译逻辑都改这个文件**，不要动包内代码。
 
 ```js
 export default [

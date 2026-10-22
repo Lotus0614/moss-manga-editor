@@ -2,7 +2,7 @@
 // level=error 阻止生成，level=warn 只提醒。
 
 import { pageSize, PANEL_SHAPES, bboxArea, panelsOf, bubblesOf } from './manga-doc.mjs';
-import { ITEM_TYPE_MAP } from './registry.mjs';
+import { ITEM_TYPE_MAP } from './runtime.mjs';
 
 const ALLOWED_TOP = new Set(['summary', 'items', 'bbox_coord_space', 'bbox_format']);
 const ALLOWED_ITEM = new Set(['label', 'caption', 'bbox', 'text', 'tags', 'palette']);

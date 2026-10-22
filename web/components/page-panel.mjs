@@ -1,7 +1,7 @@
-// 右栏：页面属性。字段来自 core/registry.mjs 的 PAGE_FIELDS，加字段不用改这里。
+// 右栏：页面属性。字段来自 config/ui.mjs 的 PAGE_FIELDS，加字段不用改这里。
 
 import { html } from '../lib.mjs';
-import { PAGE_FIELDS, enumOptions, itemType } from '../../core/registry.mjs';
+import { PAGE_FIELDS, enumOptions, itemType } from '../../config/ui.mjs';
 
 function Field({ field, value, onChange }) {
   if (field.type === 'enum') {

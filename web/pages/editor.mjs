@@ -20,7 +20,7 @@ import {
 import Canvas from '../components/canvas.mjs';
 import PagePanel from '../components/page-panel.mjs';
 import ItemForm from '../components/item-form.mjs';
-import { ITEM_TYPES, itemType } from '../../core/registry.mjs';
+import { ITEM_TYPES, itemType } from '../../config/ui.mjs';
 import { PromptPanel, HistoryPanel, ChangesPanel } from '../components/workbench.mjs';
 import { exportLongImage, exportPdf } from '../components/export.mjs';
 import { compilePage } from '../../core/compile.mjs';

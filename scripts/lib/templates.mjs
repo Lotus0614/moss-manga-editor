@@ -15,7 +15,7 @@ import {
   PROMPT_SNIPPETS,
 } from '../../config/prompts.mjs';
 import { applyTemplates } from '../../core/templates-store.mjs';
-import { applyTypes, setBuildSummary } from '../../core/registry.mjs';
+import { applyTypes, setBuildSummary } from '../../core/runtime.mjs';
 import { pathToFileURL } from 'node:url';
 
 export const typesPath = (configDir) => join(configDir, 'types.mjs');

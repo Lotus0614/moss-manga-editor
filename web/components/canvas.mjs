@@ -1,4 +1,5 @@
 // 画布：把每个 item 画成「带标签的框」。
+import { labelOf, typeColor } from '../../config/ui.mjs';
 //
 // 不渲染真实气泡形状——标注清楚比画得像更重要：
 //   分格：标签写「格 · 全景/矩形」，里面是画面描述
@@ -81,14 +82,7 @@ function horizontalLines(text, bbox, fs) {
   return shown.map((line, i) => ({ x: (x1 + x2) / 2, y: startY + i * fs * 1.35, text: line }));
 }
 
-import { labelOf } from '../../core/registry.mjs';
 
-function typeColor(name) {
-  let hash = 0;
-  for (const ch of String(name || '')) hash = (hash * 31 + ch.codePointAt(0)) % 997;
-  const hue = Math.round((hash * 137.508) % 360);
-  return { fill: 'hsla(' + hue + ', 45%, 90%, 0.6)', stroke: 'hsla(' + hue + ', 42%, 45%, 0.75)' };
-}
 
 function ItemBox({ item, page, index, selected, onSelect, onDragStart, onBegin }) {
   const [x1, y1, x2, y2] = item.bbox;

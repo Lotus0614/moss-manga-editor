@@ -1,8 +1,8 @@
-// 元素属性表单：完全由 core/registry.mjs 的 fields 生成，代码里不出现任何具体字段名。
+// 元素属性表单：完全由 config/ui.mjs 的 fields 生成，代码里不出现任何具体字段名。
 // 加一个新类型/新字段，这里自动多出对应控件。
 
 import { html, cls } from '../lib.mjs';
-import { fieldsOf, itemType, enumOptions } from '../../core/registry.mjs';
+import { fieldsOf, itemType, enumOptions } from '../../config/ui.mjs';
 
 const TYPE_LABEL = (key) => itemType(key)?.label || key;
 

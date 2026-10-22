@@ -123,3 +123,27 @@ export const TAIL_DIRECTIONS = {
   up: 'pointing straight up',
   'up-right': 'pointing up-right',
 };
+
+// ---------------------------------------------------------------- 句子模板
+// 编译器里所有会进入提示词的固定句式都在这里，{xxx} 是占位符。
+// 想改语气、改措辞，改这里，不用碰编译逻辑。
+
+export const PROMPT_SNIPPETS = {
+  panelCount: 'The page is divided into {n} {panels}. {order}',
+  textLock:
+    'This page has exactly {panels} panel(s) and exactly {texts} text element(s). Render ONLY the text listed below, with the exact wording given. Do NOT invent any additional dialogue, speech bubble, caption, sound effect or lettering, and do not fill empty space with text — any text that is not listed is an error.',
+  bubbleRule:
+    'Dialogue uses white speech bubbles with tails, thoughts use white cloud bubbles with no tail, and narration is bare lettering printed directly on the artwork with no bubble, no box and no background.',
+  noLettering: 'This page contains NO lettering at all: no speech bubbles, no captions, no sound effects, no text of any kind.',
+  boxPrefix: 'This box contains only:',
+  panelInside: 'inside PANEL {n}',
+  panelEdge: 'at the edge of PANEL {n}',
+  placement: 'placed in the {area} area of the page',
+  textVertical: 'vertical lettering, columns read right to left',
+  textHorizontal: 'horizontal lettering',
+};
+
+/** 把 {name} 替换成值 */
+export function fillSnippet(template, vars = {}) {
+  return String(template).replace(/\{(\w+)\}/g, (m, key) => (vars[key] !== undefined ? String(vars[key]) : m));
+}

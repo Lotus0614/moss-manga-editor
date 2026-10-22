@@ -428,7 +428,6 @@ const server = createServer(async (req, res) => {
 });
 
 await ensureConfig(CONFIG_DIR);
-  await exportTypes(CONFIG_DIR);
   await loadTypes(CONFIG_DIR);
 await ensureArchive(ARCHIVE);
 server.listen(PORT, HOST, async () => {

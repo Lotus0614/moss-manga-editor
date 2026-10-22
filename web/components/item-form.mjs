@@ -117,12 +117,7 @@ export default function ItemForm({ item, patchItem, removeItem, onBack, onCopy }
       </div>
     </div>
 
-    <div class="field">
-      <label class="row" style="gap:6px;align-items:center">
-        <input type="checkbox" checked=${item.showLabel !== false} onChange=${(e) => patchItem(item.id, { showLabel: e.currentTarget.checked })} />
-        <span>画布上显示这个框的标签</span>
-      </label>
-    </div>
+
 
     ${fields.map(
       (field) => html`<${Field}

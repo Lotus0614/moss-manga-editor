@@ -15,8 +15,8 @@ export const ITEM_TYPES = [
     label: '面板',
     fields: [
       { key: 'caption', type: 'longtext', label: '画面描述', required: true },
-      { key: 'camera', type: 'enum', label: '机位', options: 'CAMERAS', default: 'medium' },
-      { key: 'shape', type: 'enum', label: '形状', options: 'PANEL_SHAPES', default: 'rect' },
+      { key: 'camera', type: 'enum', label: '机位', options: 'CAMERAS', default: 'medium', canvas: true },
+      { key: 'shape', type: 'enum', label: '形状', options: 'PANEL_SHAPES', default: 'rect', canvas: true },
       { key: 'frame', type: 'enum', label: '边框', options: 'FRAME_STYLES', default: 'border' },
       { key: 'tags', type: 'tags', label: 'tags' },
       { key: 'palette', type: 'palette', label: 'palette' },
@@ -40,7 +40,7 @@ export const ITEM_TYPES = [
     label: '气泡',
     fields: [
       { key: 'text', type: 'longtext', label: '文字', required: true },
-      { key: 'kind', type: 'enum', label: '类型', options: 'BUBBLE_TYPES', default: 'speech' },
+      { key: 'kind', type: 'enum', label: '类型', options: 'BUBBLE_TYPES', default: 'speech', canvas: true },
       { key: 'tail', type: 'enum', label: '尾巴', options: 'TAIL_DIRECTIONS', default: 'down-left' },
       { key: 'caption', type: 'text', label: '补充说明（特殊文字用）' },
       { key: 'tags', type: 'tags', label: 'tags' },
@@ -61,7 +61,7 @@ export const ITEM_TYPES = [
     key: 'native',
     label: '原生',
     fields: [
-      { key: 'label', type: 'enum', label: 'label', options: 'MOSS_LABELS', default: 'object' },
+      { key: 'label', type: 'enum', label: 'label', options: 'MOSS_LABELS', default: 'object', canvas: true },
       { key: 'caption', type: 'longtext', label: 'caption', required: true },
       { key: 'text', type: 'longtext', label: 'text（label=text 时必填）' },
       { key: 'tags', type: 'tags', label: 'tags' },
@@ -112,6 +112,26 @@ export const PAGE_FIELDS = [
 
 export function itemType(key) {
   return ITEM_TYPE_MAP[key] || null;
+}
+
+/**
+ * 画布左上角标签：由字段声明里的 canvas: true 决定展示哪些值。
+ * 想加/减一个展示项，改字段上的 canvas 标记即可，不用碰画布代码。
+ */
+export function labelOf(item, index = 0) {
+  const type = itemType(item.type);
+  if (!type) return item.type || '';
+  const parts = [];
+  for (const f of type.fields) {
+    if (!f.canvas) continue;
+    const raw = item[f.key];
+    if (raw === undefined || raw === null || raw === '') continue;
+    if (Array.isArray(raw) && !raw.length) continue;
+    const shown = f.type === 'enum' ? ENUM_SOURCES[f.options]?.[raw] ?? raw : String(raw);
+    parts.push(shown);
+  }
+  const head = type.label + (item.type === 'panel' ? index + 1 : '');
+  return parts.length ? head + ' · ' + parts.join(' / ') : head;
 }
 
 export function fieldsOf(key) {

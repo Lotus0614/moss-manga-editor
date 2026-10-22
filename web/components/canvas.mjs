@@ -81,11 +81,13 @@ function horizontalLines(text, bbox, fs) {
   return shown.map((line, i) => ({ x: (x1 + x2) / 2, y: startY + i * fs * 1.35, text: line }));
 }
 
+import { labelOf } from '../../core/registry.mjs';
+
 function typeColor(name) {
   let hash = 0;
   for (const ch of String(name || '')) hash = (hash * 31 + ch.codePointAt(0)) % 997;
   const hue = Math.round((hash * 137.508) % 360);
-  return { fill: 'hsla(' + hue + ', 45%, 87%, 0.30)', stroke: 'hsla(' + hue + ', 42%, 45%, 0.75)' };
+  return { fill: 'hsla(' + hue + ', 45%, 90%, 0.6)', stroke: 'hsla(' + hue + ', 42%, 45%, 0.75)' };
 }
 
 function ItemBox({ item, page, index, selected, onSelect, onDragStart, onBegin }) {
@@ -96,12 +98,7 @@ function ItemBox({ item, page, index, selected, onSelect, onDragStart, onBegin }
   const isNative = item.type === 'native';
   const color = typeColor(item.type);
 
-  const label = item.showLabel === false ? '' :
-    isBubble
-    ? `【${BUBBLE_LABEL[item.kind] || item.kind}】`
-    : isNative
-      ? `原生 · ${item.label}`
-      : `格${index + 1} · ${CAMERA_LABEL[item.camera] || ''}${SHAPE_LABEL[item.shape] ? ` / ${SHAPE_LABEL[item.shape]}` : ''}`;
+  const label = labelOf(item, index);
 
   const fs = isBubble ? Math.max(16, Math.min(Number(item.size) || 22, Math.min(w, h) / 2)) : Math.max(13, Math.min(w / 16, h / 5, 22));
   const body = isBubble ? item.text : isNative ? item.text || item.caption : item.caption;

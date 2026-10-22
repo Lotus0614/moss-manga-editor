@@ -276,3 +276,49 @@ export default [
 - `enum` 的 `options` 指向 `prompts.mjs` 里的词表（`panelShapes` / `cameras` / `bubbleTypes` …）
 - 字段加 `canvas: true` 才会出现在格子左上角标签里
 - 改完下一次 `compile` / `render` 生效；网页需要刷新
+## 内核与漫画方言的分工
+
+| 目录 | 有什么 | 谁改 |
+|---|---|---|
+| `core/` | 坐标换算、遍历、JSON 形状、校验、占位符引擎 | 不动 |
+| `defaults/` | 漫画方言：词表、气泡文案、类型、排版辅助函数 | 复制到配置根后随便改 |
+
+`defaults/` 四个文件：
+
+| 文件 | 内容 |
+|---|---|
+| `prompts.mjs` | 词表、短语、句子模板 |
+| `bubbles.mjs` | 8 种气泡描述 + `bubblePhrase()` |
+| `helpers.mjs` | `panelsOf` / `readingOrder` / `panelNumber` / `locateInPanel` / `placementOf` / `textLayoutOf` |
+| `types.mjs` | 类型数组（含 `compile`）+ `buildSummary` |
+
+## types.mjs 的固定导出
+
+```js
+export const types = [
+  {
+    key: 'panel', label: '面板', role: 'panel',
+    fields: [ … ],
+    compile({ item, page, prompts }) { … },   // 需要什么自己 import helpers
+  },
+];
+
+export function buildSummary({ page, items, prompts }) {
+  return { meta, canvas, caption };
+}
+```
+
+- `compile` 只拿到 `{ item, page, prompts }`，**没有共享 ctx**：面板自己调 `panelNumber(page, item, types)`，气泡自己调 `locateInPanel(page, item, types)`
+- `role: 'panel'` 决定它参与编号、能被文字定位——内核不认 `'panel'` 这个字符串
+- `buildSummary` 返回 `{ meta, canvas, caption }`，写作风格全在这里
+
+## core/compile.mjs 只剩 walker
+
+```js
+export function compilePage(page, { types, prompts, buildSummary }) {
+  for (const item of page.items) { … type.compile({ item, page, prompts }) … }
+  return { doc: { summary: buildSummary({ page, items, prompts }), items, bbox_coord_space, bbox_format } };
+}
+```
+
+不传 `types` / `prompts` / `buildSummary` 时退回运行时表（CLI 启动时已按配置覆盖）。

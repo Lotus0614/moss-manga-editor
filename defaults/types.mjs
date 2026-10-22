@@ -1,18 +1,19 @@
+// 漫画方言入口：类型定义 + summary 写法。
+//
+// 固定导出两样：默认的 types 数组、buildSummary 函数。
+// 复制到配置根后，import 同目录的 prompts.mjs / helpers.mjs 即可独立运行。
+
 import { prompts } from './prompts.mjs';
 import { bubblePhrase } from './bubbles.mjs';
+import { panelNumber, locateInPanel, placementOf, textLayoutOf, panelsOf } from './helpers.mjs';
 
-// 默认类型定义（随包发布）。init 时会复制到配置根，之后 Agent 改配置里那份。
-//
-// 必须按这个格式导出：一个数组，每项 { key, label, fields, compile }。
-// compile({ item, ctx }) 返回 { label, caption, text?, tags?, palette? }，不要给 bbox（核心会补）。
+const fill = (tpl, vars) => String(tpl || '').replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? String(vars[k]) : m));
 
-// 不 import 任何东西：词表和气泡短语都由编译器通过 ctx 传进来，复制到任何目录都能用。
-const phraseOf = (item, field) => (prompts[field] || {})[item[field]]?.phrase || '';
-
-export default [
+export const types = [
   {
     key: 'panel',
     label: '面板',
+    role: 'panel',
     fields: [
       { key: 'caption', type: 'longtext', label: '画面描述', required: true },
       { key: 'camera', type: 'enum', label: '机位', options: 'cameras', default: 'medium', canvas: true },
@@ -21,15 +22,18 @@ export default [
       { key: 'tags', type: 'tags', label: 'tags' },
       { key: 'palette', type: 'palette', label: 'palette' },
     ],
-    compile({ item, ctx }) {
-      const parts = [phraseOf(item, 'panelShapes')];
-      if (!String(item.shape || '').startsWith('bleed')) parts.push(phraseOf(item, 'frameStyles'));
-      if (item.camera) parts.push(phraseOf(item, 'cameras'));
+    compile({ item, page }) {
+      const guard = (prompts.stylePresets[page.style] || {}).guard || '';
+      const parts = [prompts.panelShapes[item.shape]?.phrase];
+      if (!String(item.shape || '').startsWith('bleed')) parts.push(prompts.frameStyles[item.frame]?.phrase);
+      if (item.camera) parts.push(prompts.cameras[item.camera]?.phrase);
+      const n = panelNumber(page, item, types);
       const body = (item.caption || '').trim();
-      const tag = ctx.number ? 'PANEL ' + ctx.number : '';
-      const sn = prompts.snippets || {};
-      if (body || tag) parts.push((sn.boxPrefix || 'This box contains only:') + ' ' + [tag, body].filter(Boolean).join(', '));
-      if (ctx.guard) parts.push(ctx.guard);
+      const tag = n ? 'PANEL ' + n : '';
+      if (body || tag) {
+        parts.push((prompts.snippets.boxPrefix || 'This box contains only:') + ' ' + [tag, body].filter(Boolean).join(', '));
+      }
+      if (guard) parts.push(guard);
       return { label: 'object', caption: parts.filter(Boolean).join(', ') };
     },
   },
@@ -44,14 +48,15 @@ export default [
       { key: 'tags', type: 'tags', label: 'tags' },
       { key: 'palette', type: 'palette', label: 'palette' },
     ],
-    compile({ item, ctx }) {
+    compile({ item, page }) {
+      const guard = (prompts.stylePresets[page.style] || {}).guard || '';
       const parts = [bubblePhrase(item)];
-      const where = ctx.locate(item);
+      const where = locateInPanel(page, item, types);
       if (where) parts.push(where);
       if (item.caption) parts.push(String(item.caption));
-      parts.push(ctx.placement(item.bbox));
-      parts.push(ctx.textLayout(item, ctx.vertical));
-      if (ctx.guard) parts.push(ctx.guard);
+      parts.push('placed in the ' + placementOf(page, item.bbox));
+      parts.push(textLayoutOf(page, item));
+      if (guard) parts.push(guard);
       return { label: 'text', caption: parts.filter(Boolean).join(', '), ...(item.text ? { text: item.text } : {}) };
     },
   },
@@ -65,12 +70,47 @@ export default [
       { key: 'tags', type: 'tags', label: 'tags' },
       { key: 'palette', type: 'palette', label: 'palette' },
     ],
-    compile({ item, ctx }) {
+    compile({ item }) {
       return {
         label: item.label || 'object',
-        caption: [item.caption, ctx.guard].filter(Boolean).join(', '),
+        caption: item.caption || '',
         ...(item.text ? { text: item.text } : {}),
       };
     },
   },
 ];
+
+/** 整页 summary：写作风格全在这里 */
+export function buildSummary({ page, items }) {
+  const sn = prompts.snippets || {};
+  const style = prompts.stylePresets[page.style] || prompts.stylePresets.mono;
+  const panels = panelsOf(page, types);
+  const texts = items.filter((i) => i.label === 'text');
+  const parts = [style.phrase];
+
+  if (panels.length > 0) {
+    const order = prompts.readingOrders[page.reading] || prompts.readingOrders.rtl;
+    parts.push(
+      fill(sn.panelCount, { n: panels.length, panels: panels.length === 1 ? 'panel' : 'panels', order: order.phrase })
+    );
+  }
+
+  if (texts.length > 0) {
+    parts.push(fill(sn.textLock, { panels: panels.length, texts: texts.length }));
+    parts.push(sn.bubbleRule);
+  } else {
+    parts.push(sn.noLettering);
+  }
+
+  if (page.scene) parts.push(page.scene);
+  if (page.note) parts.push(page.note);
+  if (style.guard) parts.push(style.guard);
+
+  return {
+    meta: style.meta,
+    canvas: panels.length > 1 || texts.length > 1 ? 'multi_panel' : 'single',
+    caption: parts.filter(Boolean).join('\n\n'),
+  };
+}
+
+export default types;

@@ -16,11 +16,13 @@ import {
 } from './manga-doc.mjs';
 import { ITEM_TYPE_MAP } from './registry.mjs';
 import { PROMPT_SNIPPETS as S, fillSnippet as fill } from './prompt-templates.mjs';
+import { T } from './templates-store.mjs';
 import { validatePage } from './validate.mjs';
 
 export function compilePage(page, ctx = {}) {
   const size = pageSize(page);
-  const style = STYLE_PRESETS[page.style] || STYLE_PRESETS.mono;
+  const styles = T.stylePresets || STYLE_PRESETS;
+  const style = styles[page.style] || styles.mono;
   const guard = style.guard || '';
   const panels = panelsOf(page);
   const bubbles = bubblesOf(page);
@@ -86,17 +88,19 @@ export function compilePage(page, ctx = {}) {
 
 function buildSummary(page, panels, bubbles, style, ctx) {
   const parts = [style.phrase];
-  const order = READING_ORDERS[page.reading] || READING_ORDERS.rtl;
+  const orders = T.readingOrders || READING_ORDERS;
+  const order = orders[page.reading] || orders.rtl;
 
   if (panels.length > 0) {
     parts.push(fill(S.panelCount, { n: panels.length, panels: panels.length === 1 ? 'panel' : 'panels', order: order.phrase }));
   }
 
+  const sn = T.snippets || S;
   if (bubbles.length > 0) {
-    parts.push(fill(S.textLock, { panels: panels.length, texts: bubbles.length }));
-    parts.push(S.bubbleRule);
+    parts.push(fill(sn.textLock, { panels: panels.length, texts: bubbles.length }));
+    parts.push(sn.bubbleRule);
   } else {
-    parts.push(S.noLettering);
+    parts.push(sn.noLettering);
   }
 
   const characterText = (ctx.characterText || '').trim();
@@ -141,7 +145,8 @@ function locateInPanel(item, panels, no) {
   if (!chosen) return '';
   const [x1, y1, x2, y2] = chosen.bbox;
   const fully = bx1 >= x1 - 2 && bx2 <= x2 + 2 && by1 >= y1 - 2 && by2 <= y2 + 2;
-  const snippet = fully ? S.panelInside : S.panelEdge;
+  const sn2 = T.snippets || S;
+  const snippet = fully ? sn2.panelInside : sn2.panelEdge;
   return fill(snippet, { n: no.get(chosen.id) || '?' });
 }
 
@@ -151,10 +156,11 @@ function placementWord(bbox, size) {
   const ry = cy / size.height;
   const vertical = ry < 0.34 ? 'upper' : ry > 0.66 ? 'lower' : 'middle';
   const horizontal = rx < 0.34 ? 'left' : rx > 0.66 ? 'right' : 'centre';
-  return fill(S.placement, { area: vertical + ' ' + horizontal });
+  return fill((T.snippets || S).placement, { area: vertical + ' ' + horizontal });
 }
 
 /** 只描述方向，不算列数/字数、不提字号（报数字会让模型把框画歪） */
 function textLayout(_bubble, vertical) {
-  return vertical ? S.textVertical : S.textHorizontal;
+  const sn3 = T.snippets || S;
+  return vertical ? sn3.textVertical : sn3.textHorizontal;
 }

@@ -8,6 +8,7 @@
 import { PANEL_SHAPES, FRAME_STYLES, CAMERAS, READING_ORDERS, STYLE_PRESETS } from './manga-doc.mjs';
 import { bubblePhrase, BUBBLE_TYPES } from './bubbles.mjs';
 import { PROMPT_SNIPPETS as S } from './prompt-templates.mjs';
+import { T } from './templates-store.mjs';
 
 export const ITEM_TYPES = [
   {
@@ -22,15 +23,19 @@ export const ITEM_TYPES = [
       { key: 'palette', type: 'palette', label: 'palette' },
     ],
     compile({ item, ctx }) {
-      const shape = PANEL_SHAPES[item.shape] || PANEL_SHAPES.rect;
-      const frame = FRAME_STYLES[item.frame] || FRAME_STYLES.border;
-      const camera = CAMERAS[item.camera];
+      const shapes = T.panelShapes || PANEL_SHAPES;
+      const frames = T.frameStyles || FRAME_STYLES;
+      const shapesAll = shapes;
+      const shape = shapesAll[item.shape] || shapesAll.rect;
+      const frame = frames[item.frame] || frames.border;
+      const camera = (T.cameras || CAMERAS)[item.camera];
       const parts = [shape.phrase];
       if (!String(item.shape || '').startsWith('bleed')) parts.push(frame.phrase);
       if (camera) parts.push(camera.phrase);
       const body = (item.caption || '').trim();
       const tag = ctx.number ? 'PANEL ' + ctx.number : '';
-      if (body || tag) parts.push(S.boxPrefix + ' ' + [tag, body].filter(Boolean).join(', '));
+      const snippets = T.snippets || S;
+      if (body || tag) parts.push(snippets.boxPrefix + ' ' + [tag, body].filter(Boolean).join(', '));
       if (ctx.guard) parts.push(ctx.guard);
       return { label: 'object', caption: parts.join(', ') };
     },

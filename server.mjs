@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { loadTemplates, exportTemplates } from './scripts/lib/templates.mjs';
 // 预览服务器：给人和 Agent 看/改漫画存档用。
 //   node server.mjs                 → http://127.0.0.1:5123
 //   MOSS_ARCHIVE=/path node server.mjs
@@ -423,6 +424,8 @@ const server = createServer(async (req, res) => {
 });
 
 await ensureConfig(CONFIG_DIR);
+  await exportTemplates(CONFIG_DIR);
+  await loadTemplates(CONFIG_DIR);
 await ensureArchive(ARCHIVE);
 server.listen(PORT, HOST, async () => {
   const config = await readConfig(CONFIG_DIR);

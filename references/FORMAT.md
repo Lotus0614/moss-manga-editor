@@ -222,3 +222,28 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 所有类型走同一套渲染：同一个标签样式、同一个正文字号公式 `max(13, min(w/16, h/5, 22))`、同样的直角、同样的描边。颜色只按类型名推（`typeColor`），不按类型写 CSS。
 
 加新类型不需要写任何画布代码，也不该为它加特例样式。
+## 提示词模板（Agent 直接改这里）
+
+`manga init` 会在配置根生成 `prompt-templates.json`，内容就是全部可改的提示词：
+
+```jsonc
+{
+  "panelShapes":    { "rect": { "name": "矩形", "phrase": "rectangular panel with straight edges" } },
+  "frameStyles":    { … },
+  "cameras":        { … },
+  "stylePresets":   { "mono": { "phrase": "…", "guard": "…", "meta": [] } },
+  "readingOrders":  { … },
+  "bubbleTypes":    [ { "key": "speech", "name": "对话", "phrase": "…", "tail": true } ],
+  "tailDirections": { … },
+  "snippets":       { "textLock": "…{panels}…{texts}…", "placement": "placed in the {area} area of the page" }
+}
+```
+
+规则：
+
+- **改措辞**：直接改 `phrase` / `snippets` 里的句子，保存即生效（下一次 `compile` / `render`）
+- **加枚举**：往对应对象加一项，例如新机位 `"bird": { "name": "鸟瞰", "phrase": "bird's eye view" }`
+- `snippets` 里的 `{name}` 是占位符（`{n}` 面板号、`{area}` 位置、`{panels}`/`{texts}` 数量），改句子时保留它们
+- 想恢复默认：删掉这个文件再跑一次 `manga init --force`
+
+代码里的 `core/prompt-templates.mjs` 只是默认值；配置里有的键会覆盖它。

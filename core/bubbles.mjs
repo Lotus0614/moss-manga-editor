@@ -12,15 +12,18 @@
  * @property {boolean} inline 是否为浮字（无气泡，允许出血跨格）
  */
 
+import { T } from './templates-store.mjs';
 import { BUBBLE_TYPES, TAIL_DIRECTIONS } from './prompt-templates.mjs';
 
 export { BUBBLE_TYPES, TAIL_DIRECTIONS };
-export const BUBBLE_BY_KEY = Object.fromEntries(BUBBLE_TYPES.map((b) => [b.key, b]));
+const byKey = (types) => Object.fromEntries((types || BUBBLE_TYPES).map((b) => [b.key, b]));
+export const BUBBLE_BY_KEY = byKey(BUBBLE_TYPES);
 
 
 
 export function bubbleType(key) {
-  return BUBBLE_BY_KEY[key] || BUBBLE_BY_KEY.speech;
+  const map = byKey(T.bubbleTypes);
+  return map[key] || map.speech || BUBBLE_BY_KEY[key];
 }
 
 /**

@@ -278,7 +278,7 @@ node scripts/manga.mjs page show --page N --summary   # 想先看紧凑大纲也
 
 ## 纪律
 
-1. **不读 `scripts/` 源码**，要细节读 `references/`；但 `core/prompt-templates.mjs` 是数据文件——用户对效果不满意时可以直接改里面的措辞，或加新的形状/机位/气泡枚举（加完编译器和编辑器自动认）。
+1. **不读 `scripts/` 源码**，要细节读 `references/`；用户对生成效果不满意时，**直接改 `<配置根>/prompt-templates.json`**（`init` 时自动生成的一份提示词模板）：里面的形状、机位、画风、气泡类型、句式全都能改，改完立即生效，不用碰代码。
 2. **不改 `scripts/` 代码**——只有用户明确要求「修 bug」或「加功能」时才动，改完要跑 `npm test`。
 3. **不手写 Moss JSON**，那是 `compile` 的产物；你只写页面文档。
 4. **工作流占位符由你改写文件完成**：读用户给的 API JSON → 自己判断节点 → 生成完整新文件 → `workflow save` → `workflow check`。不要让用户手写占位符，也不要指望脚本猜节点。

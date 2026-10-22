@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { loadTemplates, exportTemplates } from './lib/templates.mjs';
 // moss-manga CLI —— Agent 操作漫画存档的唯一入口。
 //
 //   node scripts/manga.mjs doctor
@@ -81,6 +82,7 @@ const { positional, flags } = parseArgs(process.argv.slice(2));
 const command = positional[0] || 'help';
 const JSON_MODE = Boolean(flags.json);
 const CONFIG_DIR = resolveConfigDir(flags.config);
+await loadTemplates(CONFIG_DIR);
 const CONFIG = await readConfig(CONFIG_DIR);
 const DIR = resolveArchiveDir(CONFIG, flags.dir || flags.archive);
 
@@ -223,6 +225,7 @@ async function cmdDoctor() {
 }
 
 async function cmdInit() {
+  await exportTemplates(CONFIG_DIR, { force: Boolean(flags.force) });
   await ensureConfig(CONFIG_DIR);
   await ensureArchive(DIR);
   const patch = {};

@@ -1,4 +1,6 @@
-// 漫画排版辅助函数：编号、定位、页面区域、排版方向。
+import { prompts, BUBBLE_TYPES, TAIL_DIRECTIONS } from './prompts.mjs';
+
+// 漫画排版辅助函数：编号、定位、页面区域、排版方向、气泡短语。
 //
 // 只是可 import 的纯函数，不导出任何 ctx 对象——谁需要什么自己取。
 // 换一套编号/定位规则，改这个文件就行。
@@ -71,4 +73,27 @@ export function placementOf(page, bbox) {
 export function textLayoutOf(page, item) {
   const vertical = typeof item.vertical === 'boolean' ? item.vertical : page.vertical !== false;
   return vertical ? 'vertical lettering, columns read right to left' : 'horizontal lettering';
+}
+
+// ---------------------------------------------------------------- 气泡
+
+const byKey = (types) => Object.fromEntries((types || BUBBLE_TYPES).map((b) => [b.key, b]));
+
+export const BUBBLE_BY_KEY = byKey(BUBBLE_TYPES);
+
+export function bubbleType(key) {
+  const map = byKey(prompts.bubbleTypes);
+  return map[key] || map.speech || BUBBLE_BY_KEY[key];
+}
+
+/** 一条文字项的形态描述（位置由类型自己的 compile 补） */
+export function bubblePhrase(bubble) {
+  const t = bubbleType(bubble.kind);
+  const parts = [t.phrase];
+  if (t.tail) {
+    const tail = bubble.tail;
+    if (!tail || tail === 'none') parts.push('NO tail because the speaker is off panel');
+    else parts.push(`a short tapering tail ${TAIL_DIRECTIONS[tail] || TAIL_DIRECTIONS['down-left']}`);
+  }
+  return parts.join(', ');
 }

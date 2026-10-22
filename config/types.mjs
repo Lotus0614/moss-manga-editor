@@ -4,8 +4,7 @@
 // 复制到配置根后，import 同目录的 prompts.mjs / helpers.mjs 即可独立运行。
 
 import { prompts } from './prompts.mjs';
-import { bubblePhrase } from './bubbles.mjs';
-import { panelNumber, locateInPanel, placementOf, textLayoutOf, panelsOf } from './helpers.mjs';
+import { panelNumber, locateInPanel, placementOf, textLayoutOf, panelsOf, bubblePhrase } from './helpers.mjs';
 
 const fill = (tpl, vars) => String(tpl || '').replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? String(vars[k]) : m));
 

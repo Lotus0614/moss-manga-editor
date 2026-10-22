@@ -6,7 +6,8 @@
 //   2. compile 返回只能含 Moss 白名单字段：label / caption / bbox / text / tags / palette
 
 import { PANEL_SHAPES, FRAME_STYLES, CAMERAS, READING_ORDERS, STYLE_PRESETS } from './manga-doc.mjs';
-import { bubblePhrase, BUBBLE_TYPES } from './bubbles.mjs';
+import { bubblePhrase } from '../config/helpers.mjs';
+import { BUBBLE_TYPES } from '../config/prompts.mjs';
 import { PROMPT_SNIPPETS as S } from '../config/prompts.mjs';
 import { T } from './templates-store.mjs';
 

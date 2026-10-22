@@ -5,7 +5,7 @@
 
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rename, access, copyFile } from 'node:fs/promises';
 import { now } from '../../core/manga-doc.mjs';
 
 // 仓库根 = workspace 根：本文件在 <root>/scripts/lib/，上三级就是 root
@@ -65,6 +65,15 @@ export async function writeJson(file, value) {
 export async function ensureConfig(configDir) {
   await mkdir(workflowsDir(configDir), { recursive: true });
   if (!(await readJson(configPath(configDir), null))) await writeJson(configPath(configDir), defaultConfig());
+  // 首次运行：把 defaults/ 里的方言文件复制到 config/（已存在就不动）
+  for (const name of ['types.mjs', 'prompts.mjs', 'bubbles.mjs', 'helpers.mjs']) {
+    const target = join(configDir, name);
+    try {
+      await access(target);
+    } catch {
+      await copyFile(join(ROOT, 'defaults', name), target);
+    }
+  }
   return configDir;
 }
 

@@ -17,6 +17,18 @@ export let ITEM_TYPES = defaultTypes;
 export let ITEM_TYPE_MAP = Object.fromEntries(ITEM_TYPES.map((t) => [t.key, t]));
 
 /** 用配置里的类型表替换默认值 */
+let BUILD_SUMMARY = null;
+
+/** 方言模块可以带自己的 buildSummary */
+export function setBuildSummary(fn) {
+  if (typeof fn === 'function') BUILD_SUMMARY = fn;
+  return BUILD_SUMMARY;
+}
+
+export function getBuildSummary() {
+  return BUILD_SUMMARY;
+}
+
 export function applyTypes(list) {
   if (!Array.isArray(list) || !list.length) return ITEM_TYPES;
   ITEM_TYPES = list;

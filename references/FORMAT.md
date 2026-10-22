@@ -3,11 +3,11 @@
 配置和存档是两棵树：配置（含工作流）在固定的配置根，存档只放项目数据。
 
 ```
-<配置根>  默认 ~/.moss-manga（MOSS_CONFIG 可覆盖）
+config  默认 config/（MOSS_CONFIG 可覆盖）
 ├── config.json                 # ComfyUI 地址、当前工作流、出图参数
 └── workflows/                  # 全局工作流（跟存档无关）
 
-<存档>    默认 <配置根>/archive（config.archive 或 --dir 可改）
+data    默认 config/archive（config.archive 或 --dir 可改）
 ├── state.json  journal.jsonl
 └── projects/<slug>/
     ├── project.json            # 项目 + 人物设定 + 页序
@@ -249,7 +249,7 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 代码里的 `core/prompt-templates.mjs` 只是默认值；配置里有的键会覆盖它。
 ## 类型定义（配置根里的 types.mjs）
 
-`manga init` 会把默认的 `defaults/types.mjs` 复制成 `<配置根>/types.mjs`。**加类型、改字段、改编译逻辑都改这个文件**，不要动包内代码。
+`manga init` 会把默认的 `defaults/types.mjs` 复制成 `config/types.mjs`。**加类型、改字段、改编译逻辑都改这个文件**，不要动包内代码。
 
 ```js
 export default [

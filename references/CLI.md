@@ -6,8 +6,8 @@
 
 | 参数 | 作用 |
 |---|---|
-| `--config <路径>` | 配置根，默认 `~/.moss-manga`（或环境变量 `MOSS_CONFIG`） |
-| `--dir <路径>` | 存档目录，默认 `<配置根>/archive`（或 `config.archive` / `MOSS_ARCHIVE`） |
+| `--config <路径>` | 配置根，默认 `config/`（或环境变量 `MOSS_CONFIG`） |
+| `--dir <路径>` | 存档目录，默认 `config/archive`（或 `config.archive` / `MOSS_ARCHIVE`） |
 | `--project <slug>` | 项目；只有一个项目时可省略 |
 | `--json` | 输出结构化 JSON |
 
@@ -48,7 +48,7 @@ manga workflow list
 manga workflow show [--name default.json]
 ```
 
-`workflow save` 只做两件事：校验是 API 格式、复制到 `<配置根>/workflows/<name>`，然后报告占位符情况。**它不改你的文件**——`{{prompt}}` / `{{width}}` / `{{height}}` 这些由调用方（AI）读懂 JSON 后自己写进文件。
+`workflow save` 只做两件事：校验是 API 格式、复制到 `config/workflows/<name>`，然后报告占位符情况。**它不改你的文件**——`{{prompt}}` / `{{width}}` / `{{height}}` 这些由调用方（AI）读懂 JSON 后自己写进文件。
 
 `workflow check` 的输出：
 
@@ -70,7 +70,7 @@ manga workflow show [--name default.json]
 
 | 键 | 含义 |
 |---|---|
-| `archive` | 存档路径（留空 = `<配置根>/archive`） |
+| `archive` | 存档路径（留空 = `config/archive`） |
 | `comfy.url` | ComfyUI 地址 |
 | `comfy.timeoutMs` | 单张超时 |
 | `defaults.ckpt` | 检查点文件名（只有工作流里写了 `{{ckpt}}` 才需要） |
@@ -176,7 +176,7 @@ manga ack
 }
 ```
 
-**Agent 不要用这两个命令**：直接读 `<存档>/projects/<slug>/pages/pNN.json` 即可，源文件信息量更大。这两个是给网页端「变更」页签用的。`--since` 不传就用上次 `ack` 的位置。`op` 取值：`create` `add` `remove` `bbox` `text` `field` `page`。
+**Agent 不要用这两个命令**：直接读 `data/projects/<slug>/pages/pNN.json` 即可，源文件信息量更大。这两个是给网页端「变更」页签用的。`--since` 不传就用上次 `ack` 的位置。`op` 取值：`create` `add` `remove` `bbox` `text` `field` `page`。
 
 网页端看完「变更」页签会自己 ack；Agent 不需要这套流程。
 
@@ -190,7 +190,7 @@ manga stop
 manga open [--port 5123]
 ```
 
-`serve` 是后台进程（pid 写在 `<存档>/server.pid`），不占前台。用户改完页面刷新即可。
+`serve` 是后台进程（pid 写在 `data/server.pid`），不占前台。用户改完页面刷新即可。
 
 ---
 

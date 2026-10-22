@@ -226,7 +226,6 @@ async function cmdDoctor() {
 }
 
 async function cmdInit() {
-  await exportTemplates(CONFIG_DIR, { force: Boolean(flags.force) });
   await exportTypes(CONFIG_DIR, { force: Boolean(flags.force) });
   await ensureConfig(CONFIG_DIR);
   await ensureArchive(DIR);

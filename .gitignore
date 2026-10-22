@@ -1,14 +1,5 @@
-# 运行时数据：项目、页面、生成图片、上传图、设置
-data/
-
-# 依赖抓取产物（想离线用就保留，不想进仓库就放开下面这行）
-# web/vendor/
-
-# 系统垃圾
-.DS_Store
-Thumbs.db
-*.log
-
-# �������� npm run vendor ץȡ��Ҳ�ɲ��ύ��
 node_modules/
-assets/*.tmp
+data/
+config/
+*.tmp
+.DS_Store

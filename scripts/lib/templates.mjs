@@ -16,7 +16,7 @@ import {
   PROMPT_SNIPPETS,
 } from '../../core/prompt-templates.mjs';
 import { applyTemplates } from '../../core/templates-store.mjs';
-import { applyTypes } from '../../core/registry.mjs';
+import { applyTypes, setBuildSummary } from '../../core/registry.mjs';
 import { pathToFileURL } from 'node:url';
 
 export const templatesPath = (configDir) => join(configDir, 'prompt-templates.json');
@@ -84,6 +84,7 @@ export async function loadTypes(configDir) {
     const mod = await import(url);
     const list = mod.TYPES || mod.default || [];
     applyTypes(list);
+    setBuildSummary(mod.buildSummary);
     return { file, applied: true, count: list.length };
   } catch {
     return { file, applied: false, count: 0 };

@@ -100,7 +100,7 @@ function ItemBox({ item, page, index, selected, onSelect, onDragStart, onBegin }
 
   const label = labelOf(item, index);
 
-  const fs = Math.max(13, Math.min(w / 16, h / 5, 22));
+  const fs = Math.max(17, Math.min(w / 13, h / 4.5, 30));
   const body = isBubble ? item.text : isNative ? item.text || item.caption : item.caption;
 
   // 画布只做排版预览：文字一律横排显示，竖排设置只影响生成的提示词

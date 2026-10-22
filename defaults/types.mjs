@@ -1,10 +1,13 @@
+import { prompts } from './prompts.mjs';
+import { bubblePhrase } from './bubbles.mjs';
+
 // 默认类型定义（随包发布）。init 时会复制到配置根，之后 Agent 改配置里那份。
 //
 // 必须按这个格式导出：一个数组，每项 { key, label, fields, compile }。
 // compile({ item, ctx }) 返回 { label, caption, text?, tags?, palette? }，不要给 bbox（核心会补）。
 
 // 不 import 任何东西：词表和气泡短语都由编译器通过 ctx 传进来，复制到任何目录都能用。
-const phraseOf = (ctx, item, field) => (ctx.t?.[field] || {})[item[field]]?.phrase || '';
+const phraseOf = (item, field) => (prompts[field] || {})[item[field]]?.phrase || '';
 
 export default [
   {
@@ -19,12 +22,12 @@ export default [
       { key: 'palette', type: 'palette', label: 'palette' },
     ],
     compile({ item, ctx }) {
-      const parts = [phraseOf(ctx, item, 'panelShapes')];
-      if (!String(item.shape || '').startsWith('bleed')) parts.push(phraseOf(ctx, item, 'frameStyles'));
-      if (item.camera) parts.push(phraseOf(ctx, item, 'cameras'));
+      const parts = [phraseOf(item, 'panelShapes')];
+      if (!String(item.shape || '').startsWith('bleed')) parts.push(phraseOf(item, 'frameStyles'));
+      if (item.camera) parts.push(phraseOf(item, 'cameras'));
       const body = (item.caption || '').trim();
       const tag = ctx.number ? 'PANEL ' + ctx.number : '';
-      const sn = ctx.t?.snippets || {};
+      const sn = prompts.snippets || {};
       if (body || tag) parts.push((sn.boxPrefix || 'This box contains only:') + ' ' + [tag, body].filter(Boolean).join(', '));
       if (ctx.guard) parts.push(ctx.guard);
       return { label: 'object', caption: parts.filter(Boolean).join(', ') };
@@ -42,7 +45,7 @@ export default [
       { key: 'palette', type: 'palette', label: 'palette' },
     ],
     compile({ item, ctx }) {
-      const parts = [ctx.bubblePhrase(item)];
+      const parts = [bubblePhrase(item)];
       const where = ctx.locate(item);
       if (where) parts.push(where);
       if (item.caption) parts.push(String(item.caption));

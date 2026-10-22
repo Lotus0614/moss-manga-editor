@@ -14,16 +14,15 @@
 
 ## 快速开始
 
+推荐把 `INSTALL.md` 发给 AI，让它照做：确认项目位置、拉取代码、配置 ComfyUI 与工作流。
+
+也可以手动起：
+
 ```bash
-git clone <repo> my-manga && cd my-manga
-node manga.mjs init                                   # 生成 config/ 与 data/
-node manga.mjs config set comfy.url=http://127.0.0.1:8188
-node manga.mjs workflow save ./moss.api.json          # ComfyUI「导出 (API)」
-node manga.mjs workflow check
-node manga.mjs serve                                  # http://127.0.0.1:5123
+node manga.mjs init
 ```
 
-Windows 也可以直接双击 `start.bat`。
+Windows 双击 `start.bat` 即可启动网页。
 
 ## 目录
 

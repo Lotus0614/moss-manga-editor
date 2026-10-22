@@ -54,7 +54,7 @@ node manga.mjs page new --title "第 1 页"
 - `bbox` 是 `[x1, y1, x2, y2]`，左上原点，单位像素，**16 的倍数**
 - 面板的 caption 开头写**位置**（`WIDE SHOT`、`LEFT TALL PANEL`、`the wide band across the top`），编号由代码自动加，**不要自己写 PANEL 几**
 - 文字**不用**写落在哪一格，代码会算 `inside PANEL n` / `at the edge of PANEL n`
-- 好看的 caption 长什么样，看 `references/FORMAT.md` 和 `references/RECIPES.md`
+- 好看的 caption 长什么样，看 `references/FORMAT.md`；**版面怎么排、气泡怎么用、人物怎么保持一致，看 `references/TECHNIQUES.md`**（分镜节奏、五种版式、八种气泡、背景层级、自检表都在这）
 
 4. **校验**
 

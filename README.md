@@ -32,10 +32,22 @@ core/             引擎：坐标换算、编译、校验
 defaults/         配置的出厂默认值（init 时复制到 config/）
 scripts/          命令行
 web/              网页编辑器（预览、拖版面、改台词）
-references/       格式、命令、工作流、配方的详细说明
+references/       格式、命令、工作流、漫画技巧
 INSTALL.md        给 AI 的安装步骤
 AGENT.md          给 AI 的工作手册（画漫画的流程与规矩）
 ```
+
+## 文档地图
+
+| 什么时候读 | 读哪个 |
+|---|---|
+| 第一次安装 | `INSTALL.md` |
+| 每天画漫画 | `AGENT.md` |
+| 页面 JSON 每个字段什么意思、坐标怎么算 | `references/FORMAT.md` |
+| 查命令参数 | `references/CLI.md` |
+| ComfyUI 工作流怎么接、占位符怎么写 | `references/WORKFLOW.md` |
+| 画得不够好看：分镜节奏、气泡、人物、背景 | `references/TECHNIQUES.md` |
+| 整体怎么用 | `README.md`（本文） |
 
 ## 它能做什么
 

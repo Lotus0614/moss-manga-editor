@@ -50,6 +50,7 @@ AGENT.md         工作手册（画画流程与约定）
 | 命令参数 | `references/CLI.md` |
 | ComfyUI 工作流与占位符 | `references/WORKFLOW.md` |
 | 分镜版式、节奏、人物、背景 | `references/TECHNIQUES.md` |
+| MOSS 官方 Layout JSON 规范 | `references/LAYOUT.md` |
 
 ## 常用命令
 

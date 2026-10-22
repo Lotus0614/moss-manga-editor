@@ -19,7 +19,7 @@ data    默认 config/archive（config.archive 或 --dir 可改）
 
 ## 页面只有一个数组：items
 
-v3 起不再分 `panels` / `bubbles`，所有东西都在同一个数组里，用 `type` 区分：
+所有元素都在同一个数组里，用 `type` 区分：
 
 | type | 是什么 | 主要字段 |
 |---|---|---|
@@ -222,9 +222,9 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 所有类型走同一套渲染：同一个标签样式、同一个正文字号公式 `max(13, min(w/16, h/5, 22))`、同样的直角、同样的描边。颜色只按类型名推（`typeColor`），不按类型写 CSS。
 
 加新类型不需要写任何画布代码，也不该为它加特例样式。
-## 提示词模板（Agent 直接改这里）
+## 提示词模板
 
-`manga init` 会在配置根生成 `prompt-templates.json`，内容就是全部可改的提示词：
+`manga init` 会把默认提示词复制到 `config/prompts.mjs`（词表、短语、句式）：
 
 ```jsonc
 {
@@ -312,7 +312,7 @@ export function buildSummary({ page, items, prompts }) {
 - `role: 'panel'` 决定它参与编号、能被文字定位——内核不认 `'panel'` 这个字符串
 - `buildSummary` 返回 `{ meta, canvas, caption }`，写作风格全在这里
 
-## core/compile.mjs 只剩 walker
+## 编译流程
 
 ```js
 export function compilePage(page, { types, prompts, buildSummary }) {
@@ -321,4 +321,4 @@ export function compilePage(page, { types, prompts, buildSummary }) {
 }
 ```
 
-不传 `types` / `prompts` / `buildSummary` 时退回运行时表（CLI 启动时已按配置覆盖）。
+编译器遍历 `items`，逐个调用类型自己的 `compile`，补上坐标后拼成最终 JSON。

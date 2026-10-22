@@ -759,6 +759,13 @@ a { color: inherit; }
   padding: 3px 7px;
 }
 .canvas-ctrl.bottom { right: 14px; }
-.canvas-ctrl.bottom .btn { box-shadow: 2px 2px 0 var(--ink); }
+.canvas-ctrl.bottom .btn {
+  box-shadow: 2px 2px 0 var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.canvas-ctrl.bottom .btn .plus { flex: none; opacity: 0.75; }
+.canvas-ctrl.bottom .btn:hover .plus { opacity: 1; }
 .icon-btn.on { background: var(--ink); color: var(--paper); }
 .dock.collapsed .dock-body { display: none; }

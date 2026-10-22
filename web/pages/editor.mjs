@@ -523,7 +523,12 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
       </div>
 
       <div class="canvas-ctrl bottom" style=${`bottom:${dockCollapsed ? 46 : 284}px`}>
-        ${ITEM_TYPES.map((t) => html`<button class="btn" onClick=${() => addItem(t.key)}>${t.label}</button>`)}
+        ${ITEM_TYPES.map(
+          (t) => html`<button class="btn" onClick=${() => addItem(t.key)}>
+            <svg class="plus" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" aria-hidden="true"><path d="M5 1v8M1 5h8" /></svg>
+            ${t.label}
+          </button>`
+        )}
       </div>
       <div class="canvas-ctrl top">
         <input type="range" min="0.5" max="3" step="0.05" value=${zoom} title="缩放" style="width:90px" onInput=${(e) => setZoom(Number(e.currentTarget.value))} />

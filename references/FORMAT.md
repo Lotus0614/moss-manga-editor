@@ -17,53 +17,74 @@ data    默认 config/archive（config.archive 或 --dir 可改）
     └── images/<sha256>.png
 ```
 
-> MOSS 原生格式的完整字段白名单、canvas/tags/palette 用法与坐标换算，见 
-eferences/LAYOUT.md。
+> MOSS 原生格式的完整字段白名单、canvas/tags/palette 用法与坐标换算，见
+> `references/MOSSS_LAYOUT.md`。
 
 ## 页面只有一个数组：items
 
 所有元素都在同一个数组里，用 `type` 区分：
 
-| type | 是什么 | 主要字段 |
-|---|---|---|
-| `panel` | 一个分格 | `bbox` `shape` `frame` `camera` `caption` |
-| `bubble` | 一条文字 | `bbox` `kind` `text` `size` `tail` `vertical?` |
-| `native` | 原生 Moss item，绕过语义层 | `bbox` `label` `caption` `text?` |
+| type     | 是什么                     | 主要字段                                       |
+| -------- | -------------------------- | ---------------------------------------------- |
+| `panel`  | 一个分格                   | `bbox` `shape` `frame` `camera` `caption`      |
+| `bubble` | 一条文字                   | `bbox` `kind` `text` `size` `tail` `vertical?` |
+| `native` | 原生 Moss item，绕过语义层 | `bbox` `label` `caption` `text?`               |
 
 ```jsonc
 {
-  "id": "p01", "index": 1, "title": "车厢", "rev": 7,
-  "size": [768, 1280],
-  "reading": "rtl",          // rtl 右→左 | ltr 左→右
-  "style": "mono",           // mono | color | sketch
-  "vertical": true,          // 全局文字竖排；单条 bubble 可用自己的 vertical 覆盖
-  "scene": "a half-empty train carriage, fluorescent light",
-  "note": "",
-  "items": [
-    { "type": "panel", "id": "pn_a", "bbox": [8, 8, 760, 424],
-      "shape": "rect", "frame": "border", "camera": "wide",
-      "caption": "wide shot of a crowded platform, grey silhouettes",
-      "tags": ["crowded_platform", "grey_silhouettes"] },
+    "id": "p01",
+    "index": 1,
+    "title": "车厢",
+    "rev": 7,
+    "size": [768, 1280],
+    "reading": "rtl", // rtl 右→左 | ltr 左→右
+    "style": "mono", // mono | color | sketch
+    "vertical": true, // 全局文字竖排；单条 bubble 可用自己的 vertical 覆盖
+    "scene": "a half-empty train carriage, fluorescent light",
+    "note": "",
+    "items": [
+        {
+            "type": "panel",
+            "id": "pn_a",
+            "bbox": [8, 8, 760, 424],
+            "shape": "rect",
+            "frame": "border",
+            "camera": "wide",
+            "caption": "wide shot of a crowded platform, grey silhouettes",
+            "tags": ["crowded_platform", "grey_silhouettes"],
+        },
 
-    { "type": "bubble", "id": "bb_b", "bbox": [60, 30, 500, 96],
-      "kind": "narration", "text": "每天早上八点十七分，我在同一节车厢里。",
-      "size": 20, "tail": "none", "vertical": false },
+        {
+            "type": "bubble",
+            "id": "bb_b",
+            "bbox": [60, 30, 500, 96],
+            "kind": "narration",
+            "text": "每天早上八点十七分，我在同一节车厢里。",
+            "size": 20,
+            "tail": "none",
+            "vertical": false,
+        },
 
-    { "type": "native", "id": "nt_c", "bbox": [520, 980, 740, 1180],
-      "label": "character", "caption": "水科 小春（22），白衬衫，黑色长发" }
-  ]
+        {
+            "type": "native",
+            "id": "nt_c",
+            "bbox": [520, 980, 740, 1180],
+            "label": "character",
+            "caption": "水科 小春（22），白衬衫，黑色长发",
+        },
+    ],
 }
 ```
 
 ## panel
 
-| 字段 | 值 |
-|---|---|
-| `bbox` | `[x1,y1,x2,y2]`，左上原点、绝对像素、整数 |
-| `shape` | `rect` `slant-top` `slant-side` `bleed-top` `bleed-bottom` `bleed-left` `bleed-right` `bleed-all` `circle` |
-| `frame` | `border` 描边（默认） `none` 无边 `thick` 粗边 |
-| `camera` | `eye` `high` `low` `wide` `medium` `close` `xclose` `ots` `dutch` |
-| `caption` | 这一格**看得见**的东西：谁 + 在哪 + 做什么，**开头带编号和位置** |
+| 字段      | 值                                                                                                         |
+| --------- | ---------------------------------------------------------------------------------------------------------- |
+| `bbox`    | `[x1,y1,x2,y2]`，左上原点、绝对像素、整数                                                                  |
+| `shape`   | `rect` `slant-top` `slant-side` `bleed-top` `bleed-bottom` `bleed-left` `bleed-right` `bleed-all` `circle` |
+| `frame`   | `border` 描边（默认） `none` 无边 `thick` 粗边                                                             |
+| `camera`  | `eye` `high` `low` `wide` `medium` `close` `xclose` `ots` `dutch`                                          |
+| `caption` | 这一格**看得见**的东西：谁 + 在哪 + 做什么，**开头带编号和位置**                                           |
 
 出血格（`bleed-*`）可以超出画布；其它形状超出只会被裁。
 
@@ -78,13 +99,13 @@ PANEL 1, the wide band across the top — a crowded platform at dusk
 
 ## bubble
 
-| 字段 | 值 |
-|---|---|
-| `kind` | `speech` 对话 `shout` 喊叫 `whisper` 小声 `tremble` 颤抖 `thought` 内心 `heart` 心之声 `narration` 旁白 `sfx` 拟声词 |
-| `text` | 要渲染的字，原样；换行用 `\n` |
-| `size` | 字号，默认 22 |
-| `tail` | `down-left` `down` `down-right` `left` `right` `up-left` `up` `up-right` `none`；`none` = 说话者不在画面 |
-| `caption` | 选填，给枚举覆盖不到的特殊文字补充说明 |`n| `vertical` | 不写就跟随页面 `vertical`；写 `true`/`false` 单独覆盖 |
+| 字段      | 值                                                                                                                   |
+| --------- | -------------------------------------------------------------------------------------------------------------------- |
+| `kind`    | `speech` 对话 `shout` 喊叫 `whisper` 小声 `tremble` 颤抖 `thought` 内心 `heart` 心之声 `narration` 旁白 `sfx` 拟声词 |
+| `text`    | 要渲染的字，原样；换行用 `\n`                                                                                        |
+| `tail`    | `down-left` `down` `down-right` `left` `right` `up-left` `up` `up-right` `none`；`none` = 说话者不在画面             |
+| `caption` | 选填，给枚举覆盖不到的特殊文字补充说明                                                                               |
+| `vertical` | 不写就跟随页面 `vertical`；写 `true`/`false` 单独覆盖（不在表单里，手写页面时才用）                                 |
 
 **文字不用写在哪一格**：编译器按 bbox 自动加 `inside PANEL N` 或 `at the edge of PANEL N`。
 
@@ -148,13 +169,23 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 
 ```jsonc
 {
-  "currentByPage": { "p01": "v003" },   // 每页各自采用哪一版
-  "items": [
-    { "id": "v003", "page": "p01", "image": "/media/<slug>/<sha>.png",
-      "seed": 909507867, "width": 768, "height": 1280,
-      "steps": 11, "cfg": 2, "sampler": "euler", "scheduler": "sgm_uniform",
-      "workflow": "moss-user.json", "ms": 18183 }
-  ]
+    "currentByPage": { "p01": "v003" }, // 每页各自采用哪一版
+    "items": [
+        {
+            "id": "v003",
+            "page": "p01",
+            "image": "/media/<slug>/<sha>.png",
+            "seed": 909507867,
+            "width": 768,
+            "height": 1280,
+            "steps": 11,
+            "cfg": 2,
+            "sampler": "euler",
+            "scheduler": "sgm_uniform",
+            "workflow": "moss-user.json",
+            "ms": 18183,
+        },
+    ],
 }
 ```
 
@@ -184,25 +215,26 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
     { key: 'text', type: 'text', label: '拟声词', required: true },
     { key: 'caption', type: 'longtext', label: '写法说明' },
   ],
-  compile({ item, ctx }) {          // 返回合法 Moss item（不要给 bbox）
-    return { label: 'text', caption: [item.caption, ctx.guard].filter(Boolean).join(', '), text: item.text };
+  compile({ item, page }) {         // 返回合法 Moss item（不要给 bbox）
+    return { label: 'text', caption: item.caption, text: item.text };
   },
 }
 ```
 
 - `fields[].type` 可选：`text` / `longtext` / `number` / `enum` / `bool` / `tags` / `palette`
-- `enum` 用 `options: 'CAMERAS'` 引用词表（词表在 `config/prompts.mjs`，枚举名在 `config/ui.mjs` 的 `ENUM_SOURCES`）
+- `enum` 用 `options: 'cameras'` 引用词表（键与 `config/prompts.mjs` 聚合导出的 `prompts` 对象一致，中文名在 `config/ui.mjs` 的 `ENUM_SOURCES`）
 - `compile` 返回值只能是 `label` / `caption` / `text` / `tags` / `palette`，`bbox` 由核心补
 - 页面级字段在 `PAGE_FIELDS`，同样是数据驱动
 
 改完刷新网页就能用，不用重启服务。
+
 ## 画布标签由字段决定
 
 画布左上角那行字不是写死的，由字段声明上的 `canvas: true` 决定：
 
 ```js
-{ key: 'camera', type: 'enum', label: '机位', options: 'CAMERAS', canvas: true },
-{ key: 'shape',  type: 'enum', label: '形状', options: 'PANEL_SHAPES', canvas: true },
+{ key: 'camera', type: 'enum', label: '机位', options: 'cameras', canvas: true },
+{ key: 'shape',  type: 'enum', label: '形状', options: 'panelShapes', canvas: true },
 ```
 
 生成规则（`config/ui.mjs` 的 `labelOf`）：
@@ -210,7 +242,7 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 1. 类型名开头，`panel` 带序号（`面板3`），其它不带
 2. 遍历该类型字段，**只有 `canvas: true` 的才出现**，空值跳过
 3. 枚举值按 `ENUM_SOURCES` 翻成中文
-4. 用 ` · ` 连类型和值，多个值之间用 ` / `
+4. 用 `·` 连类型和值，多个值之间用 `/`
 
 ```
 面板3 · 中景 / 矩形
@@ -222,12 +254,13 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 
 ## 画布渲染是统一的
 
-所有类型走同一套渲染：同一个标签样式、同一个正文字号公式 `max(13, min(w/16, h/5, 22))`、同样的直角、同样的描边。颜色只按类型名推（`typeColor`），不按类型写 CSS。
+所有类型走同一套渲染：同一个标签样式、同一个正文字号公式 `max(17, min(w/13, h/4.5, 30))`、同样的直角、同样的描边。颜色只按类型名推（`typeColor`），不按类型写 CSS。
 
 加新类型不需要写任何画布代码，也不该为它加特例样式。
+
 ## 提示词模板
 
-`manga init` 会把默认提示词复制到 `config/prompts.mjs`（词表、短语、句式）：
+`config/prompts.mjs` 随代码一起下来（词表、短语、句式），改文件即生效，不用重新 init：
 
 ```jsonc
 {
@@ -247,26 +280,31 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 - **改措辞**：直接改 `phrase` / `snippets` 里的句子，保存即生效（下一次 `compile` / `render`）
 - **加枚举**：往对应对象加一项，例如新机位 `"bird": { "name": "鸟瞰", "phrase": "bird's eye view" }`
 - `snippets` 里的 `{name}` 是占位符（`{n}` 面板号、`{area}` 位置、`{panels}`/`{texts}` 数量），改句子时保留它们
-- 想恢复默认：删掉这个文件再跑一次 `manga init --force`
+- 想恢复默认：`git checkout -- config/prompts.mjs`
 
 词表在 `config/prompts.mjs`，改完下一次编译生效。
+
 ## 类型定义（配置根里的 types.mjs）
 
 类型定义在 `config/types.mjs`。**加类型、改字段、改编译逻辑都改这个文件**，不要动包内代码。
 
 ```js
 export default [
-  {
-    key: 'sfx',
-    label: '拟声',
-    fields: [
-      { key: 'text', type: 'text', label: '拟声词', required: true },
-      { key: 'caption', type: 'longtext', label: '写法说明' },
-    ],
-    compile({ item, ctx }) {
-      return { label: 'text', caption: `${item.caption}, in ${ctx.locate(item)}`, text: item.text };
+    {
+        key: 'sfx',
+        label: '拟声',
+        fields: [
+            { key: 'text', type: 'text', label: '拟声词', required: true },
+            { key: 'caption', type: 'longtext', label: '写法说明' },
+        ],
+        compile({ item, page }) {
+            return {
+                label: 'text',
+                caption: item.caption,
+                text: item.text,
+            };
+        },
     },
-  },
 ];
 ```
 
@@ -274,26 +312,27 @@ export default [
 
 - 导出必须是**数组**（`export default [...]` 或 `export const TYPES = [...]`）
 - 每项 `{ key, label, fields, compile }`
-- `compile({ item, ctx })` 返回 `{ label, caption, text?, tags?, palette? }`，**不要给 bbox**（核心会补）
+- `compile({ item, page })` 返回 `{ label, caption, text?, tags?, palette? }`，**不要给 bbox**（核心会补）
 - `fields[].type`：`text` / `longtext` / `number` / `enum` / `bool` / `tags` / `palette`
 - `enum` 的 `options` 指向 `prompts.mjs` 里的词表（`panelShapes` / `cameras` / `bubbleTypes` …）
 - 字段加 `canvas: true` 才会出现在格子左上角标签里
 - 改完下一次 `compile` / `render` 生效；网页需要刷新
+
 ## 内核与漫画方言的分工
 
-| 目录 | 有什么 | 谁改 |
-|---|---|---|
-| `core/` | 坐标换算、遍历、JSON 形状、校验、占位符引擎 | 不动 |
+| 目录      | 有什么                                       | 谁改   |
+| --------- | -------------------------------------------- | ------ |
+| `core/`   | 坐标换算、遍历、JSON 形状、校验、占位符引擎  | 不动   |
 | `config/` | 漫画方言：词表、类型、排版辅助函数、展示规则 | 直接改 |
 
 `config/` 下的方言文件：
 
-| 文件 | 内容 |
-|---|---|
-| `prompts.mjs` | 词表、短语、句子模板 |
+| 文件          | 内容                                                                                                            |
+| ------------- | --------------------------------------------------------------------------------------------------------------- |
+| `prompts.mjs` | 词表、短语、句子模板                                                                                            |
 | `helpers.mjs` | `panelsOf` / `readingOrder` / `panelNumber` / `locateInPanel` / `placementOf` / `textLayoutOf` / `bubblePhrase` |
-| `types.mjs` | 类型数组（含 `compile`）+ `buildSummary` |
-| `ui.mjs` | 表单字段、画布标签、类型配色 |
+| `types.mjs`   | 类型数组（含 `compile`）+ `buildSummary`                                                                        |
+| `ui.mjs`      | 表单字段、画布标签、类型配色                                                                                    |
 
 ## types.mjs 的固定导出
 

@@ -1,6 +1,11 @@
 # INSTALL
 
-给 AI 看的安装说明。按顺序做，不要跳步。
+给 AI 看的安装说明。按顺序做，不要跳步，也不要提前做后面的步骤。
+
+两条前提：
+
+- **没拿到工作流 JSON 之前，不要问「哪些参数要做成占位符」**——你不知道里面有什么节点、哪些值值得暴露，问了用户也没法回答。
+- 安装阶段不要读 `core/`、`scripts/`、`web/`、`tools/` 的代码，也不要读 `references/MOSSS_LAYOUT.md`。这些只在加功能、改 bug 时才看。
 
 ## 1. 确认项目位置
 
@@ -19,9 +24,9 @@ git clone https://github.com/Lotus0614/moss-manga-editor.git .
 # 或者把压缩包解到当前目录
 ```
 
-拉完目录里应该有：`manga.mjs`、`core/`、`defaults/`、`scripts/`、`web/`、`references/`、`start.bat`。
+拉完目录里应该有：`manga.mjs`、`config/`、`core/`、`scripts/`、`web/`、`references/`、`start.bat`。
 
-**不要**在此时手动建 `config/`、`data/`——下一步会生成。
+**不要**在此时手动建 `data/`——下一步会生成。
 
 ## 3. 初始化
 
@@ -32,11 +37,12 @@ node manga.mjs init
 它会创建：
 
 ```
-config/            config.json + types.mjs + prompts.mjs + bubbles.mjs + helpers.mjs + workflows/
-data/              存档（projects/ images/ …）
+config/config.json        ComfyUI 地址、当前工作流、出图参数
+config/workflows/         放工作流 JSON
+data/                     存档（projects/ images/ state.json）
 ```
 
-已存在的文件不会被覆盖。
+`config/` 里的 `types.mjs`、`prompts.mjs`、`helpers.mjs`、`ui.mjs` 随代码一起下来，不用生成，已存在的文件也不会被覆盖。
 
 ## 4. 配 ComfyUI
 
@@ -51,15 +57,17 @@ node manga.mjs doctor          # 应该显示 ComfyUI 可连
 
 连不上时确认：ComfyUI 是否启动、端口是否被改、是否在另一台机器（远程要带 `http://IP:端口`）。
 
-## 5. 配工作流
+## 5. 要工作流 JSON
+
+**这一步只要 JSON，别问参数。**
 
 > 「把 ComfyUI 里调好的工作流用『导出 (API)』存成 JSON，把文件路径或内容发我。」
 
-**改之前先读 `references/WORKFLOW.md`**，那里写了占位符语法、哪些节点该暴露、常见错误。
+拿到之后，先自己读一遍 JSON：顶层是 `节点 id → { class_type, inputs }` 才算 API 格式（不是 `nodes` / `links` 那种界面格式）。
 
-拿到 JSON 后：
+然后按 `references/WORKFLOW.md` 改：
 
-- 要暴露的参数写成 `{{名字:默认值}}`，例如 `"steps": "{{steps:28}}"`、`"cfg": "{{cfg:6.5}}"`
+- 要暴露的值写成 `{{名字:默认值}}`，例如 `"steps": "{{steps:28}}"`、`"cfg": "{{cfg:6.5}}"`
 - `{{prompt}}`、`{{width}}`、`{{height}}` 保留（这三个由代码填）
 - 检查点写成 `{{ckpt:D:\models\xxx.safetensors}}`
 
@@ -68,12 +76,11 @@ node manga.mjs workflow save ./moss.api.json
 node manga.mjs workflow check
 ```
 
-## 6. 确认工作流里哪些值需要可编辑
+## 6. 推荐可调参数
 
-问用户：
+看过 JSON 之后才做这一步，因为是照着里面的节点提建议，不是让用户凭空列举。
 
-> 「这个工作流里，哪些值你希望每次出图都能调？比如步数、CFG、采样器、LoRA、检查点。
-> 列出来的我做成可填参数，其余的固定在工作流里。」
+> 「这个工作流里有：检查点 / 步数 / CFG / 采样器 / LoRA / 尺寸……我建议把 A、B、C 做成可填，其余固定在工作流里，行吗？」
 
 按回答把对应字段改成占位符，再 `workflow check` 确认。
 

@@ -1,8 +1,8 @@
 # moss-manga
 
-用本地 ComfyUI（MOSS 模型）出图的漫画工作台：AI 写分镜、编译成 Layout JSON、出图、网页里改完再出。
-
-零依赖，Node 22+ 即可运行。
+- 使用 MOSS Image 创作生成漫画的工作台，可以由 Agent 生成漫画并手动调整生成的内容。
+- 项目未添加任何依赖，所有都通过原生JS实现，方便 Agent 对项目进行修改。
+- 项目目前在探索阶段，一些文档和提示词编辑方式完全由作者总结而出，有些地方可能不够理想，欢迎实践后提交 PR 让生图体验更好更稳定。有任何关于项目的问题、想要的功能、经验分享可以加群：1082160486
 
 ## 特点
 
@@ -31,7 +31,6 @@ manga.mjs        入口
 config/          配置：类型、词表、句式、工作流、生图参数
 data/            作品：项目、页面、图片
 core/            引擎：坐标换算、编译、校验、占位符
-defaults/        配置的出厂默认值
 scripts/         命令行
 web/             网页编辑器
 references/      格式、命令、工作流、漫画技巧
@@ -41,15 +40,15 @@ AGENT.md         工作手册（画画流程与约定）
 
 ## 文档
 
-| 需要什么 | 看哪里 |
-|---|---|
-| 安装 | `INSTALL.md` |
-| 画一页的流程 | `AGENT.md` |
-| 页面 JSON 与坐标 | `references/FORMAT.md` |
-| 命令参数 | `references/CLI.md` |
-| ComfyUI 工作流与占位符 | `references/WORKFLOW.md` |
-| 分镜版式、节奏、人物、背景 | `references/TECHNIQUES.md` |
-| MOSS 官方 Layout JSON 规范 | `references/LAYOUT.md` |
+| 需要什么                                             | 看哪里                     |
+| ---------------------------------------------------- | -------------------------- |
+| 安装                                                 | `INSTALL.md`               |
+| 画一页的流程                                         | `AGENT.md`                 |
+| 页面 JSON 与坐标                                     | `references/FORMAT.md`     |
+| 命令参数                                             | `references/CLI.md`        |
+| ComfyUI 工作流与占位符                               | `references/WORKFLOW.md`   |
+| 分镜版式、节奏、人物、背景                           | `references/TECHNIQUES.md` |
+| MOSS 官方 Layout JSON 规范（一般情况不用读这个文档） | `references/MOSSS_LAYOUT.md` |
 
 ## 常用命令
 

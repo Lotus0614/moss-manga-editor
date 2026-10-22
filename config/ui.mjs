@@ -2,48 +2,50 @@
 // 属于「漫画方言」的一部分，换展示习惯就改这个文件。
 
 import { ITEM_TYPES } from '../core/runtime.mjs';
-import {
-  PANEL_SHAPES,
-  FRAME_STYLES,
-  CAMERAS,
-  STYLE_PRESETS,
-  READING_ORDERS,
-  BUBBLE_TYPES,
-  TAIL_DIRECTIONS,
-} from './prompts.mjs';
+import { prompts } from './prompts.mjs';
 
-const names = (obj) => Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, v.name || k]));
+/** 一张词表 → { 值: 显示名 }。数组按 key 取，对象按 name 取 */
+function options(source) {
+  if (Array.isArray(source)) return Object.fromEntries(source.map((v) => [v.key ?? v.id, v.name ?? v.key]));
+  return Object.fromEntries(Object.entries(source || {}).map(([k, v]) => [k, (v && v.name) || k]));
+}
 
-/** 枚举词表：字段声明里的 options 指向这里 */
+/**
+ * 枚举词表：字段声明里的 options 写这里的键，与 prompts.mjs 聚合对象的键一一对应。
+ * prompts.mjs 里新加一张表（并挂到 prompts 聚合导出上），这里自动认得。
+ */
 export const ENUM_SOURCES = {
-  PANEL_SHAPES: names(PANEL_SHAPES),
-  FRAME_STYLES: names(FRAME_STYLES),
-  CAMERAS: names(CAMERAS),
-  STYLE_PRESETS: names(STYLE_PRESETS),
-  READING_ORDERS: names(READING_ORDERS),
-  BUBBLE_TYPES: Object.fromEntries(BUBBLE_TYPES.map((b) => [b.key, b.name])),
-  TAIL_DIRECTIONS: {
+  ...Object.fromEntries(
+    Object.entries(prompts)
+      .filter(([key]) => key !== 'snippets')
+      .map(([key, table]) => [key, options(table)])
+  ),
+  // 尾巴方向在 prompts.mjs 里存的是英文短语，这里换成中文选项
+  tailDirections: {
     none: '无尾巴',
     'down-left': '左下',
-    down: '下',
+    down: '正下',
     'down-right': '右下',
-    left: '左',
-    right: '右',
+    left: '正左',
+    right: '正右',
     'up-left': '左上',
-    up: '上',
+    up: '正上',
     'up-right': '右上',
   },
-  MOSS_LABELS: { object: 'object', character: 'character', text: 'text' },
+  mossLabels: { object: 'object', character: 'character', text: 'text' },
 };
 
 export function enumOptions(name) {
-  return ENUM_SOURCES[name] || {};
+  const key = String(name ?? '');
+  if (ENUM_SOURCES[key]) return ENUM_SOURCES[key];
+  const hit = Object.keys(ENUM_SOURCES).find((k) => k.toLowerCase() === key.toLowerCase());
+  return hit ? ENUM_SOURCES[hit] : {};
 }
 
 /** 页面级字段（右栏表单用） */
 export const PAGE_FIELDS = [
-  { key: 'reading', type: 'enum', label: '阅读顺序', options: 'READING_ORDERS' },
-  { key: 'style', type: 'enum', label: '画风', options: 'STYLE_PRESETS' },
+  { key: 'reading', type: 'enum', label: '阅读顺序', options: 'readingOrders' },
+  { key: 'style', type: 'enum', label: '画风', options: 'stylePresets' },
   { key: 'vertical', type: 'bool', label: '全局竖排' },
   { key: 'scene', type: 'text', label: '场景' },
   { key: 'note', type: 'text', label: '补充说明' },
@@ -67,7 +69,7 @@ export function labelOf(item, index = 0) {
     const raw = item[f.key];
     if (raw === undefined || raw === null || raw === '') continue;
     if (Array.isArray(raw) && !raw.length) continue;
-    parts.push(f.type === 'enum' ? ENUM_SOURCES[f.options]?.[raw] ?? raw : String(raw));
+    parts.push(f.type === 'enum' ? enumOptions(f.options)[raw] ?? raw : String(raw));
   }
   const head = type.label + (item.type === 'panel' ? index + 1 : '');
   return parts.length ? head + ' · ' + parts.join(' / ') : head;

@@ -55,10 +55,12 @@ node manga.mjs doctor          # 应该显示 ComfyUI 可连
 
 > 「把 ComfyUI 里调好的工作流用『导出 (API)』存成 JSON，把文件路径或内容发我。」
 
-拿到后由你（AI）改写：
+**改之前先读 `references/WORKFLOW.md`**，那里写了占位符语法、哪些节点该暴露、常见错误。
+
+拿到 JSON 后：
 
 - 要暴露的参数写成 `{{名字:默认值}}`，例如 `"steps": "{{steps:28}}"`、`"cfg": "{{cfg:6.5}}"`
-- 必须保留 `{{prompt}}`、`{{width}}`、`{{height}}`（这三个由代码填）
+- `{{prompt}}`、`{{width}}`、`{{height}}` 保留（这三个由代码填）
 - 检查点写成 `{{ckpt:D:\models\xxx.safetensors}}`
 
 ```bash
@@ -66,17 +68,16 @@ node manga.mjs workflow save ./moss.api.json
 node manga.mjs workflow check
 ```
 
-## 6. 问默认值（一次问完）
+## 6. 确认工作流里哪些值需要可编辑
 
-> 「定几个默认值，之后新建页面都用它（以后也能在项目设置里改）：
-> ① 阅读顺序：右→左还是左→右？
-> ② 画风：黑白网点 / 彩色 / 线稿？
-> ③ 文字：竖排还是横排？
-> ④ 画布尺寸：768×1280 还是别的（16 的倍数）？」
+问用户：
 
-```bash
-node manga.mjs config set defaults.reading=rtl defaults.style=mono defaults.vertical=true "defaults.canvas=[768,1280]"
-```
+> 「这个工作流里，哪些值你希望每次出图都能调？比如步数、CFG、采样器、LoRA、检查点。
+> 列出来的我做成可填参数，其余的固定在工作流里。」
+
+按回答把对应字段改成占位符，再 `workflow check` 确认。
+
+`config/config.json` 的 `params` 里会保存这些值，网页的设置页也能改。
 
 ## 7. 收尾：让用户选怎么开始
 

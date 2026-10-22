@@ -3,12 +3,14 @@
 // 位置固定（默认 ~/.moss-manga，MOSS_CONFIG 可覆盖），工作流也在配置根下。
 // 存档（项目/图片/state/journal）是另一棵树，默认 <配置根>/archive。
 
-import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { now } from '../../core/manga-doc.mjs';
 
-export const DEFAULT_CONFIG_DIR = join(homedir(), '.moss-manga');
+// 仓库根 = workspace 根：本文件在 <root>/scripts/lib/，上三级就是 root
+export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+export const DEFAULT_CONFIG_DIR = join(ROOT, 'config');
 
 export function resolveConfigDir(dir) {
   const picked = dir || process.env.MOSS_CONFIG || DEFAULT_CONFIG_DIR;
@@ -19,7 +21,7 @@ export function resolveArchiveDir(config, override) {
   if (override) return resolve(override);
   if (process.env.MOSS_ARCHIVE) return resolve(process.env.MOSS_ARCHIVE);
   if (config?.archive) return resolve(config.archive);
-  return join(resolveConfigDir(process.env.MOSS_CONFIG), 'archive');
+  return join(ROOT, 'data');
 }
 
 export function defaultConfig() {

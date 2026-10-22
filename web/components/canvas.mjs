@@ -81,14 +81,23 @@ function horizontalLines(text, bbox, fs) {
   return shown.map((line, i) => ({ x: (x1 + x2) / 2, y: startY + i * fs * 1.35, text: line }));
 }
 
+function typeColor(name) {
+  let hash = 0;
+  for (const ch of String(name || '')) hash = (hash * 31 + ch.codePointAt(0)) % 997;
+  const hue = Math.round((hash * 137.508) % 360);
+  return { fill: 'hsla(' + hue + ', 45%, 88%, 0.85)', stroke: 'hsl(' + hue + ', 40%, 42%)' };
+}
+
 function ItemBox({ item, page, index, selected, onSelect, onDragStart, onBegin }) {
   const [x1, y1, x2, y2] = item.bbox;
   const w = Math.max(0, x2 - x1);
   const h = Math.max(0, y2 - y1);
   const isBubble = item.type === 'bubble';
   const isNative = item.type === 'native';
+  const color = typeColor(item.type);
 
-  const label = isBubble
+  const label = item.showLabel === false ? '' :
+    isBubble
     ? `【${BUBBLE_LABEL[item.kind] || item.kind}】`
     : isNative
       ? `原生 · ${item.label}`
@@ -104,6 +113,7 @@ function ItemBox({ item, page, index, selected, onSelect, onDragStart, onBegin }
 
   return html`<g>
     <rect
+      style=${'fill:' + color.fill + ';stroke:' + color.stroke}
       class=${`item-box ${item.type} ${selected ? 'sel' : ''}`}
       x=${x1}
       y=${y1}

@@ -15,6 +15,7 @@ import {
   bboxCenter,
 } from './manga-doc.mjs';
 import { ITEM_TYPE_MAP } from './registry.mjs';
+import { PROMPT_SNIPPETS as S, fillSnippet as fill } from './prompt-templates.mjs';
 import { validatePage } from './validate.mjs';
 
 export function compilePage(page, ctx = {}) {
@@ -88,18 +89,14 @@ function buildSummary(page, panels, bubbles, style, ctx) {
   const order = READING_ORDERS[page.reading] || READING_ORDERS.rtl;
 
   if (panels.length > 0) {
-    parts.push(`The page is divided into ${panels.length} ${panels.length === 1 ? 'panel' : 'panels'}. ${order.phrase}`);
+    parts.push(fill(S.panelCount, { n: panels.length, panels: panels.length === 1 ? 'panel' : 'panels', order: order.phrase }));
   }
 
   if (bubbles.length > 0) {
-    parts.push(
-      `This page has exactly ${panels.length} panel${panels.length === 1 ? '' : 's'} and exactly ${bubbles.length} text element${bubbles.length === 1 ? '' : 's'}. Render ONLY the text listed below, with the exact wording given. Do NOT invent any additional dialogue, speech bubble, caption, sound effect or lettering, and do not fill empty space with text — any text that is not listed is an error.`
-    );
-    parts.push(
-      'Dialogue uses white speech bubbles with tails, thoughts use white cloud bubbles with no tail, and narration is bare lettering printed directly on the artwork with no bubble, no box and no background.'
-    );
+    parts.push(fill(S.textLock, { panels: panels.length, texts: bubbles.length }));
+    parts.push(S.bubbleRule);
   } else {
-    parts.push('This page contains NO lettering at all: no speech bubbles, no captions, no sound effects, no text of any kind.');
+    parts.push(S.noLettering);
   }
 
   const characterText = (ctx.characterText || '').trim();
@@ -144,7 +141,8 @@ function locateInPanel(item, panels, no) {
   if (!chosen) return '';
   const [x1, y1, x2, y2] = chosen.bbox;
   const fully = bx1 >= x1 - 2 && bx2 <= x2 + 2 && by1 >= y1 - 2 && by2 <= y2 + 2;
-  return `${fully ? 'inside' : 'at the edge of'} PANEL ${no.get(chosen.id) || '?'}`;
+  const snippet = fully ? S.panelInside : S.panelEdge;
+  return fill(snippet, { n: no.get(chosen.id) || '?' });
 }
 
 function placementWord(bbox, size) {
@@ -153,10 +151,10 @@ function placementWord(bbox, size) {
   const ry = cy / size.height;
   const vertical = ry < 0.34 ? 'upper' : ry > 0.66 ? 'lower' : 'middle';
   const horizontal = rx < 0.34 ? 'left' : rx > 0.66 ? 'right' : 'centre';
-  return `${vertical} ${horizontal} area of the page`;
+  return fill(S.placement, { area: vertical + ' ' + horizontal });
 }
 
 /** 只描述方向，不算列数/字数、不提字号（报数字会让模型把框画歪） */
 function textLayout(_bubble, vertical) {
-  return vertical ? 'vertical lettering, columns read right to left' : 'horizontal lettering';
+  return vertical ? S.textVertical : S.textHorizontal;
 }

@@ -596,16 +596,38 @@ async function cmdServe() {
 }
 
 async function cmdStop() {
-  const pidFile = join(DIR, 'server.pid');
-  if (!existsSync(pidFile)) return out({ ok: true, running: false }, '预览服务没有在跑');
-  const pid = Number((await readFile(pidFile, 'utf8')).trim());
-  try {
-    process.kill(pid);
-  } catch {
-    /* 已经没了 */
+  // 按端口找进程：不依赖 pid 文件，start.bat / serve / node server.mjs 都能关
+  const port = Number(flags.port || 5123);
+  const pids = await pidsOnPort(port);
+  if (!pids.length) {
+    await rm(join(DIR, 'server.pid'), { force: true });
+    return out({ ok: true, running: false }, '预览服务没有在跑');
   }
-  await rm(pidFile, { force: true });
-  out({ ok: true, running: false }, '预览服务已关闭');
+  for (const pid of pids) {
+    try {
+      process.kill(pid);
+    } catch {
+      /* 已经没了 */
+    }
+  }
+  await rm(join(DIR, 'server.pid'), { force: true });
+  out({ ok: true, running: false, port }, `预览服务已关闭（端口 ${port}）`);
+}
+
+/** 查某个端口上的监听进程（Windows / *nix） */
+async function pidsOnPort(port) {
+  try {
+    if (process.platform === 'win32') {
+      const { execSync } = await import('node:child_process');
+      const text = execSync(`netstat -ano | findstr :${port}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+      return [...new Set(text.split('\n').map((l) => l.trim().split(/\s+/).pop()).filter((v) => /^\d+$/.test(v)))].map(Number);
+    }
+    const { execSync } = await import('node:child_process');
+    const text = execSync(`lsof -ti :${port}`, { encoding: 'utf8' });
+    return text.split('\n').map((v) => Number(v.trim())).filter(Boolean);
+  } catch {
+    return [];
+  }
 }
 
 async function cmdOpen() {

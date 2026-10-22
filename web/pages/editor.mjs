@@ -18,7 +18,8 @@ import {
 
 } from '../lib.mjs';
 import Canvas from '../components/canvas.mjs';
-import { PageInspector, ItemInspector } from '../components/page-inspector.mjs';
+import PagePanel from '../components/page-panel.mjs';
+import { ItemInspector } from '../components/page-inspector.mjs';
 import { PromptPanel, HistoryPanel, ChangesPanel } from '../components/workbench.mjs';
 import { exportLongImage, exportPdf } from '../components/export.mjs';
 import { compilePage } from '../../core/compile.mjs';
@@ -518,7 +519,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         />
       </div>
 
-      <div class="canvas-ctrl bottom" style=${`bottom:${dockCollapsed ? 44 : 250}px`}>
+      <div class="canvas-ctrl bottom" style=${`bottom:${dockCollapsed ? 46 : 284}px`}>
         <button class="btn" onClick=${() => addItem('panel')}>面板</button>
         <button class="btn" onClick=${() => addItem('bubble')}>气泡</button>
         <button class="btn" onClick=${() => addItem('native')}>原生</button>
@@ -571,7 +572,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
             onBack=${() => setSelection(null)}
             onCopy=${copySelected}
           />`
-        : html`<${PageInspector} page=${page} mutate=${mutate} setSelection=${setSelection} addItem=${addItem} />`}</div>
+        : html`<${PagePanel} page=${page} mutate=${mutate} setSelection=${setSelection} />`}</div>
     </aside>
 
     ${showExport

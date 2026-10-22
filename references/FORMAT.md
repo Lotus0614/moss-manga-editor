@@ -17,7 +17,8 @@ data    默认 config/archive（config.archive 或 --dir 可改）
     └── images/<sha256>.png
 ```
 
-> MOSS 原生格式的完整字段白名单、canvas/tags/palette 用法与坐标换算，见 eferences/LAYOUT.md。
+> MOSS 原生格式的完整字段白名单、canvas/tags/palette 用法与坐标换算，见 
+eferences/LAYOUT.md。
 
 ## 页面只有一个数组：items
 

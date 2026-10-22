@@ -7,7 +7,7 @@
 
 import { PANEL_SHAPES, FRAME_STYLES, CAMERAS, READING_ORDERS, STYLE_PRESETS } from './manga-doc.mjs';
 import { bubblePhrase, BUBBLE_TYPES } from './bubbles.mjs';
-import { PROMPT_SNIPPETS as S } from './prompt-templates.mjs';
+import { PROMPT_SNIPPETS as S } from '../config/prompts.mjs';
 import { T } from './templates-store.mjs';
 
 import defaultTypes from '../config/types.mjs';

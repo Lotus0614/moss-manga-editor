@@ -3,7 +3,7 @@
 // 各模块 import 的是这里导出的对象引用，所以 applyTemplates() 改了内容，
 // 编译器和注册表立刻看到新值——不用改任何 import。
 
-import * as defaults from './prompt-templates.mjs';
+import * as defaults from '../config/prompts.mjs';
 
 export const T = {
   panelShapes: defaults.PANEL_SHAPES,

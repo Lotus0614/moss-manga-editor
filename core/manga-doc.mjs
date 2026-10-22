@@ -20,8 +20,8 @@ export const SIZE_PRESETS = {
 
 export const ITEM_TYPES = ['panel', 'bubble', 'native'];
 
-// 提示词措辞全部来自 prompt-templates.mjs —— 改生成效果去改那个文件
-import { PANEL_SHAPES, FRAME_STYLES, CAMERAS, STYLE_PRESETS, READING_ORDERS } from './prompt-templates.mjs';
+// 词表来自 config/prompts.mjs
+import { PANEL_SHAPES, FRAME_STYLES, CAMERAS, STYLE_PRESETS, READING_ORDERS } from '../config/prompts.mjs';
 export { PANEL_SHAPES, FRAME_STYLES, CAMERAS, STYLE_PRESETS, READING_ORDERS };
 // ---------------------------------------------------------------- 基础工具
 

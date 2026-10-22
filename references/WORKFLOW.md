@@ -72,21 +72,38 @@ default.json：7 个节点
 - 提供了没用的占位符没关系；用了没提供的会报错并列出已知参数
 - **连线值不能改**：`"clip": ["1", 1]` 是「节点 1 的第 1 个输出」，不是文本
 
-## 自动可用的参数
+## 参数怎么来
 
-不用自己算，`render` 会自动填：
+**没有参数白名单。** 工作流里写什么占位符，就是什么参数。
+
+**代码自动填的四个**（不要写进表单，也不用配）：
 
 | 占位符 | 来源 |
 |---|---|
-| `{{prompt}}` | 编译出的 Moss Layout JSON（单行） |
-| `{{negative}}` | `defaults.negative` |
+| `{{prompt}}` | 页面编译出的 Moss Layout JSON |
 | `{{width}}` `{{height}}` | 页面尺寸 |
-| `{{seed}}` | `--seed`，否则 `defaults.seed`，否则随机（一定显式记录） |
-| `{{steps}}` `{{cfg}}` `{{sampler}}` `{{scheduler}}` | `defaults.*` 或命令行 |
-| `{{ckpt}}` | `defaults.ckpt`（必须填） |
-| `{{lora_name}}` `{{lora_strength}}` | 从 `defaults.lora` 或 `--lora` 解析第一条 |
-| `{{batch_size}}` | 1 |
+| `{{seed}}` | 每次随机（`--seed 42` 才固定） |
 
+**其余全部由用户填**，写在占位符的默认值里：
+
+```jsonc
+"steps": "{{steps:30}}",
+"cfg": "{{cfg:6.5}}",
+"sampler_name": "{{sampler:dpmpp_2m}}",
+"lora_data": "{{lora_data:<lora:moss\\khn:0.8>}}"
+```
+
+- 语法 `{{名字:默认值}}`，只按**第一个 `:`** 切分，所以 lora 串里的冒号不受影响
+- 默认值按字面量推断类型：`30` → 数字、`true` → 布尔、其它字符串
+- `workflow save` 会把默认值抄进 `config.params`，配置里因此自带一份可读的默认
+- 取值优先级：**项目 params > 全局 params > 占位符默认值**
+- 不写默认值也行（`{{steps}}`），那样就必须有人填，否则报错
+
+改值：
+
+```bash
+manga config set params.steps=24 'params.lora_data=<lora:moss\khn:0.9>'
+```
 ## 报错对照
 
 | 报错 | 原因 | 处理 |
@@ -94,7 +111,7 @@ default.json：7 个节点
 | `连不上 ComfyUI` | 地址错、ComfyUI 没开、端口不是 8188 | 先 `doctor`，确认 URL |
 | `工作流节点错误：...` | 缺自定义节点、模型文件不在、枚举值不支持 | 在 ComfyUI 里手动跑一次同样的工作流 |
 | `工作流里有未提供的占位符 {{x}}` | 图里写了占位符但没对应值 | 改成已有参数名，或删掉占位符 |
-| `还没有设置检查点 ckpt` | `defaults.ckpt` 为空 | `manga config set defaults.ckpt <文件名>` |
+| `需要参数 {{ckpt}}，但没有值也没有默认值` | 工作流要 ckpt 但没人填 | `manga config set params.ckpt=<文件名>` |
 | `这一页还有错误：...` | 页面内容过不了校验 | `manga compile --page N` 看具体哪条 |
 | `等待生成结果超时` | 图太大/步数太高 | `comfy.timeoutMs` 调大，或 `--steps` 降低 |
 

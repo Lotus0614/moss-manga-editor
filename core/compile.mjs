@@ -17,6 +17,7 @@ import {
 import { ITEM_TYPE_MAP } from './registry.mjs';
 import { PROMPT_SNIPPETS as S, fillSnippet as fill } from './prompt-templates.mjs';
 import { T } from './templates-store.mjs';
+import { bubblePhrase } from './bubbles.mjs';
 import { validatePage } from './validate.mjs';
 
 export function compilePage(page, ctx = {}) {
@@ -31,6 +32,8 @@ export function compilePage(page, ctx = {}) {
   const no = new Map(readingOrderOf(page).map((p, i) => [p.id, i + 1]));
 
   const typeCtx = {
+    t: T,
+    bubblePhrase,
     page,
     size,
     guard,

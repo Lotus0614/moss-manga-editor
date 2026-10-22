@@ -134,6 +134,10 @@ export function createNativeItem(patch = {}) {
 }
 
 export function createItem(type = 'panel', patch = {}) {
+  if (type && typeof type === 'object') {
+    patch = type;
+    type = patch.type || 'panel';
+  }
   if (type === 'bubble') return createBubbleItem(patch);
   if (type === 'native') return createNativeItem(patch);
   return createPanelItem(patch);

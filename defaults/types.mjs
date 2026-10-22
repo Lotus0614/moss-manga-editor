@@ -3,10 +3,8 @@
 // 必须按这个格式导出：一个数组，每项 { key, label, fields, compile }。
 // compile({ item, ctx }) 返回 { label, caption, text?, tags?, palette? }，不要给 bbox（核心会补）。
 
-import { bubblePhrase } from '../core/bubbles.mjs';
-import { T } from '../core/templates-store.mjs';
-
-const phraseOf = (item, field) => (T[field] || {})[item[field]]?.phrase || '';
+// 不 import 任何东西：词表和气泡短语都由编译器通过 ctx 传进来，复制到任何目录都能用。
+const phraseOf = (ctx, item, field) => (ctx.t?.[field] || {})[item[field]]?.phrase || '';
 
 export default [
   {
@@ -21,12 +19,12 @@ export default [
       { key: 'palette', type: 'palette', label: 'palette' },
     ],
     compile({ item, ctx }) {
-      const parts = [phraseOf(item, 'panelShapes')];
-      if (!String(item.shape || '').startsWith('bleed')) parts.push(phraseOf(item, 'frameStyles'));
-      if (item.camera) parts.push(phraseOf(item, 'cameras'));
+      const parts = [phraseOf(ctx, item, 'panelShapes')];
+      if (!String(item.shape || '').startsWith('bleed')) parts.push(phraseOf(ctx, item, 'frameStyles'));
+      if (item.camera) parts.push(phraseOf(ctx, item, 'cameras'));
       const body = (item.caption || '').trim();
       const tag = ctx.number ? 'PANEL ' + ctx.number : '';
-      const sn = T.snippets || {};
+      const sn = ctx.t?.snippets || {};
       if (body || tag) parts.push((sn.boxPrefix || 'This box contains only:') + ' ' + [tag, body].filter(Boolean).join(', '));
       if (ctx.guard) parts.push(ctx.guard);
       return { label: 'object', caption: parts.filter(Boolean).join(', ') };
@@ -44,7 +42,7 @@ export default [
       { key: 'palette', type: 'palette', label: 'palette' },
     ],
     compile({ item, ctx }) {
-      const parts = [bubblePhrase(item)];
+      const parts = [ctx.bubblePhrase(item)];
       const where = ctx.locate(item);
       if (where) parts.push(where);
       if (item.caption) parts.push(String(item.caption));

@@ -8,7 +8,7 @@
 import { pageSize, toMoss } from './manga-doc.mjs';
 import { ITEM_TYPES, getBuildSummary } from './registry.mjs';
 import { T } from './templates-store.mjs';
-import { buildSummary as defaultBuildSummary } from '../defaults/types.mjs';
+import { buildSummary as defaultBuildSummary } from '../config/types.mjs';
 import { validatePage } from './validate.mjs';
 
 export function compilePage(page, opts = {}) {

@@ -10,7 +10,7 @@ import { bubblePhrase, BUBBLE_TYPES } from './bubbles.mjs';
 import { PROMPT_SNIPPETS as S } from './prompt-templates.mjs';
 import { T } from './templates-store.mjs';
 
-import defaultTypes from '../defaults/types.mjs';
+import defaultTypes from '../config/types.mjs';
 
 /** 运行时可替换的类型表：配置文件覆盖后立即生效 */
 export let ITEM_TYPES = defaultTypes;

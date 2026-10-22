@@ -1,2 +1,2 @@
-﻿// core 不再持有气泡文案：全部内容在 defaults/bubbles.mjs。
-export * from '../defaults/bubbles.mjs';
+﻿// 气泡文案在 config/bubbles.mjs。
+export * from '../config/bubbles.mjs';

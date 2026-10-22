@@ -19,15 +19,13 @@ export const types = [
       { key: 'camera', type: 'enum', label: '机位', options: 'cameras', default: 'medium', canvas: true },
       { key: 'shape', type: 'enum', label: '形状', options: 'panelShapes', default: 'rect', canvas: true },
       { key: 'frame', type: 'enum', label: '边框', options: 'frameStyles', default: 'border' },
-      { key: 'overlay', type: 'bool', label: '叠在其它面板之上' },
       { key: 'tags', type: 'tags', label: 'tags' },
       { key: 'palette', type: 'palette', label: 'palette' },
     ],
     compile({ item, page }) {
       const guard = (prompts.stylePresets[page.style] || {}).guard || '';
       const parts = [prompts.panelShapes[item.shape]?.phrase];
-      parts.push(prompts.frameStyles[item.frame]?.phrase);
-      if (item.overlay) parts.push('this panel overlaps the panels beneath it');
+      if (!String(item.shape || '').startsWith('bleed')) parts.push(prompts.frameStyles[item.frame]?.phrase);
       if (item.camera) parts.push(prompts.cameras[item.camera]?.phrase);
       const n = panelNumber(page, item, types);
       const body = (item.caption || '').trim();

@@ -1,5 +1,6 @@
 node_modules/
 data/
-config/
+config/config.json
+config/prompt-templates.json
 *.tmp
 .DS_Store

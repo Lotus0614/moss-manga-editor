@@ -11,8 +11,12 @@ export const PANEL_SHAPES = {
   rect: { name: '矩形', phrase: 'rectangular panel with straight edges' },
   'slant-top': { name: '斜切上边', phrase: 'trapezoid panel with a slanted top edge cutting diagonally' },
   'slant-side': { name: '斜切侧边', phrase: 'panel with a sharply angled slanted side edge' },
+  'bleed-top': { name: '出血·上', phrase: 'panel bleeding off the TOP edge of the page, no border' },
+  'bleed-bottom': { name: '出血·下', phrase: 'panel bleeding off the BOTTOM edge of the page, no border' },
+  'bleed-left': { name: '出血·左', phrase: 'panel bleeding off the LEFT edge of the page, no border' },
+  'bleed-right': { name: '出血·右', phrase: 'panel bleeding off the RIGHT edge of the page, no border' },
+  'bleed-all': { name: '满版', phrase: 'full-bleed panel covering the whole page, no border, artwork running off all four edges' },
   circle: { name: '圆形', phrase: 'circular panel with a clean round border' },
-  free: { name: '无框', phrase: 'panel with no visible border, artwork blending into the page' },
 };
 
 /** 边框 */

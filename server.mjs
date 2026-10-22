@@ -371,8 +371,8 @@ async function route(req, res, url) {
     return sendFile(res, join(ARCHIVE, 'projects', slug, 'images', file));
   }
 
-  if (path.startsWith('/defaults/')) {
-    return sendFile(res, resolve(join(WEB, '..', 'defaults', safe(path.slice(10)))), 'text/javascript; charset=utf-8');
+  if (path.startsWith('/config/')) {
+    return sendFile(res, resolve(join(WEB, '..', 'config', safe(path.slice(8)))), 'text/javascript; charset=utf-8');
   }
 
   if (path.startsWith('/core/')) {

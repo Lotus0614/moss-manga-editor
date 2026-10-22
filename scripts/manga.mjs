@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { loadTemplates, exportTemplates, loadTypes, exportTypes } from './lib/templates.mjs';
+import { loadTemplates, loadTypes } from './lib/templates.mjs';
 // moss-manga CLI —— Agent 操作漫画存档的唯一入口。
 //
 //   node scripts/manga.mjs doctor
@@ -226,7 +226,6 @@ async function cmdDoctor() {
 }
 
 async function cmdInit() {
-  await exportTypes(CONFIG_DIR, { force: Boolean(flags.force) });
   await ensureConfig(CONFIG_DIR);
   await ensureArchive(DIR);
   const patch = {};

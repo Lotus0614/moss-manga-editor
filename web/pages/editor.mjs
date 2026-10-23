@@ -1,4 +1,4 @@
-﻿// 编辑页：左页序 / 中画布 + 工作台 / 右属性面板。
+// 编辑页：左页序 / 中画布 + 工作台 / 右属性面板。
 // 页面是单层 items；快捷键 Delete 删除、Ctrl+C/V 复制粘贴、Ctrl+Z 撤销。
 
 import {
@@ -50,7 +50,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const [showBoxes, setShowBoxes] = useState(true);
   const [dockCollapsed, setDockCollapsed] = useState(false);
   const [grid, setGrid] = useState(4);
-  const [opacity, setOpacity] = useState(0.55);
+  const [opacity, setOpacity] = useState(1);
   const [changes, setChanges] = useState(null);
   const [showExport, setShowExport] = useState(false);
   const [exporting, setExporting] = useState('');

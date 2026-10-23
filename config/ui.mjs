@@ -4,15 +4,13 @@
 import { ITEM_TYPES } from '../core/runtime.mjs';
 import { prompts } from './prompts.mjs';
 
-/** 一张词表 → { 值: 显示名 }。数组按 key 取，对象按 name 取 */
-function options(source) {
-  if (Array.isArray(source)) return Object.fromEntries(source.map((v) => [v.key ?? v.id, v.name ?? v.key]));
-  return Object.fromEntries(Object.entries(source || {}).map(([k, v]) => [k, (v && v.name) || k]));
-}
+/** 词表 { 值: { name, … } } → 下拉用 { 值: 显示名 } */
+const options = (table) =>
+  Object.fromEntries(Object.entries(table || {}).map(([key, entry]) => [key, (entry && entry.name) || key]));
 
 /**
  * 枚举词表：字段声明里的 options 写这里的键，与 prompts.mjs 聚合对象的键一一对应。
- * prompts.mjs 里新加一张表（并挂到 prompts 聚合导出上），这里自动认得。
+ * prompts.mjs 里所有表都是 { 值: { name, … } }，新加一张挂到 prompts 上，这里自动认得。
  */
 export const ENUM_SOURCES = {
   ...Object.fromEntries(
@@ -20,18 +18,7 @@ export const ENUM_SOURCES = {
       .filter(([key]) => key !== 'snippets')
       .map(([key, table]) => [key, options(table)])
   ),
-  // 尾巴方向在 prompts.mjs 里存的是英文短语，这里换成中文选项
-  tailDirections: {
-    none: '无尾巴',
-    'down-left': '左下',
-    down: '正下',
-    'down-right': '右下',
-    left: '正左',
-    right: '正右',
-    'up-left': '左上',
-    up: '正上',
-    'up-right': '右上',
-  },
+  // MOSS 原生 label 是格式固定项，不随提示词变，所以不在 prompts.mjs 里
   mossLabels: { object: 'object', character: 'character', text: 'text' },
 };
 

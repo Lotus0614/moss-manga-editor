@@ -269,11 +269,13 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
   "cameras":        { … },
   "stylePresets":   { "mono": { "phrase": "…", "guard": "…", "meta": [] } },
   "readingOrders":  { … },
-  "bubbleTypes":    [ { "key": "speech", "name": "对话", "phrase": "…", "tail": true } ],
-  "tailDirections": { … },
+  "bubbleTypes":    { "speech": { "id": "01", "name": "对话", "phrase": "…", "tail": true } },
+  "tailDirections": { "down-left": { "name": "左下", "phrase": "a short tapering tail pointing down-left" } },
   "snippets":       { "textLock": "…{panels}…{texts}…", "placement": "placed in the {area} area of the page" }
 }
 ```
+
+所有词表都是 `{ 值: { name, … } }`，`name` 就是右栏下拉里显示的字，加一项不用动代码。
 
 规则：
 

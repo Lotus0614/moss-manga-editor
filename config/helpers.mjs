@@ -77,23 +77,17 @@ export function textLayoutOf(page, item) {
 
 // ---------------------------------------------------------------- 气泡
 
-const byKey = (types) => Object.fromEntries((types || BUBBLE_TYPES).map((b) => [b.key, b]));
-
-export const BUBBLE_BY_KEY = byKey(BUBBLE_TYPES);
+/** 气泡类型表本身就是 { key: { … } }，直接按 key 取 */
+export const BUBBLE_BY_KEY = BUBBLE_TYPES;
 
 export function bubbleType(key) {
-  const map = byKey(prompts.bubbleTypes);
-  return map[key] || map.speech || BUBBLE_BY_KEY[key];
+  return BUBBLE_BY_KEY[key] || BUBBLE_BY_KEY.speech;
 }
 
 /** 一条文字项的形态描述（位置由类型自己的 compile 补） */
 export function bubblePhrase(bubble) {
   const t = bubbleType(bubble.kind);
   const parts = [t.phrase];
-  if (t.tail) {
-    const tail = bubble.tail;
-    if (!tail || tail === 'none') parts.push('NO tail because the speaker is off panel');
-    else parts.push(`a short tapering tail ${TAIL_DIRECTIONS[tail] || TAIL_DIRECTIONS['down-left']}`);
-  }
+  if (t.tail) parts.push((TAIL_DIRECTIONS[bubble.tail] || TAIL_DIRECTIONS['down-left']).phrase);
   return parts.join(', ');
 }

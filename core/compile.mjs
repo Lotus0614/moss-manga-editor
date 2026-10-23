@@ -7,14 +7,14 @@
 
 import { pageSize, toMoss } from './manga-doc.mjs';
 import { ITEM_TYPES, getBuildSummary } from './runtime.mjs';
-import { T } from './templates-store.mjs';
+import { prompts as defaultPrompts } from '../config/prompts.mjs';
 import { buildSummary as defaultBuildSummary } from '../config/types.mjs';
 import { validatePage } from './validate.mjs';
 
 export function compilePage(page, opts = {}) {
-  // 不给就退回到运行时表（CLI 启动时已按配置覆盖过）
+  // 调用方不给就退回配置里的词表与类型
   const types = opts.types || ITEM_TYPES;
-  const prompts = opts.prompts || T;
+  const prompts = opts.prompts || defaultPrompts;
   const buildSummary = opts.buildSummary || getBuildSummary() || defaultBuildSummary;
   const byKey = new Map(types.map((t) => [t.key, t]));
   const size = pageSize(page);

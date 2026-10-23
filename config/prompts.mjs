@@ -69,59 +69,58 @@ export const READING_ORDERS = {
   ltr: { name: '左 → 右（西式）', phrase: 'Panels are read LEFT TO RIGHT, top to bottom.' },
 };
 
-/** 八种文字载体：抄自模板文档 4.2 节，改错会让气泡画歪 */
-export const BUBBLE_TYPES = [
-  {
+/**
+ * 八种文字载体：抄自模板文档 4.2 节，改错会让气泡画歪。
+ * 键就是页面 item 上的 `kind`，id 是文档里的编号，只用来对照。
+ */
+export const BUBBLE_TYPES = {
+  speech: {
     id: '01',
-    key: 'speech',
     name: '对话',
     phrase: 'WHITE OVAL speech bubble, smooth even outline, thin black line',
     tail: true,
   },
-  { id: '02', key: 'shout', name: '喊叫', phrase: 'JAGGED EXPLOSIVE speech bubble with sharp spiky edges', tail: true },
-  {
+  shout: { id: '02', name: '喊叫', phrase: 'JAGGED EXPLOSIVE speech bubble with sharp spiky edges', tail: true },
+  whisper: {
     id: '03',
-    key: 'whisper',
     name: '小声',
     phrase: 'small round WHITE OVAL speech bubble, its tail made of three tiny circles trailing away in a line',
     tail: true,
   },
-  { id: '04', key: 'tremble', name: '颤抖', phrase: 'WHITE speech bubble with a SHAKY WAVY outline', tail: true },
-  {
+  tremble: { id: '04', name: '颤抖', phrase: 'WHITE speech bubble with a SHAKY WAVY outline', tail: true },
+  thought: {
     id: '05',
-    key: 'thought',
     name: '内心',
     phrase: 'WHITE CLOUD-shaped thought bubble, scalloped edge, thin black outline, NO tail',
     tail: false,
   },
-  { id: '06', key: 'heart', name: '心之声', phrase: 'speech bubble with a DASHED black outline, white interior, NO tail', tail: false },
-  {
+  heart: { id: '06', name: '心之声', phrase: 'speech bubble with a DASHED black outline, white interior, NO tail', tail: false },
+  narration: {
     id: '07',
-    key: 'narration',
     name: '旁白',
     phrase:
       'narration lettering printed DIRECTLY on the artwork, floating freely, no bubble, no box, no background, thin white outline only',
     tail: false,
   },
-  {
+  sfx: {
     id: '08',
-    key: 'sfx',
     name: '拟声词',
     phrase: 'hand-lettered sound effect, bold brush strokes, slightly rotated, thin white outline, no bubble',
     tail: false,
   },
-];
+};
 
-/** 尾巴方向 */
+/** 尾巴方向：phrase 是整段可拼的短语；none = 说话者不在画面 */
 export const TAIL_DIRECTIONS = {
-  'down-left': 'pointing down-left',
-  down: 'pointing straight down',
-  'down-right': 'pointing down-right',
-  left: 'pointing left',
-  right: 'pointing right',
-  'up-left': 'pointing up-left',
-  up: 'pointing straight up',
-  'up-right': 'pointing up-right',
+  none: { name: '无尾巴', phrase: 'NO tail because the speaker is off panel' },
+  'down-left': { name: '左下', phrase: 'a short tapering tail pointing down-left' },
+  down: { name: '正下', phrase: 'a short tapering tail pointing straight down' },
+  'down-right': { name: '右下', phrase: 'a short tapering tail pointing down-right' },
+  left: { name: '正左', phrase: 'a short tapering tail pointing left' },
+  right: { name: '正右', phrase: 'a short tapering tail pointing right' },
+  'up-left': { name: '左上', phrase: 'a short tapering tail pointing up-left' },
+  up: { name: '正上', phrase: 'a short tapering tail pointing straight up' },
+  'up-right': { name: '右上', phrase: 'a short tapering tail pointing up-right' },
 };
 
 // ---------------------------------------------------------------- 句子模板

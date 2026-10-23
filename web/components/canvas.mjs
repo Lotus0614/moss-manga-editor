@@ -11,41 +11,6 @@ import { html, useRef, useState, useEffect } from '../lib.mjs';
 const MIN_SIZE = 40;
 const SNAP = 6;
 
-const BUBBLE_LABEL = {
-  speech: '对话',
-  shout: '喊叫',
-  whisper: '小声',
-  tremble: '颤抖',
-  thought: '内心',
-  heart: '心之声',
-  narration: '旁白',
-  sfx: '拟声词',
-};
-
-const CAMERA_LABEL = {
-  eye: '平视',
-  high: '俯视',
-  low: '仰视',
-  wide: '全景',
-  medium: '中景',
-  close: '特写',
-  xclose: '大特写',
-  ots: '过肩',
-  dutch: '荷兰角',
-};
-
-const SHAPE_LABEL = {
-  rect: '矩形',
-  'slant-top': '斜切上',
-  'slant-side': '斜切侧',
-  'bleed-top': '出血上',
-  'bleed-bottom': '出血下',
-  'bleed-left': '出血左',
-  'bleed-right': '出血右',
-  'bleed-all': '满版',
-  circle: '圆形',
-};
-
 function isVertical(page, item) {
   if (typeof item.vertical === 'boolean') return item.vertical;
   return page.vertical !== false;

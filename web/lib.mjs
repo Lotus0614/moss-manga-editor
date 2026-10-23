@@ -148,56 +148,6 @@ export function formatTime(iso) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export const BUBBLE_LABELS = [
-  { key: 'speech', name: '对话', shape: 'oval' },
-  { key: 'shout', name: '喊叫', shape: 'burst' },
-  { key: 'whisper', name: '小声', shape: 'small' },
-  { key: 'tremble', name: '颤抖', shape: 'wavy' },
-  { key: 'thought', name: '内心', shape: 'cloud' },
-  { key: 'heart', name: '心之声', shape: 'dashed' },
-  { key: 'narration', name: '旁白', shape: 'bare' },
-  { key: 'sfx', name: '拟声词', shape: 'sfx' },
-];
-
-export const CAMERA_LABELS = [
-  ['eye', '平视'],
-  ['high', '俯视'],
-  ['low', '仰视'],
-  ['wide', '全景'],
-  ['medium', '中景'],
-  ['close', '特写'],
-  ['xclose', '大特写'],
-  ['ots', '过肩'],
-  ['dutch', '荷兰角'],
-];
-
-export const SHAPE_LABELS = [
-  ['rect', '矩形'],
-  ['slant-top', '斜切上'],
-  ['slant-side', '斜切侧'],
-  ['bleed-top', '出血上'],
-  ['bleed-bottom', '出血下'],
-  ['bleed-left', '出血左'],
-  ['bleed-right', '出血右'],
-  ['bleed-all', '满版'],
-  ['circle', '圆形'],
-];
-
-export const FRAME_LABELS = [
-  ['border', '描边'],
-  ['none', '无边'],
-  ['thick', '粗边'],
-];
-
-export const PRESET_LABELS = [
-  ['band-3', '三横带'],
-  ['band-4', '四横带'],
-  ['daily-5', '日常 5 带'],
-  ['split-2x2', '四宫格'],
-  ['climax', '高潮页'],
-  ['single', '整页一张'],
-];
-
 // ---------------------------------------------------------------- 极简全局状态
 // 只放「顶栏要显示什么」这类跨页面的少量数据，业务数据仍然由各页面自己持有。
 

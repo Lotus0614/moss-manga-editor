@@ -69,10 +69,13 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const [changes, setChanges] = useState(null);
   const [showExport, setShowExport] = useState(false);
   const [exporting, setExporting] = useState('');
+  // 外部改动来了但手上有未保存的编辑 → 先提示，不覆盖
+  const [external, setExternal] = useState('');
 
   const stageRef = useRef(null);
   const pageRef = useRef(null);
   const saveTimer = useRef(null);
+  const dirtyRef = useRef(false);
   const createdFirst = useRef(false);
   const history = useRef([]);
   const clipboard = useRef(null);
@@ -124,6 +127,8 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         setApp({ page: data.page });
         setSelection(null);
         history.current = [];
+        dirtyRef.current = false;
+        setExternal('');
       })
       .catch((err) => toast(err.message, 'bad'));
     return () => {
@@ -179,6 +184,36 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         toast(job.error || '生成失败', 'bad');
       }
     });
+
+    // 外部改动（CLI 出图、Agent 改页面 JSON）由服务器看目录后推过来
+    es.addEventListener('archive', (event) => {
+      let change;
+      try {
+        change = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      const items = (change.items || []).filter((item) => item.project === projectId);
+      if (!items.length) return;
+
+      const cur = pageRef.current;
+      const touchesPage = items.some(
+        (item) => item.kind === 'project' || item.kind === 'versions' || (item.kind === 'page' && item.page === cur?.id)
+      );
+      if (!touchesPage) {
+        refreshPages();
+        return;
+      }
+      // 手上有没保存的改动 / 正在拖：不覆盖，给个提示让人自己决定
+      if (dirtyRef.current || saveTimer.current) {
+        setExternal(change.at || '');
+        return;
+      }
+      setExternal('');
+      if (cur) reloadPage(cur.id);
+      refreshPages();
+    });
+
     return () => es.close();
   }, [projectId]);
 
@@ -235,6 +270,17 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
       .catch(() => {});
   }
 
+  /** 外部更新本来被未保存改动挡住了，用户点「刷新」= 放弃本地改动，拉最新的 */
+  function applyExternal() {
+    clearTimeout(saveTimer.current);
+    saveTimer.current = null;
+    dirtyRef.current = false;
+    setExternal('');
+    const cur = pageRef.current;
+    if (cur) reloadPage(cur.id);
+    refreshPages();
+  }
+
   /** selection 统一形状：{ kind, id, ids }，id 是主选中项，ids 是全部选中 */
   function select(next) {
     if (!next) return setSelection(null);
@@ -246,6 +292,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   function snapshot() {
     const cur = pageRef.current;
     if (!cur) return;
+    dirtyRef.current = true;
     const json = JSON.stringify(cur);
     if (history.current[history.current.length - 1] === json) return;
     history.current.push(json);
@@ -319,6 +366,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   }
 
   function scheduleSave() {
+    dirtyRef.current = true;
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(saveNow, 600);
   }
@@ -329,6 +377,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     try {
       const saved = await apiPut(`/api/projects/${projectId}/pages/${cur.id}`, { ...cur, replaceItems: true });
       pageRef.current = saved;
+      dirtyRef.current = false;
       setPage((prev) => (prev && prev.id === saved.id ? { ...prev, rev: saved.rev } : prev));
       refreshPages();
     } catch (err) {
@@ -514,6 +563,9 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
           : warns.length
             ? html`<span class="tag">${warns.length} 个提醒</span>`
             : null}
+        ${external
+          ? html`<button class="btn sm inv" title="外部改动了这一页，点这里拉最新版本" onClick=${applyExternal}>外部已更新 · 刷新</button>`
+          : null}
         <div class="spacer"></div>
         <label class="meta" style="display:flex;align-items:center;gap:5px" title="格子底色的不透明度，全站生效">
           底色

@@ -6,7 +6,7 @@
 // 不做 Agent、不做对话：改内容由用户点，或由外部 Agent 走 CLI。
 
 import { createServer } from 'node:http';
-import { createReadStream, existsSync } from 'node:fs';
+import { createReadStream, existsSync, watch } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, resolve, sep } from 'node:path';
 import { EventEmitter } from 'node:events';
@@ -48,6 +48,61 @@ const CORE = resolve(import.meta.dirname, 'core');
 const bus = new EventEmitter();
 bus.setMaxListeners(32);
 const jobs = [];
+
+// ---------------------------------------------------------------- 存档监听
+// CLI / Agent 直接改存档（写页面 JSON、出图）不会经过服务器，这里盯着目录，
+// 变了就通过 SSE 推给网页，省得手动刷新。
+
+const WATCH_DEBOUNCE = 300;
+const SELF_WRITE_WINDOW = 1200;
+let pendingChanges = new Map();
+let watchTimer = null;
+let selfWriteUntil = 0;
+
+/** 服务器自己发起的写（网页保存、网页出图）不应该再推回给网页 */
+function markSelfWrite() {
+  selfWriteUntil = Date.now() + SELF_WRITE_WINDOW;
+}
+
+/** 只关心页面、版本、图片、项目文件；日志/pid/日志滚动一律忽略 */
+function classifyPath(rel) {
+  const parts = String(rel).split(/[\\/]/).filter(Boolean);
+  if (parts[0] !== 'projects' || parts.length < 3) return null;
+  const project = parts[1];
+  const rest = parts[2];
+  if (rest === 'pages' && parts[3]) return { project, page: parts[3].replace(/\.json$/i, ''), kind: 'page' };
+  if (rest === 'versions.json') return { project, kind: 'versions' };
+  if (rest === 'versions' && parts[3]) return { project, kind: 'versions' };
+  if (rest === 'images' && parts[3]) return { project, kind: 'image' };
+  if (rest === 'project.json') return { project, kind: 'project' };
+  return null;
+}
+
+async function flushChanges() {
+  watchTimer = null;
+  const items = [...pendingChanges.values()];
+  pendingChanges = new Map();
+  if (!items.length) return;
+  if (Date.now() < selfWriteUntil) return;
+  const state = await readState(ARCHIVE).catch(() => ({}));
+  bus.emit('archive', { at: new Date().toISOString(), rev: state.rev ?? 0, items });
+}
+
+function startArchiveWatch() {
+  try {
+    watch(ARCHIVE, { recursive: true }, (_event, filename) => {
+      const hit = classifyPath(filename);
+      if (!hit) return;
+      pendingChanges.set(`${hit.project}|${hit.page || ''}|${hit.kind}`, hit);
+      if (watchTimer) clearTimeout(watchTimer);
+      watchTimer = setTimeout(flushChanges, WATCH_DEBOUNCE);
+    });
+    return true;
+  } catch (err) {
+    console.error(`[watch] 监听存档失败（外部改动不会自动刷新）：${err.message}`);
+    return false;
+  }
+}
 
 // ---------------------------------------------------------------- 小工具
 
@@ -193,10 +248,18 @@ async function route(req, res, url) {
 
   if (path === '/api/jobs/stream' && method === 'GET') {
     const stream = sse(res);
-    const listener = (job) => stream.send('job', job);
-    bus.on('job', listener);
+    const onJob = (job) => stream.send('job', job);
+    const onArchive = (change) => stream.send('archive', change);
+    bus.on('job', onJob);
+    bus.on('archive', onArchive);
     for (const job of jobs.slice(-20)) stream.send('job', job);
-    req.on('close', () => bus.off('job', listener));
+    // 长连接别被中间层掐掉
+    const ping = setInterval(() => res.write(':ping\n\n'), 15000);
+    req.on('close', () => {
+      clearInterval(ping);
+      bus.off('job', onJob);
+      bus.off('archive', onArchive);
+    });
     return;
   }
 
@@ -411,6 +474,8 @@ function importmap(vendored) {
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+  // 自己写存档不算「外部改动」，别推给自己
+  if (req.method !== 'GET' && req.method !== 'HEAD') markSelfWrite();
   try {
     const handled = await route(req, res, url);
     if (handled !== false) return;
@@ -426,6 +491,7 @@ const server = createServer(async (req, res) => {
 
 await ensureConfig(CONFIG_DIR);
 await ensureArchive(ARCHIVE);
+startArchiveWatch();
 server.listen(PORT, HOST, async () => {
   const config = await readConfig(CONFIG_DIR);
   const state = await readState(ARCHIVE);

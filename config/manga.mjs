@@ -106,8 +106,8 @@ export const STYLES = [
         value: 'mono',
         label: '黑白网点',
         meta: ['japanese manga page', 'monochrome'],
-        phrase: 'STRICTLY BLACK AND WHITE MANGA PAGE, monochrome ink with grey screentone only. Black ink lines on bare white paper, grey screentone dot patterns only. ZERO COLOUR: no flesh colour, no skin tone, no blue, no cyan, no yellow, no brown, no colour wash. Skin is flat pale GREY halftone with black line shading. Shadows are dense black crosshatching, highlights are untouched white paper.',
-        guard: 'Black ink, white paper and grey screentone only, zero colour.',
+        phrase: 'STRICTLY BLACK AND WHITE PRINTED MANGA PAGE, black ink only. Every tone is either PURE BLACK INK, BARE WHITE PAPER, or a VISIBLE SCREENTONE DOT PATTERN — screentone is always a pattern of discrete dots, never a flat grey fill, never a smooth gradient, never an airbrushed grey wash, never grey paint. ZERO COLOUR: no flesh colour, no skin tone, no blue, no cyan, no yellow, no brown, no colour wash. Skin is bare white paper with black line hatching and dot screentone, never a grey fill. Shadows are dense black crosshatching or dense dot patterns, highlights are untouched white paper.',
+        guard: 'Pure black ink and bare white paper only, every tone is visible dot screentone, no flat grey fill, no gradient, no airbrush, zero colour.',
     },
     {
         value: 'color',

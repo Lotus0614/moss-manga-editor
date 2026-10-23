@@ -32,6 +32,21 @@ const STYLE_LABELS = [
   ['sketch', '线稿'],
 ];
 
+// 格子底色的不透明度：存在浏览器里，所有页面、下次打开都沿用
+const FILL_ALPHA_KEY = 'moss.fillAlpha';
+const DEFAULT_FILL_ALPHA = 0.5;
+
+function readFillAlpha() {
+  try {
+    const raw = localStorage.getItem(FILL_ALPHA_KEY);
+    const value = Number(raw);
+    if (raw !== null && Number.isFinite(value) && value >= 0 && value <= 1) return value;
+  } catch {
+    /* 隐私模式读不了就用默认值 */
+  }
+  return DEFAULT_FILL_ALPHA;
+}
+
 const TYPE_NAME = { panel: '分格', bubble: '文字', native: '原生项' };
 
 export default function EditorPage({ projectId, pageId, config, onOpenSettings }) {
@@ -50,7 +65,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const [showBoxes, setShowBoxes] = useState(true);
   const [dockCollapsed, setDockCollapsed] = useState(false);
   const [grid, setGrid] = useState(4);
-  const [opacity, setOpacity] = useState(1);
+  const [fillAlpha, setFillAlphaState] = useState(readFillAlpha);
   const [changes, setChanges] = useState(null);
   const [showExport, setShowExport] = useState(false);
   const [exporting, setExporting] = useState('');
@@ -65,6 +80,15 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   useEffect(() => {
     pageRef.current = page;
   }, [page]);
+
+  function setFillAlpha(value) {
+    setFillAlphaState(value);
+    try {
+      localStorage.setItem(FILL_ALPHA_KEY, String(value));
+    } catch {
+      /* 存不了就只在本次会话里生效 */
+    }
+  }
 
   useEffect(() => {
     let alive = true;
@@ -491,12 +515,18 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
             ? html`<span class="tag">${warns.length} 个提醒</span>`
             : null}
         <div class="spacer"></div>
-        ${image
-          ? html`<label class="meta" style="display:flex;align-items:center;gap:5px">
-              图
-              <input type="range" min="0" max="1" step="0.05" value=${opacity} style="width:70px" onInput=${(e) => setOpacity(Number(e.currentTarget.value))} />
-            </label>`
-          : null}
+        <label class="meta" style="display:flex;align-items:center;gap:5px" title="格子底色的不透明度，全站生效">
+          底色
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value=${fillAlpha}
+            style="width:70px"
+            onInput=${(e) => setFillAlpha(Number(e.currentTarget.value))}
+          />
+        </label>
         <label class="meta" style="display:flex;align-items:center;gap:4px">网格
           <select class="select" style="width:56px;padding:1px 14px 1px 4px;font-size:11px" value=${grid} onChange=${(e) => setGrid(Number(e.currentTarget.value))}>
             ${[1, 2, 4, 8, 16].map((n) => html`<option value=${n}>${n}px</option>`)}
@@ -537,7 +567,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         <${Canvas}
           page=${page}
           image=${image}
-          imageOpacity=${opacity}
+          fillAlpha=${fillAlpha}
           showBoxes=${showBoxes}
           grid=${grid}
           scale=${scale}

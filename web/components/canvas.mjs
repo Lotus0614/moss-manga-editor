@@ -11,13 +11,13 @@ import { html, useRef, useState, useEffect } from '../lib.mjs';
 const MIN_SIZE = 40;
 const SNAP = 6;
 
-/** 类型颜色：按名字确定性推导。描边要实，底色仍很浅（底下生成图得透出来） */
-function typeColor(name) {
+/** 类型颜色：按名字确定性推导。描边固定要实；底色透明度由右上的「底色」滑杆给 */
+function typeColor(name, alpha = 0.5) {
   let hash = 0;
   for (const ch of String(name || '')) hash = (hash * 31 + ch.codePointAt(0)) % 997;
   const hue = Math.round((hash * 137.508) % 360);
   return {
-    fill: `hsla(${hue}, 50%, 88%, 0.42)`,
+    fill: `hsla(${hue}, 50%, 88%, ${alpha})`,
     stroke: `hsla(${hue}, 62%, 34%, 0.95)`,
   };
 }
@@ -60,13 +60,13 @@ function horizontalLines(text, bbox, fs) {
 
 
 
-function ItemBox({ item, page, index, selected, primary }) {
+function ItemBox({ item, page, index, selected, primary, fillAlpha }) {
   const [x1, y1, x2, y2] = item.bbox;
   const w = Math.max(0, x2 - x1);
   const h = Math.max(0, y2 - y1);
   const isBubble = item.type === 'bubble';
   const isNative = item.type === 'native';
-  const color = typeColor(item.type);
+  const color = typeColor(item.type, fillAlpha);
 
   const label = canvasLabel(item, index);
 
@@ -98,7 +98,7 @@ function ItemBox({ item, page, index, selected, primary }) {
   </g>`;
 }
 
-export default function Canvas({ page, image, imageOpacity = 1, showBoxes = true, grid = 4, scale, selection, onSelect, onBegin, onChange, onCommit }) {
+export default function Canvas({ page, image, showBoxes = true, grid = 4, scale, selection, fillAlpha = 0.5, onSelect, onBegin, onChange, onCommit }) {
   const [W, H] = page.size;
   const svgRef = useRef(null);
   const dragRef = useRef(null);
@@ -307,7 +307,7 @@ export default function Canvas({ page, image, imageOpacity = 1, showBoxes = true
         onPointerDown=${onCanvasDown}
       >
         <rect x="0" y="0" width=${W} height=${H} fill="#ffffff" />
-        ${image ? html`<image href=${image} x="0" y="0" width=${W} height=${H} preserveAspectRatio="xMidYMid slice" opacity=${imageOpacity} />` : null}
+        ${image ? html`<image href=${image} x="0" y="0" width=${W} height=${H} preserveAspectRatio="xMidYMid slice" opacity="1" />` : null}
 
         ${showBoxes ? page.items.map((item, i) => html`<${ItemBox}
           key=${item.id}
@@ -316,6 +316,7 @@ export default function Canvas({ page, image, imageOpacity = 1, showBoxes = true
           index=${item.type === 'panel' ? panelIndex(item) : i}
           selected=${selIds.includes(item.id)}
           primary=${item.id === primaryId}
+          fillAlpha=${fillAlpha}
         />`) : null}
 
         ${guides.map((g) =>

@@ -17,7 +17,7 @@ function typeColor(name) {
   for (const ch of String(name || '')) hash = (hash * 31 + ch.codePointAt(0)) % 997;
   const hue = Math.round((hash * 137.508) % 360);
   return {
-    fill: `hsla(${hue}, 10%, 98%, 0.55)`,
+    fill: `hsla(${hue}, 50%, 88%, 0.42)`,
     stroke: `hsla(${hue}, 62%, 34%, 0.95)`,
   };
 }

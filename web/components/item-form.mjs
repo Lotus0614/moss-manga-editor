@@ -1,8 +1,8 @@
-// 元素属性表单：完全由 config/ui.mjs 的 fields 生成，代码里不出现任何具体字段名。
+// 元素属性表单：完全由 config-store 里的字段声明生成，代码里不出现任何具体字段名。
 // 加一个新类型/新字段，这里自动多出对应控件。
 
 import { html, cls } from '../lib.mjs';
-import { fieldsOf, itemType, enumOptions } from '../../config/ui.mjs';
+import { fieldsOf, itemType, optionsOf } from '../../core/config-store.mjs';
 
 const TYPE_LABEL = (key) => itemType(key)?.label || key;
 
@@ -20,11 +20,10 @@ function Field({ field, value, onChange }) {
   }
 
   if (field.type === 'enum') {
-    const options = enumOptions(field.options);
     return html`<div class="field">
       ${label}
       <select class="select" value=${value ?? field.default ?? ''} onChange=${(e) => onChange(e.currentTarget.value)}>
-        ${Object.entries(options).map(([k, n]) => html`<option value=${k}>${n}</option>`)}
+        ${optionsOf(field).map((option) => html`<option value=${option.value}>${option.label}</option>`)}
       </select>
     </div>`;
   }

@@ -1,0 +1,367 @@
+// 漫画方言：这个项目对「漫画」这件事的全部约定。
+//
+// 页面字段、item 类型、枚举词表、句子模板、summary 写法，全在这一个文件里。
+// 内核与网页都不 import 这个文件——它只往 core/config-store.mjs 注册一次，
+// 之后所有地方（编译、校验、右栏表单、画布标签）都从管理器按同一份格式取。
+
+const pick = (list, value) => list.find((option) => option.value === value) || null;
+
+// ---------------------------------------------------------------- 词表
+// 每项都是 { value, label, phrase?, ... }：value 存进 JSON，label 是界面上显示的字，
+// phrase 是拼进提示词的那句英文。多出来的键由这一项自己解释，不用去别处找。
+
+/** 分格形状：bleed = 可以超出画布 */
+export const SHAPES = [
+  { value: 'rect', label: '矩形', phrase: 'rectangular panel with straight edges' },
+  { value: 'slant-top', label: '斜切上边', phrase: 'trapezoid panel with a slanted top edge cutting diagonally' },
+  { value: 'slant-side', label: '斜切侧边', phrase: 'panel with a sharply angled slanted side edge' },
+  { value: 'bleed-top', label: '出血·上', phrase: 'panel bleeding off the TOP edge of the page, no border', bleed: true },
+  { value: 'bleed-bottom', label: '出血·下', phrase: 'panel bleeding off the BOTTOM edge of the page, no border', bleed: true },
+  { value: 'bleed-left', label: '出血·左', phrase: 'panel bleeding off the LEFT edge of the page, no border', bleed: true },
+  { value: 'bleed-right', label: '出血·右', phrase: 'panel bleeding off the RIGHT edge of the page, no border', bleed: true },
+  {
+    value: 'bleed-all',
+    label: '满版',
+    phrase: 'full-bleed panel covering the whole page, no border, artwork running off all four edges',
+    bleed: true,
+  },
+  { value: 'circle', label: '圆形', phrase: 'circular panel with a clean round border' },
+];
+
+/** 边框 */
+export const FRAMES = [
+  { value: 'border', label: '描边', phrase: 'crisp black panel border with a white gutter around it' },
+  { value: 'none', label: '无边', phrase: 'no border, artwork fills the panel edge to edge' },
+  { value: 'thick', label: '粗边', phrase: 'heavy black panel border' },
+];
+
+/** 机位 / 景别 */
+export const CAMERAS = [
+  { value: 'eye', label: '平视', phrase: 'eye-level shot' },
+  { value: 'high', label: '俯视', phrase: 'high-angle shot looking down' },
+  { value: 'low', label: '仰视', phrase: 'low-angle shot looking up' },
+  { value: 'wide', label: '全景', phrase: 'wide establishing shot' },
+  { value: 'medium', label: '中景', phrase: 'medium shot' },
+  { value: 'close', label: '特写', phrase: 'close-up' },
+  { value: 'xclose', label: '大特写', phrase: 'extreme close-up' },
+  { value: 'ots', label: '过肩', phrase: 'over-the-shoulder shot' },
+  { value: 'dutch', label: '荷兰角', phrase: 'dutch angle with a tilted horizon' },
+];
+
+/**
+ * 画风：整页总基调。
+ * phrase 进 summary 开头；guard 会补到每一项末尾，用来压住模型跑偏（彩色/网点/线稿）。
+ * meta 进 summary.meta。
+ */
+export const STYLES = [
+  {
+    value: 'mono',
+    label: '黑白网点',
+    meta: ['japanese manga page', 'monochrome'],
+    phrase:
+      'STRICTLY BLACK AND WHITE MANGA PAGE, monochrome ink with grey screentone only. Black ink lines on bare white paper, grey screentone dot patterns only. ZERO COLOUR: no flesh colour, no skin tone, no blue, no cyan, no yellow, no brown, no colour wash. Skin is flat pale GREY halftone with black line shading. Shadows are dense black crosshatching, highlights are untouched white paper.',
+    guard: 'Black ink, white paper and grey screentone only, zero colour.',
+  },
+  {
+    value: 'color',
+    label: '彩色',
+    meta: ['japanese manga page', 'full color'],
+    phrase:
+      'FULL COLOUR JAPANESE MANGA PAGE: clean ink lineart with soft muted digital colouring, pale skin tones, desaturated palette, consistent light direction across all panels.',
+    guard: '',
+  },
+  {
+    value: 'sketch',
+    label: '线稿',
+    meta: ['manga lineart', 'monochrome'],
+    phrase: 'MANGA LINEART ONLY, clean black ink lines on pure white, no screentone, no shading fills, no colour at all.',
+    guard: 'Black ink on white only, zero tone, zero colour.',
+  },
+];
+
+/** 文字载体：tail = 这种载体画不画尾巴 */
+export const BUBBLES = [
+  {
+    value: 'speech',
+    label: '对话',
+    phrase: 'WHITE OVAL speech bubble, smooth even outline, thin black line',
+    tail: true,
+  },
+  { value: 'shout', label: '喊叫', phrase: 'JAGGED EXPLOSIVE speech bubble with sharp spiky edges', tail: true },
+  {
+    value: 'whisper',
+    label: '小声',
+    phrase: 'small round WHITE OVAL speech bubble, its tail made of three tiny circles trailing away in a line',
+    tail: true,
+  },
+  { value: 'tremble', label: '颤抖', phrase: 'WHITE speech bubble with a SHAKY WAVY outline', tail: true },
+  {
+    value: 'thought',
+    label: '内心',
+    phrase: 'WHITE CLOUD-shaped thought bubble, scalloped edge, thin black outline, NO tail',
+    tail: false,
+  },
+  { value: 'heart', label: '心之声', phrase: 'speech bubble with a DASHED black outline, white interior, NO tail', tail: false },
+  {
+    value: 'narration',
+    label: '旁白',
+    phrase:
+      'narration lettering printed DIRECTLY on the artwork, floating freely, no bubble, no box, no background, thin white outline only',
+    tail: false,
+  },
+  {
+    value: 'sfx',
+    label: '拟声词',
+    phrase: 'hand-lettered sound effect, bold brush strokes, slightly rotated, thin white outline, no bubble',
+    tail: false,
+  },
+];
+
+/** 尾巴方向：none = 说话者不在画面 */
+export const TAILS = [
+  { value: 'none', label: '无尾巴', phrase: 'NO tail because the speaker is off panel' },
+  { value: 'down-left', label: '左下', phrase: 'a short tapering tail pointing down-left' },
+  { value: 'down', label: '正下', phrase: 'a short tapering tail pointing straight down' },
+  { value: 'down-right', label: '右下', phrase: 'a short tapering tail pointing down-right' },
+  { value: 'left', label: '正左', phrase: 'a short tapering tail pointing left' },
+  { value: 'right', label: '正右', phrase: 'a short tapering tail pointing right' },
+  { value: 'up-left', label: '左上', phrase: 'a short tapering tail pointing up-left' },
+  { value: 'up', label: '正上', phrase: 'a short tapering tail pointing straight up' },
+  { value: 'up-right', label: '右上', phrase: 'a short tapering tail pointing up-right' },
+];
+
+/** 原生 item 的 MOSS label，格式固定三种 */
+export const MOSS_LABELS = [
+  { value: 'object', label: 'object' },
+  { value: 'character', label: 'character' },
+  { value: 'text', label: 'text' },
+];
+
+// ---------------------------------------------------------------- 句子模板
+// 编译器里所有会进提示词的固定句式；{xxx} 是占位符。
+
+export const SNIPPETS = {
+  panelCount: 'The page is divided into {n} {panels}. {order}',
+  readingOrder: 'Panels are read RIGHT TO LEFT, top to bottom.',
+  textLock:
+    'This page has exactly {panels} panel(s) and exactly {texts} text element(s). Render ONLY the text listed below, with the exact wording given. Do NOT invent any additional dialogue, speech bubble, caption, sound effect or lettering, and do not fill empty space with text — any text that is not listed is an error.',
+  bubbleRule:
+    'Dialogue uses white speech bubbles with tails, thoughts use white cloud bubbles with no tail, and narration is bare lettering printed directly on the artwork with no bubble, no box and no background.',
+  noLettering: 'This page contains NO lettering at all: no speech bubbles, no captions, no sound effects, no text of any kind.',
+  boxPrefix: 'This box contains only:',
+};
+
+const fill = (template, vars = {}) =>
+  String(template || '').replace(/\{(\w+)\}/g, (match, key) => (vars[key] !== undefined ? String(vars[key]) : match));
+
+// ---------------------------------------------------------------- 排版辅助
+
+/** 阅读顺序：同一横带内先右后左，再上→下（日漫固定右开） */
+function readingOrder(page) {
+  return [...panelsOf(page)].sort((a, b) => {
+    if (Math.abs(a.bbox[1] - b.bbox[1]) > 24) return a.bbox[1] - b.bbox[1];
+    return b.bbox[0] - a.bbox[0];
+  });
+}
+
+function panelsOf(page) {
+  return (page.items || []).filter((item) => PANEL_KEYS.has(item.type));
+}
+
+/** 面板编号：在阅读顺序里的 1-based 序号 */
+function panelNumber(page, item) {
+  const index = readingOrder(page).findIndex((panel) => panel.id === item.id);
+  return index >= 0 ? index + 1 : undefined;
+}
+
+/** 文字落在哪个面板：完全在里面 / 压到边缘 */
+function locateInPanel(page, item) {
+  const panels = panelsOf(page);
+  const [bx1, by1, bx2, by2] = item.bbox;
+  const cx = (bx1 + bx2) / 2;
+  const cy = (by1 + by2) / 2;
+  let chosen = null;
+  let bestArea = 0;
+
+  for (const panel of panels) {
+    const [x1, y1, x2, y2] = panel.bbox;
+    const inside = cx >= x1 && cx <= x2 && cy >= y1 && cy <= y2;
+    if (inside) {
+      chosen = panel;
+      break;
+    }
+    const ix = Math.min(bx2, x2) - Math.max(bx1, x1);
+    const iy = Math.min(by2, y2) - Math.max(by1, y1);
+    const area = ix > 0 && iy > 0 ? ix * iy : 0;
+    if (area > bestArea) {
+      bestArea = area;
+      chosen = panel;
+    }
+  }
+  if (!chosen) return '';
+
+  const [x1, y1, x2, y2] = chosen.bbox;
+  const fully = bx1 >= x1 - 2 && bx2 <= x2 + 2 && by1 >= y1 - 2 && by2 <= y2 + 2;
+  const number = panelNumber(page, chosen);
+  return `${fully ? 'inside' : 'at the edge of'} PANEL ${number ?? '?'}`;
+}
+
+/** 页面区域：九宫格描述 */
+function placementOf(page, bbox) {
+  const [w, h] = page.size;
+  const rx = (bbox[0] + bbox[2]) / 2 / w;
+  const ry = (bbox[1] + bbox[3]) / 2 / h;
+  const vertical = ry < 0.34 ? 'upper' : ry > 0.66 ? 'lower' : 'middle';
+  const horizontal = rx < 0.34 ? 'left' : rx > 0.66 ? 'right' : 'centre';
+  return `${vertical} ${horizontal} area of the page`;
+}
+
+/** 竖排 / 横排描述 */
+function textLayoutOf(page, item) {
+  const vertical = typeof item.vertical === 'boolean' ? item.vertical : page.vertical !== false;
+  return vertical ? 'vertical lettering, columns read right to left' : 'horizontal lettering';
+}
+
+/** 一条文字的形态描述 */
+function bubblePhrase(bubble) {
+  const kind = pick(BUBBLES, bubble.kind) || pick(BUBBLES, 'speech');
+  const parts = [kind.phrase];
+  if (kind.tail) parts.push((pick(TAILS, bubble.tail) || pick(TAILS, 'down-left')).phrase);
+  return parts.join(', ');
+}
+
+const styleOf = (page) => pick(STYLES, page.style) || pick(STYLES, 'mono');
+
+// ---------------------------------------------------------------- 页面字段
+
+export const PAGE = [
+  { key: 'style', type: 'enum', label: '画风', options: STYLES, default: 'mono' },
+  { key: 'vertical', type: 'bool', label: '全局竖排', default: true },
+  { key: 'scene', type: 'text', label: '场景' },
+  { key: 'note', type: 'text', label: '补充说明' },
+];
+
+// ---------------------------------------------------------------- item 类型
+
+export const TYPES = [
+  {
+    key: 'panel',
+    label: '面板',
+    role: 'panel',
+    fields: [
+      { key: 'caption', type: 'longtext', label: '画面描述', required: true },
+      { key: 'camera', type: 'enum', label: '机位', options: CAMERAS, default: 'medium', canvas: true },
+      { key: 'shape', type: 'enum', label: '形状', options: SHAPES, default: 'rect', canvas: true },
+      { key: 'frame', type: 'enum', label: '边框', options: FRAMES, default: 'border' },
+      { key: 'tags', type: 'tags', label: 'tags' },
+      { key: 'palette', type: 'palette', label: 'palette' },
+    ],
+    compile({ item, page }) {
+      const style = styleOf(page);
+      const shape = pick(SHAPES, item.shape);
+      const parts = [shape?.phrase];
+      if (!shape?.bleed) parts.push(pick(FRAMES, item.frame)?.phrase);
+      if (item.camera) parts.push(pick(CAMERAS, item.camera)?.phrase);
+
+      const number = panelNumber(page, item);
+      const body = (item.caption || '').trim();
+      const tag = number ? `PANEL ${number}` : '';
+      if (body || tag) parts.push(`${SNIPPETS.boxPrefix} ${[tag, body].filter(Boolean).join(', ')}`);
+      if (style.guard) parts.push(style.guard);
+
+      return { label: 'object', caption: parts.filter(Boolean).join(', ') };
+    },
+  },
+  {
+    key: 'bubble',
+    label: '气泡',
+    fields: [
+      { key: 'text', type: 'longtext', label: '文字', required: true },
+      { key: 'kind', type: 'enum', label: '类型', options: BUBBLES, default: 'speech', canvas: true },
+      { key: 'tail', type: 'enum', label: '尾巴', options: TAILS, default: 'down-left' },
+      { key: 'caption', type: 'text', label: '补充说明（特殊文字用）' },
+      { key: 'tags', type: 'tags', label: 'tags' },
+      { key: 'palette', type: 'palette', label: 'palette' },
+    ],
+    compile({ item, page }) {
+      const style = styleOf(page);
+      const parts = [bubblePhrase(item)];
+      const where = locateInPanel(page, item);
+      if (where) parts.push(where);
+      if (item.caption) parts.push(String(item.caption));
+      parts.push(`placed in the ${placementOf(page, item.bbox)}`);
+      parts.push(textLayoutOf(page, item));
+      if (style.guard) parts.push(style.guard);
+      return {
+        label: 'text',
+        caption: parts.filter(Boolean).join(', '),
+        ...(item.text ? { text: item.text } : {}),
+      };
+    },
+  },
+  {
+    key: 'native',
+    label: '原生',
+    fields: [
+      { key: 'label', type: 'enum', label: 'label', options: MOSS_LABELS, default: 'object', canvas: true },
+      { key: 'caption', type: 'longtext', label: 'caption', required: true },
+      { key: 'text', type: 'longtext', label: 'text（label=text 时必填）' },
+      { key: 'tags', type: 'tags', label: 'tags' },
+      { key: 'palette', type: 'palette', label: 'palette' },
+    ],
+    compile({ item }) {
+      return {
+        label: item.label || 'object',
+        caption: item.caption || '',
+        ...(item.text ? { text: item.text } : {}),
+      };
+    },
+  },
+];
+
+// ---------------------------------------------------------------- 整页 summary
+
+/** 参与编号的类型：按 role 标记，不认具体 key */
+const PANEL_KEYS = new Set(TYPES.filter((type) => type.role === 'panel').map((type) => type.key));
+
+export function buildSummary({ page, items }) {
+  const style = styleOf(page);
+  const panels = panelsOf(page);
+  const texts = items.filter((item) => item.label === 'text');
+  const parts = [style.phrase];
+
+  if (panels.length > 0) {
+    parts.push(
+      fill(SNIPPETS.panelCount, {
+        n: panels.length,
+        panels: panels.length === 1 ? 'panel' : 'panels',
+        order: SNIPPETS.readingOrder,
+      })
+    );
+  }
+
+  if (texts.length > 0) {
+    parts.push(fill(SNIPPETS.textLock, { panels: panels.length, texts: texts.length }));
+    parts.push(SNIPPETS.bubbleRule);
+  } else {
+    parts.push(SNIPPETS.noLettering);
+  }
+
+  if (page.scene) parts.push(page.scene);
+  if (page.note) parts.push(page.note);
+  if (style.guard) parts.push(style.guard);
+
+  return {
+    meta: style.meta,
+    canvas: panels.length > 1 || texts.length > 1 ? 'multi_panel' : 'single',
+    caption: parts.filter(Boolean).join('\n\n'),
+  };
+}
+
+export default {
+  name: 'manga',
+  page: PAGE,
+  types: TYPES,
+  snippets: SNIPPETS,
+  buildSummary,
+};

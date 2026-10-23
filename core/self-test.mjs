@@ -4,11 +4,15 @@
 // 这些断言对应 Moss 模板文档里的硬性约定，任何一条挂了都说明产物会被模型拒绝或画歪。
 
 import assert from 'node:assert/strict';
+import { registerConfig } from './config-store.mjs';
+import mangaConfig from '../config/manga.mjs';
 import { compilePage } from './compile.mjs';
 import { createPage, createPanelItem, createBubbleItem, toMoss, fromMoss } from './manga-doc.mjs';
 import { validatePage } from './validate.mjs';
 import { decompile } from './decompile.mjs';
 import { fillGraph, scanTokens, MissingParam, describeWorkflow } from './placeholders.mjs';
+
+registerConfig(mangaConfig);
 
 let passed = 0;
 const failures = [];

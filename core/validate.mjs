@@ -1,8 +1,8 @@
 // 校验：把《JSON Layout》第七节的检查清单变成代码。
 // level=error 阻止生成，level=warn 只提醒。
 
-import { pageSize, PANEL_SHAPES, bboxArea, panelsOf, bubblesOf } from './manga-doc.mjs';
-import { ITEM_TYPE_MAP } from './runtime.mjs';
+import { pageSize, bboxArea, panelsOf, bubblesOf } from './manga-doc.mjs';
+import { itemType, typeOption } from './config-store.mjs';
 
 const ALLOWED_TOP = new Set(['summary', 'items', 'bbox_coord_space', 'bbox_format']);
 const ALLOWED_ITEM = new Set(['label', 'caption', 'bbox', 'text', 'tags', 'palette']);
@@ -25,7 +25,7 @@ export function validatePage(page, doc) {
 
   items.forEach((item, i) => {
     const name = `第 ${i + 1} 项`;
-    if (!ITEM_TYPE_MAP[item.type]) {
+    if (!itemType(item.type)) {
       add('error', 'item.type', `${name} 的 type「${item.type}」不认识`, item.id);
       return;
     }
@@ -36,12 +36,12 @@ export function validatePage(page, doc) {
     }
 
     if (item.type === 'panel') {
-      const bleed = String(item.shape || '').startsWith('bleed');
-      if (!bleed && (x1 < 0 || y1 < 0 || x2 > size.width || y2 > size.height)) {
+      const shape = typeOption('panel', 'shape', item.shape);
+      if (!shape?.bleed && (x1 < 0 || y1 < 0 || x2 > size.width || y2 > size.height)) {
         add('warn', 'panel.out', `${name} 超出画布，内容可能被裁掉`, item.id);
       }
       if (!item.caption?.trim()) add('warn', 'panel.blank', `${name} 没写画面描述，只会画出一个空框`, item.id);
-      if (!PANEL_SHAPES[item.shape]) add('warn', 'panel.shape', `${name} 的形状「${item.shape}」不认识`, item.id);
+      if (!shape) add('warn', 'panel.shape', `${name} 的形状「${item.shape}」不认识`, item.id);
     }
 
     if (item.type === 'bubble') {
@@ -148,7 +148,6 @@ export function textBudget(item) {
 }
 
 function sameBandAmbiguity(page) {
-  const rtl = page.reading !== 'ltr';
   const panels = panelsOf(page);
   for (let i = 0; i < panels.length; i += 1) {
     for (let j = i + 1; j < panels.length; j += 1) {
@@ -157,7 +156,7 @@ function sameBandAmbiguity(page) {
       const sameBand = Math.abs(a[1] - b[1]) < 24 && Math.abs(a[3] - b[3]) < 24;
       const xOverlap = Math.min(a[2], b[2]) - Math.max(a[0], b[0]);
       if (sameBand && xOverlap > 24) {
-        return `面板 ${panels[i].id} 与 ${panels[j].id} 在同一横带且位置重叠，${rtl ? '右→左' : '左→右'}阅读顺序会歧义`;
+        return `面板 ${panels[i].id} 与 ${panels[j].id} 在同一横带且位置重叠，右→左阅读顺序会歧义`;
       }
     }
   }

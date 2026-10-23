@@ -1,5 +1,5 @@
 // 画布：把每个 item 画成「带标签的框」。
-import { labelOf, typeColor } from '../../config/ui.mjs';
+import { canvasLabel } from '../../core/config-store.mjs';
 //
 // 不渲染真实气泡形状——标注清楚比画得像更重要：
 //   分格：标签写「格 · 全景/矩形」，里面是画面描述
@@ -10,6 +10,17 @@ import { html, useRef, useState, useEffect } from '../lib.mjs';
 
 const MIN_SIZE = 40;
 const SNAP = 6;
+
+/** 类型颜色：按名字确定性推导，永远浅色 */
+function typeColor(name) {
+  let hash = 0;
+  for (const ch of String(name || '')) hash = (hash * 31 + ch.codePointAt(0)) % 997;
+  const hue = Math.round((hash * 137.508) % 360);
+  return {
+    fill: `hsla(${hue}, 45%, 87%, 0.30)`,
+    stroke: `hsla(${hue}, 42%, 45%, 0.75)`,
+  };
+}
 
 function isVertical(page, item) {
   if (typeof item.vertical === 'boolean') return item.vertical;
@@ -57,7 +68,7 @@ function ItemBox({ item, page, index, selected, primary }) {
   const isNative = item.type === 'native';
   const color = typeColor(item.type);
 
-  const label = labelOf(item, index);
+  const label = canvasLabel(item, index);
 
   const fs = Math.max(17, Math.min(w / 13, h / 4.5, 30));
   const body = isBubble ? item.text : isNative ? item.text || item.caption : item.caption;

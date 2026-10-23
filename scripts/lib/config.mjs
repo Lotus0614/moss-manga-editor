@@ -1,4 +1,4 @@
-// 全局配置：ComfyUI 地址、当前工作流、页面级默认值、任意工作流参数。
+﻿// 全局配置：ComfyUI 地址、当前工作流、页面级默认值、任意工作流参数。
 //
 // 位置固定（默认 ~/.moss-manga，MOSS_CONFIG 可覆盖），工作流也在配置根下。
 // 存档（项目/图片/state/journal）是另一棵树，默认 <配置根>/archive。
@@ -31,7 +31,7 @@ export function defaultConfig() {
     comfy: { url: 'http://127.0.0.1:8188', timeoutMs: 180000 },
     workflow: { name: '' },
     // 页面级默认值：新建项目/页面时继承
-    defaults: { canvas: [768, 1280], reading: 'rtl', style: 'mono', vertical: true },
+    defaults: { canvas: [768, 1280], style: 'mono', vertical: true },
     // 工作流参数：键就是占位符名，值就是用户填的内容（代码里没有白名单）
     params: {},
     createdAt: now(),

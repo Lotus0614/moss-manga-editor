@@ -2,16 +2,12 @@
 // 参数列表同样由工作流占位符生成，代码不认识具体名字。
 
 import { html, api, apiPut, useState, useEffect, toast } from '../lib.mjs';
-
-const STYLE_LABELS = [
-  ['mono', '黑白网点'],
-  ['color', '彩色'],
-  ['sketch', '线稿'],
-];
+import { pageField, optionsOf } from '../../core/config-store.mjs';
 
 const AUTO = ['prompt', 'width', 'height', 'seed'];
 
 export default function ProjectSettings({ slug, open, onClose, onSaved, onOpenGlobal }) {
+  const STYLES = optionsOf(pageField('style'));
   const [form, setForm] = useState(null);
   const [globalParams, setGlobalParams] = useState({});
   const [params, setParams] = useState([]);
@@ -24,7 +20,6 @@ export default function ProjectSettings({ slug, open, onClose, onSaved, onOpenGl
         setGlobalParams(cfg.params || {});
         setForm({
           name: p.name,
-          reading: (p.defaults || {}).reading || 'rtl',
           style: (p.defaults || {}).style || 'mono',
           vertical: (p.defaults || {}).vertical !== false,
           canvas: p.canvas || [768, 1280],
@@ -55,7 +50,7 @@ export default function ProjectSettings({ slug, open, onClose, onSaved, onOpenGl
       const saved = await apiPut(`/api/projects/${slug}`, {
         name: form.name,
         canvas: form.canvas,
-        defaults: { reading: form.reading, style: form.style, vertical: form.vertical },
+        defaults: { style: form.style, vertical: form.vertical },
         params: form.params,
       });
       onSaved?.(saved);
@@ -83,16 +78,9 @@ export default function ProjectSettings({ slug, open, onClose, onSaved, onOpenGl
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div class="field">
-            <label>默认阅读顺序</label>
-            <select class="select" value=${form.reading} onChange=${(e) => setForm({ ...form, reading: e.currentTarget.value })}>
-              <option value="rtl">右 → 左</option>
-              <option value="ltr">左 → 右</option>
-            </select>
-          </div>
-          <div class="field">
             <label>默认画风</label>
             <select class="select" value=${form.style} onChange=${(e) => setForm({ ...form, style: e.currentTarget.value })}>
-              ${STYLE_LABELS.map(([v, n]) => html`<option value=${v}>${n}</option>`)}
+              ${STYLES.map((option) => html`<option value=${option.value}>${option.label}</option>`)}
             </select>
           </div>
         </div>

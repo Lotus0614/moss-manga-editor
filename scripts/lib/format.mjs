@@ -1,11 +1,11 @@
-// 终端输出格式：人看的紧凑文本，AI 用 --json。
+﻿// 终端输出格式：人看的紧凑文本，AI 用 --json。
 
 const TYPE_LABEL = { panel: '格', bubble: '字', native: '原生' };
 
 export function pageOutline(page) {
   const lines = [];
   lines.push(`第 ${page.index} 页${page.title ? ` · ${page.title}` : ''}  ${page.size[0]}×${page.size[1]}  rev ${page.rev}`);
-  lines.push(`阅读 ${page.reading === 'rtl' ? '右→左' : '左→右'} · 画风 ${page.style} · 文字${page.vertical ? '竖排' : '横排'}${page.scene ? ` · 场景 ${page.scene}` : ''}`);
+  lines.push(`画风 ${page.style} · 文字${page.vertical ? '竖排' : '横排'}${page.scene ? ` · 场景 ${page.scene}` : ''}`);
   if (!page.items?.length) lines.push('（还没有任何内容）');
 
   for (const item of page.items || []) {

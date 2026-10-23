@@ -20,7 +20,7 @@ import {
 import Canvas from '../components/canvas.mjs';
 import PagePanel from '../components/page-panel.mjs';
 import ItemForm from '../components/item-form.mjs';
-import { ITEM_TYPES, itemType } from '../../config/ui.mjs';
+import { itemTypes, itemType } from '../../core/config-store.mjs';
 import { PromptPanel, HistoryPanel, ChangesPanel } from '../components/workbench.mjs';
 import { exportLongImage, exportPdf } from '../components/export.mjs';
 import { compilePage } from '../../core/compile.mjs';
@@ -550,7 +550,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
       </div>
 
       <div class="canvas-ctrl bottom" style=${`bottom:${dockCollapsed ? 46 : 284}px`}>
-        ${ITEM_TYPES.map(
+        ${itemTypes().map(
           (t) => html`<button class="btn" onClick=${() => addItem(t.key)}>
             <svg class="plus" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" aria-hidden="true"><path d="M5 1v8M1 5h8" /></svg>
             ${t.label}

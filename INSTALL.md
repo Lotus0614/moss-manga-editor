@@ -42,7 +42,7 @@ config/workflows/         放工作流 JSON
 data/                     存档（projects/ images/ state.json）
 ```
 
-`config/` 里的 `types.mjs`、`prompts.mjs`、`helpers.mjs`、`ui.mjs` 随代码一起下来，不用生成，已存在的文件也不会被覆盖。
+`config/manga.mjs` 是方言文件（词表、类型、句式），随代码一起下来，不用生成；已存在的 `config.json` 不会被覆盖。
 
 ## 4. 配 ComfyUI
 

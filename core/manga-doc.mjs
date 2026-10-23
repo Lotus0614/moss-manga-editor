@@ -18,12 +18,14 @@ export const SIZE_PRESETS = {
   wide: { name: '横版 1536×1024', size: [1536, 1024], manga: false },
 };
 
-export const ITEM_TYPES = ['panel', 'bubble', 'native'];
-
-// 词表来自 config/prompts.mjs
-import { PANEL_SHAPES, FRAME_STYLES, CAMERAS, STYLE_PRESETS, READING_ORDERS } from '../config/prompts.mjs';
-export { PANEL_SHAPES, FRAME_STYLES, CAMERAS, STYLE_PRESETS, READING_ORDERS };
 // ---------------------------------------------------------------- 基础工具
+
+import { pageField, itemType, optionsOf } from './config-store.mjs';
+
+/** 画风取值校验：以注册的页面字段为准，认不出就退回默认 */
+function isValidStyle(value) {
+  return optionsOf(pageField('style')).some((option) => option.value === value);
+}
 
 let seq = 0;
 export function uid(prefix = 'id') {
@@ -151,7 +153,6 @@ export function createPage(patch = {}) {
     title: '',
     rev: 0,
     size,
-    reading: 'rtl',
     style: 'mono',
     vertical: true,
     scene: '',
@@ -229,8 +230,7 @@ export function normalizePage(raw = {}) {
     title: String(raw.title || ''),
     rev: Number(raw.rev) || 0,
     size: [size.width, size.height],
-    reading: READING_ORDERS[raw.reading || raw.readingOrder] ? raw.reading || raw.readingOrder : 'rtl',
-    style: STYLE_PRESETS[style] ? style : 'mono',
+    style: isValidStyle(style) ? style : 'mono',
     vertical: raw.vertical !== false,
     scene: String(raw.scene || ''),
     note: String(raw.note || ''),
@@ -250,7 +250,7 @@ function extras(raw) {
 function normalizeItem(raw = {}, size) {
   const bbox = normalizeBbox(raw.bbox, size);
   // 注册表里新增的类型：不认识也原样保留，别改写成 panel
-  if (!ITEM_TYPES.includes(raw.type)) {
+  if (!itemType(raw.type)) {
     if (typeof raw.type === 'string' && raw.type) {
       return { ...raw, id: raw.id || uid('it'), bbox };
     }
@@ -286,13 +286,4 @@ export function panelsOf(page) {
 
 export function bubblesOf(page) {
   return (page.items || []).filter((it) => it.type === 'bubble');
-}
-
-/** 阅读顺序：同一横带内先右后左（用于提示与自检） */
-export function readingOrderOf(page) {
-  const rtl = page.reading !== 'ltr';
-  return [...panelsOf(page)].sort((a, b) => {
-    if (Math.abs(a.bbox[1] - b.bbox[1]) > 24) return a.bbox[1] - b.bbox[1];
-    return rtl ? b.bbox[0] - a.bbox[0] : a.bbox[0] - b.bbox[0];
-  });
 }

@@ -1,4 +1,4 @@
-# MOSS Layout JSON 规范（原版）
+﻿# MOSS Layout JSON 规范（原版）
 
 MOSS-Image 的布局提示词格式。这里照录官方规范，用于理解编译产物；日常画漫画不需要手写，`compile` 会生成它。
 
@@ -132,4 +132,4 @@ y_max = y2 - H/2      x_max = x2 - W/2
 - 页面坐标用左上原点 `[x1,y1,x2,y2]`，`core/manga-doc.mjs` 的 `toMoss()` 负责换成中心原点
 - `label` 由类型定义决定（面板 → `object`，文字 → `text`，原生项可指定）
 - `tags` / `palette` 在页面 item 上写，编译时原样透传
-- `summary` 由 `config/types.mjs` 的 `buildSummary` 生成
+- `summary` 由 `config/manga.mjs` 的 `buildSummary` 生成

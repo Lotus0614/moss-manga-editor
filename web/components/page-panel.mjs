@@ -1,15 +1,14 @@
-// 右栏：页面属性。字段来自 config/ui.mjs 的 PAGE_FIELDS，加字段不用改这里。
+// 右栏：页面属性。字段来自 config-store 里的页面字段，加字段不用改这里。
 
 import { html } from '../lib.mjs';
-import { PAGE_FIELDS, enumOptions, itemType } from '../../config/ui.mjs';
+import { pageFields, optionsOf, itemType } from '../../core/config-store.mjs';
 
 function Field({ field, value, onChange }) {
   if (field.type === 'enum') {
-    const options = enumOptions(field.options);
     return html`<div class="field" key=${field.key}>
       <label>${field.label}</label>
-      <select class="select" value=${value ?? ''} onChange=${(e) => onChange(e.currentTarget.value)}>
-        ${Object.entries(options).map(([k, n]) => html`<option value=${k}>${n}</option>`)}
+      <select class="select" value=${value ?? field.default ?? ''} onChange=${(e) => onChange(e.currentTarget.value)}>
+        ${optionsOf(field).map((option) => html`<option value=${option.value}>${option.label}</option>`)}
       </select>
     </div>`;
   }
@@ -37,7 +36,7 @@ function Field({ field, value, onChange }) {
 
 export default function PagePanel({ page, mutate, setSelection }) {
   return html`<div class="col">
-    ${PAGE_FIELDS.map(
+    ${pageFields().map(
       (field) => html`<${Field}
         key=${field.key}
         field=${field}

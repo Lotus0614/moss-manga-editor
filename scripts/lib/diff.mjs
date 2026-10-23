@@ -1,7 +1,7 @@
-// 语义化 diff：把「页面文件前后」压成一组可读操作。
+﻿// 语义化 diff：把「页面文件前后」压成一组可读操作。
 // 页面是单层 items，所以按 id 对齐即可。
 
-const PAGE_FIELDS = ['title', 'scene', 'note', 'reading', 'style', 'size', 'vertical'];
+const PAGE_FIELDS = ['title', 'scene', 'note', 'style', 'size', 'vertical'];
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 

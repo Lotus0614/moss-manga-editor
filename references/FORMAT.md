@@ -37,7 +37,6 @@ data    默认 config/archive（config.archive 或 --dir 可改）
     "title": "车厢",
     "rev": 7,
     "size": [768, 1280],
-    "reading": "rtl", // rtl 右→左 | ltr 左→右
     "style": "mono", // mono | color | sketch
     "vertical": true, // 全局文字竖排；单条 bubble 可用自己的 vertical 覆盖
     "scene": "a half-empty train carriage, fluorescent light",
@@ -205,7 +204,7 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 
 ## 加一个新类型
 
-类型、字段、编译规则都在 `config/types.mjs`。往导出的数组里加一项即可，编译、校验、编辑器表单、画布按钮和配色全部自动认得。
+类型、字段、编译规则都在 `config/manga.mjs`。往 `types` 数组里加一项即可：编译、校验、右栏表单、画布按钮、配色全部自动认得。
 
 ```js
 {
@@ -222,9 +221,9 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 ```
 
 - `fields[].type` 可选：`text` / `longtext` / `number` / `enum` / `bool` / `tags` / `palette`
-- `enum` 用 `options: 'cameras'` 引用词表（键与 `config/prompts.mjs` 聚合导出的 `prompts` 对象一致，中文名在 `config/ui.mjs` 的 `ENUM_SOURCES`）
+- `enum` 的 `options` 直接给数组：`[{ value: 'eye', label: '平视', phrase: 'eye-level shot' }]`
 - `compile` 返回值只能是 `label` / `caption` / `text` / `tags` / `palette`，`bbox` 由核心补
-- 页面级字段在 `PAGE_FIELDS`，同样是数据驱动
+- 页面级字段在同一个文件的 `page` 数组里，格式与 item 字段完全一样
 
 改完刷新网页就能用，不用重启服务。
 
@@ -233,15 +232,15 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 画布左上角那行字不是写死的，由字段声明上的 `canvas: true` 决定：
 
 ```js
-{ key: 'camera', type: 'enum', label: '机位', options: 'cameras', canvas: true },
-{ key: 'shape',  type: 'enum', label: '形状', options: 'panelShapes', canvas: true },
+{ key: 'camera', type: 'enum', label: '机位', options: CAMERAS, canvas: true },
+{ key: 'shape',  type: 'enum', label: '形状', options: SHAPES, canvas: true },
 ```
 
-生成规则（`config/ui.mjs` 的 `labelOf`）：
+生成规则（`core/config-store.mjs` 的 `canvasLabel`）：
 
 1. 类型名开头，`panel` 带序号（`面板3`），其它不带
 2. 遍历该类型字段，**只有 `canvas: true` 的才出现**，空值跳过
-3. 枚举值按 `ENUM_SOURCES` 翻成中文
+3. 枚举值取选项的 `label`
 4. 用 `·` 连类型和值，多个值之间用 `/`
 
 ```
@@ -258,111 +257,93 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 
 加新类型不需要写任何画布代码，也不该为它加特例样式。
 
-## 提示词模板
+## 配置：一个文件，注册给管理器
 
-`config/prompts.mjs` 随代码一起下来（词表、短语、句式），改文件即生效，不用重新 init：
+方言全在 `config/manga.mjs`：词表、页面字段、item 类型、句子模板、`buildSummary`，最后由 `export default` 交给管理器。
 
-```jsonc
+```js
+export default { name: 'manga', page: PAGE, types: TYPES, snippets: SNIPPETS, buildSummary };
+```
+
+`core/config-store.mjs` 是唯一入口：CLI / 服务器 / 网页启动时各注册一次，之后编译、校验、右栏表单、画布标签都从它取，**代码里不再 import 方言文件**。注册时会校验（枚举没选项、`default` 越界、`value` 重复都会报），`npm run check` 会跑这一遍。
+
+## 词表
+
+每张词表是数组，一项就是 `{ value, label, phrase }`：
+
+| 键 | 是什么 |
+| --- | --- |
+| `value` | 存进 page.json 的值 |
+| `label` | 右栏下拉、画布标签上显示的字 |
+| `phrase` | 拼进提示词的英文 |
+
+```js
+export const CAMERAS = [
+  { value: 'eye', label: '平视', phrase: 'eye-level shot' },
+  { value: 'high', label: '俯视', phrase: 'high-angle shot looking down' },
+];
+```
+
+有的项还会多带自己专用的键，就写在那一项里：
+
+- 画风 `STYLES`：`meta`（进 `summary.meta`）、`guard`（补到每一项末尾的硬约束）
+- 文字载体 `BUBBLES`：`tail`（这种载体画不画尾巴）
+- 形状 `SHAPES`：`bleed`（可以超出画布，校验时不再报越界）
+
+改措辞就改 `phrase`；加一个机位就在数组里加一项，下拉和提示词同时就有了。
+
+## 句子模板
+
+`SNIPPETS` 里是整句模板，`{xxx}` 是占位符（`{n}` 面板数、`{panels}` / `{texts}` 数量、`{order}` 阅读顺序那句），改句子时保留它们。
+
+## 字段
+
+页面字段和 item 字段是同一种格式：
+
+```js
+{ key: 'camera', type: 'enum', label: '机位', options: CAMERAS, default: 'medium', canvas: true }
+```
+
+- `type`：`text` / `longtext` / `number` / `enum` / `bool` / `tags` / `palette`
+- `enum` 的 `options` 直接是数组：可以引用上面定义好的常量，也可以就地写 `[{ value, label, phrase }]`
+- `default`：新建 item 时的初值，必须出现在 `options` 里
+- `required`：右栏表单标星
+- `canvas: true`：这一项的值会出现在画布左上角的标签里
+
+## 类型
+
+```js
 {
-  "panelShapes":    { "rect": { "name": "矩形", "phrase": "rectangular panel with straight edges" } },
-  "frameStyles":    { … },
-  "cameras":        { … },
-  "stylePresets":   { "mono": { "phrase": "…", "guard": "…", "meta": [] } },
-  "readingOrders":  { … },
-  "bubbleTypes":    { "speech": { "id": "01", "name": "对话", "phrase": "…", "tail": true } },
-  "tailDirections": { "down-left": { "name": "左下", "phrase": "a short tapering tail pointing down-left" } },
-  "snippets":       { "textLock": "…{panels}…{texts}…", "placement": "placed in the {area} area of the page" }
+  key: 'panel',                 // 存进 page.json 的 type
+  label: '面板',                // 按钮与右栏标题
+  role: 'panel',                // 参与编号、能被文字定位
+  fields: [ … ],
+  compile({ item, page }) {     // 返回 { label, caption, text?, tags?, palette? }，bbox 由核心补
+    …
+  },
 }
 ```
 
-所有词表都是 `{ 值: { name, … } }`，`name` 就是右栏下拉里显示的字，加一项不用动代码。
+`compile` 只拿到 `{ item, page }`；排版辅助函数（编号、定位、九宫格、竖排）就是同文件里的普通函数，直接用。
 
-规则：
-
-- **改措辞**：直接改 `phrase` / `snippets` 里的句子，保存即生效（下一次 `compile` / `render`）
-- **加枚举**：往对应对象加一项，例如新机位 `"bird": { "name": "鸟瞰", "phrase": "bird's eye view" }`
-- `snippets` 里的 `{name}` 是占位符（`{n}` 面板号、`{area}` 位置、`{panels}`/`{texts}` 数量），改句子时保留它们
-- 想恢复默认：`git checkout -- config/prompts.mjs`
-
-词表在 `config/prompts.mjs`，改完下一次编译生效。
-
-## 类型定义（配置根里的 types.mjs）
-
-类型定义在 `config/types.mjs`。**加类型、改字段、改编译逻辑都改这个文件**，不要动包内代码。
+## buildSummary
 
 ```js
-export default [
-    {
-        key: 'sfx',
-        label: '拟声',
-        fields: [
-            { key: 'text', type: 'text', label: '拟声词', required: true },
-            { key: 'caption', type: 'longtext', label: '写法说明' },
-        ],
-        compile({ item, page }) {
-            return {
-                label: 'text',
-                caption: item.caption,
-                text: item.text,
-            };
-        },
-    },
-];
-```
-
-约定：
-
-- 导出必须是**数组**（`export default [...]` 或 `export const TYPES = [...]`）
-- 每项 `{ key, label, fields, compile }`
-- `compile({ item, page })` 返回 `{ label, caption, text?, tags?, palette? }`，**不要给 bbox**（核心会补）
-- `fields[].type`：`text` / `longtext` / `number` / `enum` / `bool` / `tags` / `palette`
-- `enum` 的 `options` 指向 `prompts.mjs` 里的词表（`panelShapes` / `cameras` / `bubbleTypes` …）
-- 字段加 `canvas: true` 才会出现在格子左上角标签里
-- 改完下一次 `compile` / `render` 生效；网页需要刷新
-
-## 内核与漫画方言的分工
-
-| 目录      | 有什么                                       | 谁改   |
-| --------- | -------------------------------------------- | ------ |
-| `core/`   | 坐标换算、遍历、JSON 形状、校验、占位符引擎  | 不动   |
-| `config/` | 漫画方言：词表、类型、排版辅助函数、展示规则 | 直接改 |
-
-`config/` 下的方言文件：
-
-| 文件          | 内容                                                                                                            |
-| ------------- | --------------------------------------------------------------------------------------------------------------- |
-| `prompts.mjs` | 词表、短语、句子模板                                                                                            |
-| `helpers.mjs` | `panelsOf` / `readingOrder` / `panelNumber` / `locateInPanel` / `placementOf` / `textLayoutOf` / `bubblePhrase` |
-| `types.mjs`   | 类型数组（含 `compile`）+ `buildSummary`                                                                        |
-| `ui.mjs`      | 表单字段、画布标签、类型配色                                                                                    |
-
-## types.mjs 的固定导出
-
-```js
-export const types = [
-  {
-    key: 'panel', label: '面板', role: 'panel',
-    fields: [ … ],
-    compile({ item, page, prompts }) { … },   // 需要什么自己 import helpers
-  },
-];
-
-export function buildSummary({ page, items, prompts }) {
+export function buildSummary({ page, items }) {
   return { meta, canvas, caption };
 }
 ```
 
-- `compile` 只拿到 `{ item, page, prompts }`，**没有共享 ctx**：面板自己调 `panelNumber(page, item, types)`，气泡自己调 `locateInPanel(page, item, types)`
-- `role: 'panel'` 决定它参与编号、能被文字定位——内核不认 `'panel'` 这个字符串
-- `buildSummary` 返回 `{ meta, canvas, caption }`，写作风格全在这里
+`items` 已经是编译后的 Moss item，`caption` 就是整页那段总述。
 
 ## 编译流程
 
 ```js
-export function compilePage(page, { types, prompts, buildSummary }) {
-  for (const item of page.items) { … type.compile({ item, page, prompts }) … }
-  return { doc: { summary: buildSummary({ page, items, prompts }), items, bbox_coord_space, bbox_format } };
-}
+compilePage(page)                 // 从管理器拿类型与 buildSummary
+  → 每个 item 调自己类型的 compile
+  → toMoss() 把坐标换成中心原点 yxyx
+  → buildSummary() 拼 summary
+  → validatePage() 校验
 ```
 
 编译器遍历 `items`，逐个调用类型自己的 `compile`，补上坐标后拼成最终 JSON。

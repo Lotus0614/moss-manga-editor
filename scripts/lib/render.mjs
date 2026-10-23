@@ -1,14 +1,13 @@
 // 渲染一页：编译 → 填工作流 → 提交 ComfyUI → 取图 → 存版本。
 
 import { compilePage } from '../../core/compile.mjs';
-import { compileContext } from '../../core/bible.mjs';
 import { blocking } from '../../core/validate.mjs';
 import { comfyFromSettings } from './comfy.mjs';
 import { readWorkflow, buildValues, fillWorkflow } from './workflow.mjs';
 import { saveImage, addVersion } from './archive.mjs';
 
 export async function prepareRender({ dir, configDir = dir, project, page, config, opts = {} }) {
-  const compiled = compilePage(page, compileContext(project, page));
+  const compiled = compilePage(page);
   const errors = blocking(compiled.warnings);
   if (errors.length) return { ok: false, error: `这一页还有错误：${errors[0].message}`, warnings: compiled.warnings };
 

@@ -28,9 +28,6 @@ export function pageOutline(page) {
 
 export function projectOutline(project, pages) {
   const lines = [`${project.name}（${project.slug}）  画布 ${project.size}  ${pages.length} 页`];
-  const characters = project.bible?.characters || [];
-  if (characters.length) lines.push(`人物 ${characters.map((c) => c.code || c.name).join('、')}`);
-  if (project.bible?.scene) lines.push(`共用场景：${project.bible.scene}`);
   for (const page of pages) {
     lines.push(`  第 ${page.index} 页 ${page.id}  ${page.items ?? 0} 项${page.title ? ` · ${page.title}` : ''}`);
   }

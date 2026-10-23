@@ -35,7 +35,6 @@ import {
 import { listWorkflows, readWorkflow, saveWorkflow, checkWorkflow } from './scripts/lib/workflow.mjs';
 import { renderPage } from './scripts/lib/render.mjs';
 import { compilePage } from './core/compile.mjs';
-import { compileContext } from './core/bible.mjs';
 import { createPanelItem } from './core/manga-doc.mjs';
 import { ComfyClient } from './scripts/lib/comfy.mjs';
 
@@ -183,7 +182,7 @@ async function route(req, res, url) {
       if (project && page) {
         group.index = page.index;
         group.title = page.title;
-        group.warnings = compilePage(page, compileContext(project, page)).warnings.length;
+        group.warnings = compilePage(page).warnings.length;
       }
     }
     return json(res, 200, result);
@@ -259,7 +258,6 @@ async function route(req, res, url) {
       if (method === 'PUT') {
         const payload = await body(req);
         if (payload.name) project.name = String(payload.name);
-        if (payload.bible) project.bible = { ...project.bible, ...payload.bible };
         if (payload.defaults) project.defaults = { ...(project.defaults || {}), ...payload.defaults };
         if (payload.generation) project.generation = { ...(project.generation || {}), ...payload.generation };
         if (Array.isArray(payload.canvas)) project.canvas = payload.canvas;
@@ -301,7 +299,7 @@ async function route(req, res, url) {
       if (!page) return fail(res, 404, '页面不存在');
 
       if (action === 'compile' && method === 'POST') {
-        const compiled = compilePage(page, compileContext(project, page));
+        const compiled = compilePage(page);
         return json(res, 200, { json: compiled.json, doc: compiled.doc, warnings: compiled.warnings, stats: compiled.stats });
       }
 

@@ -44,7 +44,6 @@ import { listWorkflows, readWorkflow, saveWorkflow, checkWorkflow } from './lib/
 import { ComfyClient } from './lib/comfy.mjs';
 import { prepareRender, renderPage } from './lib/render.mjs';
 import { compilePage } from '../core/compile.mjs';
-import { compileContext } from '../core/bible.mjs';
 import { diffPage, describeOp } from './lib/diff.mjs';
 import { createItem } from '../core/manga-doc.mjs';
 import { pageOutline, projectOutline, warningsText, table, diffText } from './lib/format.mjs';
@@ -488,7 +487,7 @@ function checkScope(config, ops) {
 async function cmdCompile() {
   const project = await needProject();
   const page = await needPage(project);
-  const compiled = compilePage(page, compileContext(project, page));
+  const compiled = compilePage(page);
   const warnings = compiled.warnings;
   if (JSON_MODE) return out({ ok: true, json: compiled.json, doc: compiled.doc, warnings, stats: compiled.stats }, '');
   return out(
@@ -546,7 +545,7 @@ async function cmdChanges() {
     const project = await getProject(DIR, group.project);
     const page = await getPage(DIR, group.project, group.page);
     if (project && page) {
-      const compiled = compilePage(page, compileContext(project, page));
+      const compiled = compilePage(page);
       group.warnings = compiled.warnings.length;
       group.title = page.title;
       group.index = page.index;

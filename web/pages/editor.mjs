@@ -24,7 +24,6 @@ import { ITEM_TYPES, itemType } from '../../config/ui.mjs';
 import { PromptPanel, HistoryPanel, ChangesPanel } from '../components/workbench.mjs';
 import { exportLongImage, exportPdf } from '../components/export.mjs';
 import { compilePage } from '../../core/compile.mjs';
-import { compileContext } from '../../core/bible.mjs';
 import { createItem } from '../../core/manga-doc.mjs';
 
 const STYLE_LABELS = [
@@ -316,11 +315,11 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const compiled = useMemo(() => {
     if (!page) return null;
     try {
-      return compilePage(page, compileContext(project, page));
+      return compilePage(page);
     } catch (err) {
       return { json: '', warnings: [{ level: 'error', code: 'compile', message: err.message }], stats: {} };
     }
-  }, [page, project]);
+  }, [page]);
 
   async function generate() {
     if (!page || generating) return;

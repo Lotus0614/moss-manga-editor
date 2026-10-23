@@ -80,7 +80,7 @@ function buildDocPage() {
   return page;
 }
 
-const compiled = compilePage(buildDocPage(), { characterText: 'CHARACTER: W = a 22 year old college girl.' });
+const compiled = compilePage(buildDocPage());
 
 test('四个面板的 bbox 与文档示例完全一致', () => {
   const got = compiled.doc.items.filter((i) => i.label === 'object').map((i) => JSON.stringify(i.bbox)).sort();

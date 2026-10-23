@@ -73,7 +73,6 @@ export async function listProjects(dir) {
 export async function getProject(dir, slug) {
   const project = await readJson(join(projectDir(dir, slug), 'project.json'), null);
   if (!project) return null;
-  project.bible = { characters: [], scene: '', ...(project.bible || {}) };
   project.pages = Array.isArray(project.pages) ? project.pages : [];
   return project;
 }
@@ -85,7 +84,7 @@ export async function saveProject(dir, project) {
   return project;
 }
 
-export async function createProject(dir, { name, size = 'page', bible, canvas, defaults } = {}) {
+export async function createProject(dir, { name, size = 'page', canvas, defaults } = {}) {
   const base = slugify(name);
   let slug = base;
   let n = 2;
@@ -98,7 +97,6 @@ export async function createProject(dir, { name, size = 'page', bible, canvas, d
     canvas: Array.isArray(canvas) ? canvas : [768, 1280],
     defaults: defaults || { reading: 'rtl', style: 'mono', vertical: true },
     pages: [],
-    bible: bible || { characters: [], scene: '' },
     createdAt: now(),
   };
   await saveProject(dir, project);

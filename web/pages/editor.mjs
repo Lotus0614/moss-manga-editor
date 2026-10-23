@@ -558,6 +558,14 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
           </button>`
         )}
       </div>
+
+      <div class="canvas-hint" style=${`bottom:${dockCollapsed ? 46 : 284}px`}>
+        <span><span class="k">Ctrl</span>滚轮 缩放</span>
+        <span><span class="k">Shift</span>点击 多选</span>
+        <span><span class="k">Alt</span>点击 穿透</span>
+        <span><span class="k">Ctrl</span><span class="k">Z</span>撤销</span>
+        <span><span class="k">Del</span>删除</span>
+      </div>
       <div class="canvas-ctrl top">
         <input type="range" min="0.5" max="3" step="0.05" value=${zoom} title="缩放" style="width:90px" onInput=${(e) => setZoom(Number(e.currentTarget.value))} />
         <button class="icon-btn" title="适应画布" onClick=${() => setZoom(1)}>

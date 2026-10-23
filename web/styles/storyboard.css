@@ -768,5 +768,30 @@ a { color: inherit; }
 }
 .canvas-ctrl.bottom .btn .plus { flex: none; opacity: 0.75; }
 .canvas-ctrl.bottom .btn:hover .plus { opacity: 1; }
+
+/* 画布左下角：快捷键提示 */
+.canvas-hint {
+  position: absolute;
+  left: 14px;
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 12px;
+  max-width: calc(100% - 320px);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--mid);
+  pointer-events: none;
+  user-select: none;
+}
+.canvas-hint .k {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.85);
+  padding: 0 4px;
+  margin-right: 2px;
+  color: var(--mid);
+}
 .icon-btn.on { background: var(--ink); color: var(--paper); }
 .dock.collapsed .dock-body { display: none; }

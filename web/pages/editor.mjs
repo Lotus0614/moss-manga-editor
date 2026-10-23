@@ -76,6 +76,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const pageRef = useRef(null);
   const saveTimer = useRef(null);
   const dirtyRef = useRef(false);
+  const jobsRef = useRef({});
   const createdFirst = useRef(false);
   const history = useRef([]);
   const clipboard = useRef(null);
@@ -129,6 +130,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         history.current = [];
         dirtyRef.current = false;
         setExternal('');
+        restoreJob(data.page.id);
       })
       .catch((err) => toast(err.message, 'bad'));
     return () => {
@@ -171,6 +173,8 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
       } catch {
         return;
       }
+      // 先按页记下来，切走再切回来还能看到这一页的状态
+      jobsRef.current[job.page] = job;
       const cur = pageRef.current;
       if (!cur || job.page !== cur.id) return;
       setGen(job);
@@ -266,6 +270,24 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         pageRef.current = data.page;
         setVersions(data.versions || []);
         setCurrent(data.current || '');
+      })
+      .catch(() => {});
+  }
+
+  /** 切回某一页时恢复它的生成状态：先用手上记着的，再以服务器的任务列表为准 */
+  function restoreJob(id) {
+    const known = jobsRef.current[id];
+    setGen(known || null);
+    setBusyGen(Boolean(known && (known.status === 'queued' || known.status === 'running')));
+
+    api('/api/jobs')
+      .then(({ jobs }) => {
+        if (pageRef.current?.id !== id) return;
+        const latest = (jobs || []).find((job) => job.page === id);
+        if (!latest) return;
+        jobsRef.current[id] = latest;
+        setGen(latest);
+        setBusyGen(latest.status === 'queued' || latest.status === 'running');
       })
       .catch(() => {});
   }
@@ -404,7 +426,9 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     setBusyGen(true);
     try {
       const res = await apiPost(`/api/projects/${projectId}/pages/${page.id}/render`, {});
-      setGen({ status: 'running', progress: 0, id: res.jobId });
+      const started = { page: page.id, status: 'running', progress: 0, id: res.jobId };
+      jobsRef.current[page.id] = started;
+      setGen(started);
     } catch (err) {
       setBusyGen(false);
       toast(err.message, 'bad');

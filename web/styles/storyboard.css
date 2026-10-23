@@ -461,13 +461,27 @@ a { color: inherit; }
 .version {
   width: 96px;
   border: 1px solid var(--line);
-  cursor: pointer;
   background: var(--paper);
 }
 .version.on { border-color: var(--ink); box-shadow: 2px 2px 0 var(--ink); }
-.version img { width: 100%; aspect-ratio: 3 / 5; object-fit: cover; display: block; background: var(--grey); }
+.version img { width: 100%; aspect-ratio: 3 / 5; object-fit: cover; display: block; background: var(--grey); cursor: pointer; }
 .version .vmeta { padding: 4px 6px; font-family: var(--mono); font-size: 9px; color: var(--mid); letter-spacing: 0.04em; }
 .version .vmeta b { color: var(--ink); display: block; font-size: 9.5px; }
+.version .vbtn {
+  width: 100%;
+  padding: 4px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.version .vbtn:hover { background: var(--ink); color: var(--paper); }
+.version .vbtn:disabled { background: var(--grey); color: var(--mid); cursor: default; }
+.version.on .vbtn { border-top-color: var(--ink); }
 
 /* ---------------------------------------------------------------- 聊天 */
 

@@ -33,17 +33,20 @@ export function PromptPanel({ compiled, warnings }) {
 
 export function HistoryPanel({ versions, current, onPick }) {
   const list = [...versions].reverse();
+  const activeId = current || list[0]?.id;
   if (!list.length) return html`<div class="hint">这一页还没有生成过图片。点右上角「生成」。</div>`;
   return html`<div class="col" style="gap:10px">
     <div class="history-strip">
-      ${list.map(
-        (v) => html`<div class=${cls('version', v.id === (current || list[0]?.id) && 'on')} key=${v.id} onClick=${() => onPick(v.id)}>
-          <img src=${v.image} alt="" loading="lazy" />
+      ${list.map((v) => {
+        const on = v.id === activeId;
+        return html`<div class=${cls('version', on && 'on')} key=${v.id}>
+          <img src=${v.image} alt="" loading="lazy" title="预览这一版" onClick=${() => onPick(v.id)} />
           <div class="vmeta"><b>${v.seed}</b>${formatTime(v.at).slice(5)}</div>
-        </div>`
-      )}
+          <button class="vbtn" disabled=${on} onClick=${() => onPick(v.id)}>${on ? '当前' : '用这版'}</button>
+        </div>`;
+      })}
     </div>
-    <span class="hint">点缩略图切换当前采用版；历史只读，不会改布局。</span>
+    <span class="hint">点「用这版」把它设为当前采用的图；历史只读，不会改布局。</span>
   </div>`;
 }
 

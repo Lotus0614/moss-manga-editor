@@ -480,6 +480,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     setCurrent(id);
     try {
       await apiPost(`/api/projects/${projectId}/versions/current`, { id, pageId: page.id });
+      refreshPages();
     } catch (err) {
       toast(err.message, 'bad');
     }

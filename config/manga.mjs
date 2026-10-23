@@ -166,7 +166,8 @@ export const BUBBLES = [
     {
         value: 'narration',
         label: '旁白',
-        phrase: 'narration lettering printed DIRECTLY on the artwork, floating freely, no bubble, no box, no background, thin white outline only',
+        // 旁白压在细节多的画面上根本读不清，改用日漫常见的白底小方框
+        phrase: 'narration lettering set in a plain white rectangular caption box with a thin black border, box edges straight and parallel to the panel edge, box covers the artwork behind it',
         tail: false,
     },
     {
@@ -242,7 +243,7 @@ export const SNIPPETS = {
     textLock:
         'This page has exactly {panels} panel(s) and exactly {texts} text element(s). Render ONLY the text listed below, with the exact wording given. Do NOT invent any additional dialogue, speech bubble, caption, sound effect or lettering, and do not fill empty space with text — any text that is not listed is an error.',
     bubbleRule:
-        'Dialogue uses white speech bubbles with tails, thoughts use white cloud bubbles with no tail, and narration is bare lettering printed directly on the artwork with no bubble, no box and no background.',
+        'Dialogue uses white speech bubbles with tails, thoughts use white cloud bubbles with no tail, and narration sits in a small plain white rectangular caption box. Every bubble and caption box stays INSIDE one panel and never crosses a panel border.',
     noLettering:
         'This page contains NO lettering at all: no speech bubbles, no captions, no sound effects, no text of any kind.',
     boxPrefix: 'This box contains only:',
@@ -331,10 +332,15 @@ function textLayoutOf(page, item) {
 function bubblePhrase(bubble) {
     const kind = pick(BUBBLES, bubble.kind) || pick(BUBBLES, 'speech');
     const parts = [kind.phrase];
-    if (kind.tail)
+    if (kind.tail) {
         parts.push(
             (pick(TAILS, bubble.tail) || pick(TAILS, 'down-left')).phrase,
         );
+        // 文字贴到气泡轮廓上会糊成一团，明确要求留边
+        parts.push(
+            'the lettering sits well inside the bubble with a clear margin, never touching the outline',
+        );
+    }
     return parts.join(', ');
 }
 

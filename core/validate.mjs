@@ -1,4 +1,4 @@
-﻿// 校验：把《JSON Layout》第七节的检查清单变成代码。
+// 校验：把《JSON Layout》第七节的检查清单变成代码。
 // level=error 阻止生成，level=warn 只提醒。
 
 import { pageSize, bboxArea, panelsOf, bubblesOf } from './manga-doc.mjs';
@@ -62,6 +62,17 @@ export function validatePage(page, doc) {
           `${name} 文字 ${used} 字，按当前框与字号最多约 ${budget.capacity} 字（${budget.cols} 列 × ${budget.perCol}），建议拆条或放大框`,
           item.id
         );
+      }
+    }
+
+    // 文字压分格线 / 贴边：模型会把字直接画到接缝和边框上
+    if (item.type === 'bubble' || (item.type === 'native' && item.label === 'text')) {
+      const place = textPlacement(page, item);
+      if (place.seam) {
+        add('warn', 'text.seam', `${name} 的文字框跨在分格线上，会被画到两格接缝处：${place.seam}`, item.id);
+      }
+      if (place.tight !== null) {
+        add('warn', 'text.edge', `${name} 的文字框离分格线只有 ${place.tight}px，字会被画到边框上`, item.id);
       }
     }
 
@@ -135,6 +146,36 @@ function intersectionArea(a, b) {
   const w = Math.min(a[2], b[2]) - Math.max(a[0], b[0]);
   const h = Math.min(a[3], b[3]) - Math.max(a[1], b[1]);
   return w > 0 && h > 0 ? w * h : 0;
+}
+
+/**
+ * 文字框和面板的关系：
+ *   seam  —— 没有完整落在任何一格内，却跨了不止一格（字会画到接缝上）
+ *   tight —— 完整落在某一格内，但离某条边不到 EDGE_MARGIN px
+ */
+const EDGE_MARGIN = 10;
+
+function textPlacement(page, item) {
+  const [x1, y1, x2, y2] = item.bbox;
+  const inside = [];
+  const partial = [];
+
+  for (const panel of panelsOf(page)) {
+    const [px1, py1, px2, py2] = panel.bbox;
+    if (intersectionArea(item.bbox, panel.bbox) <= 0) continue;
+    const fully = x1 >= px1 - 2 && x2 <= px2 + 2 && y1 >= py1 - 2 && y2 <= py2 + 2;
+    (fully ? inside : partial).push(panel);
+  }
+
+  if (!inside.length && partial.length > 1) {
+    return { seam: partial.map((panel) => panel.id).join(' / '), tight: null };
+  }
+  if (inside.length === 1) {
+    const [px1, py1, px2, py2] = inside[0].bbox;
+    const gap = Math.min(x1 - px1, y1 - py1, px2 - x2, py2 - y2);
+    return { seam: '', tight: gap < EDGE_MARGIN ? Math.round(gap) : null };
+  }
+  return { seam: '', tight: null };
 }
 
 export function textBudget(item) {

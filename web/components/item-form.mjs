@@ -1,8 +1,8 @@
-// 元素属性表单：完全由 config-store 里的字段声明生成，代码里不出现任何具体字段名。
+﻿// 元素属性表单：完全由 config/manga.mjs 的字段声明生成，代码里不出现任何具体字段名。
 // 加一个新类型/新字段，这里自动多出对应控件。
 
 import { html, cls } from '../lib.mjs';
-import { fieldsOf, itemType, optionsOf } from '../../core/config-store.mjs';
+import { fieldsOf, itemType, optionsOf } from '../../config/manga.mjs';
 
 const TYPE_LABEL = (key) => itemType(key)?.label || key;
 

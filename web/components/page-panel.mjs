@@ -1,7 +1,7 @@
-// 右栏：页面属性。字段来自 config-store 里的页面字段，加字段不用改这里。
+// 右栏：页面属性。字段来自 config/manga.mjs 的 PAGE，加字段不用改这里。
 
 import { html } from '../lib.mjs';
-import { pageFields, optionsOf, itemType } from '../../core/config-store.mjs';
+import { PAGE, optionsOf, itemType } from '../../config/manga.mjs';
 
 function Field({ field, value, onChange }) {
   if (field.type === 'enum') {
@@ -36,7 +36,7 @@ function Field({ field, value, onChange }) {
 
 export default function PagePanel({ page, mutate, setSelection }) {
   return html`<div class="col">
-    ${pageFields().map(
+    ${PAGE.map(
       (field) => html`<${Field}
         key=${field.key}
         field=${field}

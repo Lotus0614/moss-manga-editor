@@ -1,16 +1,10 @@
 // 应用根组件：顶栏 + 路由 + 设置弹窗 + 全局提示。
 
 import { html, render, useEffect, useState, useRoute, useApp, setApp, useToasts, api, go, toast } from './lib.mjs';
-import { registerConfig, configProblems } from '../core/config-store.mjs';
-import mangaConfig from '../config/manga.mjs';
 import ProjectsPage from './pages/projects.mjs';
 import EditorPage from './pages/editor.mjs';
 import SettingsModal from './components/settings-modal.mjs';
 import ProjectSettings from './components/project-settings.mjs';
-
-// 方言注册一次，之后各组件只从 config-store 取
-const store = registerConfig(mangaConfig);
-if (store.problems.length) console.error('[配置]', store.problems);
 
 function Toasts() {
   const items = useToasts();

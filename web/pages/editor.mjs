@@ -1,4 +1,4 @@
-// 编辑页：左页序 / 中画布 + 工作台 / 右属性面板。
+﻿// 编辑页：左页序 / 中画布 + 工作台 / 右属性面板。
 // 页面是单层 items；快捷键 Delete 删除、Ctrl+C/V 复制粘贴、Ctrl+Z 撤销。
 
 import {
@@ -20,7 +20,7 @@ import {
 import Canvas from '../components/canvas.mjs';
 import PagePanel from '../components/page-panel.mjs';
 import ItemForm from '../components/item-form.mjs';
-import { itemTypes, itemType } from '../../core/config-store.mjs';
+import { TYPES, itemType } from '../../config/manga.mjs';
 import { PromptPanel, HistoryPanel, ChangesPanel } from '../components/workbench.mjs';
 import { exportLongImage, exportPdf } from '../components/export.mjs';
 import { compilePage } from '../../core/compile.mjs';
@@ -550,7 +550,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
       </div>
 
       <div class="canvas-ctrl bottom" style=${`bottom:${dockCollapsed ? 46 : 284}px`}>
-        ${itemTypes().map(
+        ${TYPES.map(
           (t) => html`<button class="btn" onClick=${() => addItem(t.key)}>
             <svg class="plus" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" aria-hidden="true"><path d="M5 1v8M1 5h8" /></svg>
             ${t.label}

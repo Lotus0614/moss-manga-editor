@@ -1,5 +1,5 @@
-// 画布：把每个 item 画成「带标签的框」。
-import { canvasLabel } from '../../core/config-store.mjs';
+﻿// 画布：把每个 item 画成「带标签的框」。
+import { canvasLabel } from '../../config/manga.mjs';
 //
 // 不渲染真实气泡形状——标注清楚比画得像更重要：
 //   分格：标签写「格 · 全景/矩形」，里面是画面描述

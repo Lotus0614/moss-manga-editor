@@ -1,8 +1,8 @@
-// 校验：把《JSON Layout》第七节的检查清单变成代码。
+﻿// 校验：把《JSON Layout》第七节的检查清单变成代码。
 // level=error 阻止生成，level=warn 只提醒。
 
 import { pageSize, bboxArea, panelsOf, bubblesOf } from './manga-doc.mjs';
-import { itemType, typeOption } from './config-store.mjs';
+import { itemType, typeOption } from '../config/manga.mjs';
 
 const ALLOWED_TOP = new Set(['summary', 'items', 'bbox_coord_space', 'bbox_format']);
 const ALLOWED_ITEM = new Set(['label', 'caption', 'bbox', 'text', 'tags', 'palette']);

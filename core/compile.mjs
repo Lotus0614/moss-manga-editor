@@ -1,10 +1,10 @@
-// items → Moss Layout JSON 的通用 walker。
+﻿// items → Moss Layout JSON 的通用 walker。
 //
 // 内核不认识任何漫画概念：类型、写法、summary 全从配置管理器取。
-//   config-store 提供 types / buildSummary，方言自己负责 compile 的内容。
+//   类型与 buildSummary 来自 config/manga.mjs。
 
 import { pageSize, toMoss } from './manga-doc.mjs';
-import { itemType, buildSummary } from './config-store.mjs';
+import { itemType, buildSummary } from '../config/manga.mjs';
 import { validatePage } from './validate.mjs';
 
 export function compilePage(page) {

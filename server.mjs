@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { loadConfig } from './scripts/lib/load-config.mjs';
 // 预览服务器：给人和 Agent 看/改漫画存档用。
 //   node server.mjs                 → http://127.0.0.1:5123
 //   MOSS_ARCHIVE=/path node server.mjs
@@ -426,9 +425,6 @@ const server = createServer(async (req, res) => {
 });
 
 await ensureConfig(CONFIG_DIR);
-const dialect = await loadConfig(CONFIG_DIR);
-if (!dialect.applied) console.error(`[配置] 读不了 ${dialect.file}：${dialect.error}`);
-else for (const problem of dialect.problems) console.error(`[配置] ${problem}`);
 await ensureArchive(ARCHIVE);
 server.listen(PORT, HOST, async () => {
   const config = await readConfig(CONFIG_DIR);

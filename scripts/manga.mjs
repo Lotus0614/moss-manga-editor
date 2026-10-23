@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { loadConfig } from './lib/load-config.mjs';
 // moss-manga CLI —— Agent 操作漫画存档的唯一入口。
 //
 //   node scripts/manga.mjs doctor
@@ -81,9 +80,6 @@ const { positional, flags } = parseArgs(process.argv.slice(2));
 const command = positional[0] || 'help';
 const JSON_MODE = Boolean(flags.json);
 const CONFIG_DIR = resolveConfigDir(flags.config);
-const loaded = await loadConfig(CONFIG_DIR);
-if (!loaded.applied) fail(`读不了方言配置：${loaded.file}（${loaded.error}）`);
-if (loaded.problems.length) fail(`方言配置有问题：${loaded.problems.join('；')}`);
 const CONFIG = await readConfig(CONFIG_DIR);
 const DIR = resolveArchiveDir(CONFIG, flags.dir || flags.archive);
 

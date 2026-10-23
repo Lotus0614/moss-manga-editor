@@ -1,4 +1,4 @@
-// 漫画页面文档（v3）：单层 items。
+﻿// 漫画页面文档（v3）：单层 items。
 //
 // 页面只有一串 items，每个 item 用 type 区分：
 //   panel  —— 一个分格：坐标、形状、边框、机位、画面描述
@@ -20,7 +20,7 @@ export const SIZE_PRESETS = {
 
 // ---------------------------------------------------------------- 基础工具
 
-import { pageField, itemType, optionsOf } from './config-store.mjs';
+import { pageField, itemType, optionsOf } from '../config/manga.mjs';
 
 /** 画风取值校验：以注册的页面字段为准，认不出就退回默认 */
 function isValidStyle(value) {

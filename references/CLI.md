@@ -1,4 +1,4 @@
-# CLI 参考
+﻿# CLI 参考
 
 入口：`node scripts/manga.mjs <命令> [参数]`。所有命令支持 `--json`，失败时退出码非零。
 
@@ -6,7 +6,7 @@
 
 | 参数 | 作用 |
 |---|---|
-| `--config <路径>` | 配置根，默认 `config/`（或环境变量 `MOSS_CONFIG`） |
+| `--config <路径>` | 配置根，默认 `config/`（或环境变量 `MOSS_CONFIG`）；只管 `config.json` 与工作流，方言固定是仓库里的 `config/manga.mjs` |
 | `--dir <路径>` | 存档目录，默认 `config/archive`（或 `config.archive` / `MOSS_ARCHIVE`） |
 | `--project <slug>` | 项目；只有一个项目时可省略 |
 | `--json` | 输出结构化 JSON |

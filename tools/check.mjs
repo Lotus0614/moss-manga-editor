@@ -6,8 +6,7 @@ import { join, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
-import { registerConfig } from '../core/config-store.mjs';
-import mangaConfig from '../config/manga.mjs';
+import { PAGE, TYPES } from '../config/manga.mjs';
 
 const run = promisify(execFile);
 const ROOT = resolve(process.cwd());
@@ -37,16 +36,52 @@ for await (const file of walk(ROOT)) {
 }
 console.log(failed ? `\n${failed} / ${checked} 个文件有语法错误` : `\n${checked} 个文件语法正常`);
 
-// 方言配置：注册时就校验过一遍（枚举没词表、default 越界、重复 value 都会记下来）
-const store = registerConfig(mangaConfig);
-for (const problem of store.problems) {
-  failed += 1;
-  console.error(`✗ ${problem}`);
+// 方言配置：枚举必须有选项、value 不重复、default 落在选项里
+const problems = [];
+const FIELD_TYPES = new Set(['text', 'longtext', 'number', 'enum', 'bool', 'tags', 'palette']);
+
+function checkFields(fields, where) {
+  const keys = new Set();
+  for (const field of fields || []) {
+    const at = `${where} 字段 ${field.key || '?'}`;
+    if (!field.key) problems.push(`${at}：没有 key`);
+    else if (keys.has(field.key)) problems.push(`${at}：key 重复`);
+    keys.add(field.key);
+    if (!field.label) problems.push(`${at}：没有 label`);
+    if (!FIELD_TYPES.has(field.type)) problems.push(`${at}：type "${field.type}" 不认识`);
+
+    if (field.type !== 'enum') continue;
+    if (!Array.isArray(field.options) || !field.options.length) {
+      problems.push(`${at}：enum 必须给 options 数组`);
+      continue;
+    }
+    const values = new Set();
+    for (const option of field.options) {
+      if (!option || option.value === undefined) problems.push(`${at}：选项缺 value`);
+      else if (values.has(option.value)) problems.push(`${at}：选项 "${option.value}" 重复`);
+      else values.add(option.value);
+    }
+    if (field.default !== undefined && !values.has(field.default)) {
+      problems.push(`${at}：default "${field.default}" 不在 options 里`);
+    }
+  }
 }
-const enumCount = [...store.page, ...store.types.flatMap((type) => type.fields)].filter((field) => field.type === 'enum').length;
-if (!store.problems.length) {
-  console.log(`配置：${store.page.length} 个页面字段、${store.types.length} 个类型、${enumCount} 个枚举字段`);
-  console.log(`字段：${store.page.map((field) => field.key).join(' / ')}`);
+
+checkFields(PAGE, '页面');
+const typeKeys = new Set();
+for (const type of TYPES || []) {
+  if (!type.key) problems.push(`类型 ${type.label || '?'}：没有 key`);
+  else if (typeKeys.has(type.key)) problems.push(`类型 ${type.key}：key 重复`);
+  typeKeys.add(type.key);
+  if (typeof type.compile !== 'function') problems.push(`类型 ${type.key}：没有 compile()`);
+  checkFields(type.fields, `类型 ${type.key}`);
 }
+
+for (const problem of problems) console.error(`✗ ${problem}`);
+const enumCount = [...PAGE, ...TYPES.flatMap((type) => type.fields || [])].filter((field) => field.type === 'enum').length;
+if (!problems.length) {
+  console.log(`配置：${PAGE.length} 个页面字段、${TYPES.length} 个类型、${enumCount} 个枚举字段`);
+}
+failed += problems.length;
 
 process.exitCode = failed ? 1 : 0;

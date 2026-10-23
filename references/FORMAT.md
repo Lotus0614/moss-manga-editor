@@ -1,4 +1,4 @@
-# 存档格式
+﻿# 存档格式
 
 配置和存档是两棵树：配置（含工作流）在固定的配置根，存档只放项目数据。
 
@@ -236,7 +236,7 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 { key: 'shape',  type: 'enum', label: '形状', options: SHAPES, canvas: true },
 ```
 
-生成规则（`core/config-store.mjs` 的 `canvasLabel`）：
+生成规则（`config/manga.mjs` 的 `canvasLabel`）：
 
 1. 类型名开头，`panel` 带序号（`面板3`），其它不带
 2. 遍历该类型字段，**只有 `canvas: true` 的才出现**，空值跳过
@@ -257,15 +257,18 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 
 加新类型不需要写任何画布代码，也不该为它加特例样式。
 
-## 配置：一个文件，注册给管理器
+## 配置：一个文件
 
-方言全在 `config/manga.mjs`：词表、页面字段、item 类型、句子模板、`buildSummary`，最后由 `export default` 交给管理器。
+方言全在 `config/manga.mjs`：词表、页面字段、item 类型、句子模板、`buildSummary`。
 
 ```js
-export default { name: 'manga', page: PAGE, types: TYPES, snippets: SNIPPETS, buildSummary };
+export const PAGE = [ … ];       // 页面字段
+export const TYPES = [ … ];      // item 类型
+export const SNIPPETS = { … };   // 句子模板
+export function buildSummary({ page, items }) { … }
 ```
 
-`core/config-store.mjs` 是唯一入口：CLI / 服务器 / 网页启动时各注册一次，之后编译、校验、右栏表单、画布标签都从它取，**代码里不再 import 方言文件**。注册时会校验（枚举没选项、`default` 越界、`value` 重复都会报），`npm run check` 会跑这一遍。
+编译、校验、右栏表单、画布标签都直接 `import` 这个文件，格式就是下面这几节写的形状。少了字段、枚举没选项、`default` 越界，`npm run check` 会报出来。
 
 ## 词表
 
@@ -339,7 +342,7 @@ export function buildSummary({ page, items }) {
 ## 编译流程
 
 ```js
-compilePage(page)                 // 从管理器拿类型与 buildSummary
+compilePage(page)                 // 用 config/manga.mjs 的类型与 buildSummary
   → 每个 item 调自己类型的 compile
   → toMoss() 把坐标换成中心原点 yxyx
   → buildSummary() 拼 summary

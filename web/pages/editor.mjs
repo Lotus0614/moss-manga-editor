@@ -181,9 +181,10 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         return;
       }
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selection) {
+        const ids = idsOfSelection();
+        if (ids.length) {
           e.preventDefault();
-          removeItem(selection.id);
+          removeItems(ids);
         }
       }
     };
@@ -211,6 +212,13 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
       .catch(() => {});
   }
 
+  /** selection 统一形状：{ kind, id, ids }，id 是主选中项，ids 是全部选中 */
+  function select(next) {
+    if (!next) return setSelection(null);
+    const ids = Array.isArray(next.ids) && next.ids.length ? next.ids : [next.id];
+    setSelection({ kind: next.kind, id: next.id || ids[ids.length - 1], ids });
+  }
+
   // ---- 修改与历史
   function snapshot() {
     const cur = pageRef.current;
@@ -231,11 +239,12 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     scheduleSave();
   }
 
-  /** 拖拽过程中只更新视图，不进历史 */
-  function updateBbox(id, bbox) {
+  /** 拖拽过程中只更新视图，不进历史；list 是 [{ id, bbox }] */
+  function updateBbox(list) {
     const cur = pageRef.current;
-    if (!cur) return;
-    const next = { ...cur, items: cur.items.map((it) => (it.id === id ? { ...it, bbox } : it)) };
+    if (!cur || !list?.length) return;
+    const map = new Map(list.map((one) => [one.id, one.bbox]));
+    const next = { ...cur, items: cur.items.map((it) => (map.has(it.id) ? { ...it, bbox: map.get(it.id) } : it)) };
     pageRef.current = next;
     setPage(next);
   }
@@ -255,24 +264,35 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
 
   function copySelected() {
     const cur = pageRef.current;
-    const item = cur?.items.find((it) => it.id === selection?.id);
-    if (!item) return;
-    clipboard.current = JSON.parse(JSON.stringify(item));
-    toast(`已复制${TYPE_NAME[item.type] || '项'}`);
+    const items = idsOfSelection()
+      .map((id) => cur?.items.find((it) => it.id === id))
+      .filter(Boolean)
+      .map((it) => JSON.parse(JSON.stringify(it)));
+    if (!items.length) return;
+    clipboard.current = items;
+    toast(items.length > 1 ? `已复制 ${items.length} 项` : `已复制${TYPE_NAME[items[0].type] || '项'}`);
   }
 
   function paste() {
     const src = clipboard.current;
-    if (!src) return;
-    const patch = {
-      ...src,
-      id: undefined,
-      bbox: [src.bbox[0] + 24, src.bbox[1] + 24, src.bbox[2] + 24, src.bbox[3] + 24],
-    };
-    const created = src.type === 'bubble' ? createBubbleItem(patch) : src.type === 'native' ? patch : createPanelItem(patch);
-    mutate((cur) => ({ ...cur, items: [...cur.items, created] }));
-    setSelection({ kind: created.type, id: created.id });
+    if (!src?.length) return;
+    const created = src.map((one) => {
+      const { id, ...rest } = one;
+      return createItem(one.type, {
+        ...rest,
+        bbox: [one.bbox[0] + 24, one.bbox[1] + 24, one.bbox[2] + 24, one.bbox[3] + 24],
+      });
+    });
+    mutate((cur) => ({ ...cur, items: [...cur.items, ...created] }));
+    select({ kind: created[0].type, id: created[created.length - 1].id, ids: created.map((it) => it.id) });
     setTimeout(saveNow, 60);
+  }
+
+  /** 当前选中的 id 列表（单选也返回单元素数组） */
+  function idsOfSelection() {
+    if (!selection) return [];
+    if (Array.isArray(selection.ids) && selection.ids.length) return selection.ids;
+    return selection.id ? [selection.id] : [];
   }
 
   function scheduleSave() {
@@ -399,6 +419,8 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const warnings = compiled?.warnings || [];
   const errors = warnings.filter((w) => w.level === 'error');
   const warns = warnings.filter((w) => w.level === 'warn');
+  const selectedIds = idsOfSelection();
+  const multi = selectedIds.length > 1;
   const selected = selection ? page.items.find((it) => it.id === selection.id) : null;
   const version = versions.find((v) => v.id === current) || versions.slice(-1)[0];
   const image = version?.image || '';
@@ -415,14 +437,20 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     const bbox = type === 'bubble' ? [400, 140, 680, 320] : type === 'native' ? [40, 40, 400, 160] : [40, 420, 728, 780];
     const item = createItem(type, { bbox, ...(type === 'bubble' ? { text: '新台词' } : {}), ...patch });
     mutate((cur) => ({ ...cur, items: [...cur.items, item] }));
-    setSelection({ kind: item.type, id: item.id });
+    select({ kind: item.type, id: item.id });
+    setTimeout(saveNow, 60);
+  }
+
+  function removeItems(ids) {
+    const drop = new Set(ids);
+    if (!drop.size) return;
+    mutate((cur) => ({ ...cur, items: cur.items.filter((it) => !drop.has(it.id)) }));
+    setSelection(null);
     setTimeout(saveNow, 60);
   }
 
   function removeItem(id) {
-    mutate((cur) => ({ ...cur, items: cur.items.filter((it) => it.id !== id) }));
-    setSelection(null);
-    setTimeout(saveNow, 60);
+    removeItems([id]);
   }
 
   function patchItem(id, patch) {
@@ -515,7 +543,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
           grid=${grid}
           scale=${scale}
           selection=${selection}
-          onSelect=${setSelection}
+          onSelect=${select}
           onBegin=${snapshot}
           onChange=${updateBbox}
           onCommit=${saveNow}
@@ -569,16 +597,34 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     </section>
 
     <aside class="inspect">
-      <div class="inspect-head">${selected ? `${TYPE_NAME[selected.type]}属性` : '页面属性'}</div>
-      <div class="inspect-body">${selected
-        ? html`<${ItemForm}
-            item=${selected}
-            patchItem=${patchItem}
-            removeItem=${removeItem}
-            onBack=${() => setSelection(null)}
-            onCopy=${copySelected}
-          />`
-        : html`<${PagePanel} page=${page} mutate=${mutate} setSelection=${setSelection} />`}</div>
+      <div class="inspect-head">${multi ? `已选 ${selectedIds.length} 项` : selected ? `${TYPE_NAME[selected.type]}属性` : '页面属性'}</div>
+      <div class="inspect-body">${multi
+        ? html`<div class="col">
+            <div class="hint">多选：可以直接在画布上整体拖动，右侧不提供逐项编辑。Shift + 点击可加减选。</div>
+            <div class="col" style="gap:3px">
+              ${selectedIds.map((id) => {
+                const it = page.items.find((one) => one.id === id);
+                if (!it) return null;
+                return html`<div class="rowitem" onClick=${() => select({ kind: it.type, id })}>
+                  <span class="mono small">${itemType(it.type)?.label || it.type}</span>
+                  <span class="grow ellipsis">${(it.text || it.caption || '（空）').slice(0, 40)}</span>
+                </div>`;
+              })}
+            </div>
+            <div class="row">
+              <button class="btn sm ghost grow" onClick=${() => setSelection(null)}>取消选择</button>
+              <button class="btn sm ghost" onClick=${() => removeItems(selectedIds)}>删除</button>
+            </div>
+          </div>`
+        : selected
+          ? html`<${ItemForm}
+              item=${selected}
+              patchItem=${patchItem}
+              removeItem=${removeItem}
+              onBack=${() => setSelection(null)}
+              onCopy=${copySelected}
+            />`
+          : html`<${PagePanel} page=${page} mutate=${mutate} setSelection=${select} />`}</div>
     </aside>
 
     ${showExport

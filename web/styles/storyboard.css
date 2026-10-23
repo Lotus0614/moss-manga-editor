@@ -709,11 +709,12 @@ a { color: inherit; }
 .param-grid .full { grid-column: 1 / -1; }
 .panel-box label .mono { color: var(--mid); font-size: 9px; letter-spacing: 0; margin-left: 4px; }
 /* 画布 item：带标签的半透明框 */
-.item-box { fill: rgba(120,120,120,0.06); stroke: var(--ink); stroke-width: 2.5; }
+.item-box { fill: rgba(120,120,120,0.06); stroke: var(--ink); stroke-width: 2.5; cursor: move; }
 
 
 
 .item-box.sel { stroke-width: 4; }
+.item-box.sel-multi { stroke-dasharray: 10 6; }
 .item-tag {
   font-family: var(--mono);
   font-size: 18px;

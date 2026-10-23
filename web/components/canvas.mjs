@@ -84,7 +84,7 @@ function horizontalLines(text, bbox, fs) {
 
 
 
-function ItemBox({ item, page, index, selected, onSelect, onDragStart, onBegin }) {
+function ItemBox({ item, page, index, selected, primary }) {
   const [x1, y1, x2, y2] = item.bbox;
   const w = Math.max(0, x2 - x1);
   const h = Math.max(0, y2 - y1);
@@ -105,7 +105,7 @@ function ItemBox({ item, page, index, selected, onSelect, onDragStart, onBegin }
   return html`<g>
     <rect
       style=${'fill:' + color.fill + ';stroke:' + color.stroke}
-      class=${`item-box ${item.type} ${selected ? 'sel' : ''}`}
+      class=${`item-box ${item.type}${selected ? ' sel' : ''}${selected && !primary ? ' sel-multi' : ''}`}
       x=${x1}
       y=${y1}
       width=${w}
@@ -119,20 +119,6 @@ function ItemBox({ item, page, index, selected, onSelect, onDragStart, onBegin }
         </text>`)
       : rows.map((row) => html`<text class="item-text" x=${row.x} y=${row.y} font-size=${fs} text-anchor="middle">${row.text}</text>`)}
 
-    <rect
-      x=${x1}
-      y=${y1}
-      width=${w}
-      height=${h}
-      fill="transparent"
-      style="cursor:move"
-      onPointerDown=${(e) => {
-        e.stopPropagation();
-        onBegin?.();
-        onSelect?.({ kind: item.type, id: item.id });
-        onDragStart?.(e, item.id, 'move');
-      }}
-    />
   </g>`;
 }
 
@@ -170,10 +156,76 @@ export default function Canvas({ page, image, imageOpacity = 1, showBoxes = true
     return dist <= SNAP ? best : value;
   }
 
-  function startDrag(event, id, mode) {
-    const item = page.items.find((it) => it.id === id);
-    if (!item) return;
-    dragRef.current = { id, mode, start: pointOf(event), origin: [...item.bbox], moved: false };
+  function idsOf(sel) {
+    if (!sel) return [];
+    if (Array.isArray(sel.ids) && sel.ids.length) return sel.ids;
+    return sel.id ? [sel.id] : [];
+  }
+
+  /** 指针压着的所有元素，上面的排前面（items 里越靠后画得越上） */
+  function stackAt(pt) {
+    return [...page.items]
+      .reverse()
+      .filter((it) => pt.x >= it.bbox[0] && pt.x <= it.bbox[2] && pt.y >= it.bbox[1] && pt.y <= it.bbox[3]);
+  }
+
+  /**
+   * 命中规则：
+   *   Alt + 点击  → 在被压住的一摞里往下穿一层（选到下面的格子）
+   *   Shift + 点击 → 加选 / 减选
+   *   普通点击     → 选中最上面那个；如果点的是已选中的，就保持整组不动
+   */
+  function onCanvasDown(event) {
+    if (event.button !== 0) return;
+    if (!showBoxes) {
+      onSelect?.(null);
+      return;
+    }
+    const hits = stackAt(pointOf(event));
+    const held = idsOf(selection);
+
+    if (!hits.length) {
+      if (!event.shiftKey) onSelect?.(null);
+      return;
+    }
+
+    let target;
+    if (event.altKey) {
+      const index = hits.findIndex((it) => it.id === selection?.id);
+      target = hits[(index + 1) % hits.length];
+    } else {
+      target = hits.find((it) => held.includes(it.id)) || hits[0];
+    }
+
+    let ids;
+    if (event.shiftKey) {
+      ids = held.includes(target.id) ? held.filter((id) => id !== target.id) : [...held, target.id];
+      if (!ids.length) {
+        onSelect?.(null);
+        return;
+      }
+    } else if (held.includes(target.id)) {
+      ids = held;
+    } else {
+      ids = [target.id];
+    }
+
+    const primary = ids.includes(selection?.id) ? selection.id : target.id;
+    // 多选状态下单击（没有拖动）收敛成单个
+    const collapse = !event.shiftKey && !event.altKey && ids.length > 1 ? target.id : null;
+    onSelect?.({ kind: target.type, id: primary, ids });
+    onBegin?.();
+    startDrag(event, ids, 'move', primary, collapse);
+  }
+
+  function startDrag(event, ids, mode, primary, collapse = null) {
+    const origin = {};
+    for (const id of ids) {
+      const item = page.items.find((it) => it.id === id);
+      if (item) origin[id] = [...item.bbox];
+    }
+    if (!origin[primary]) return;
+    dragRef.current = { ids: Object.keys(origin), primary, mode, start: pointOf(event), origin, moved: false, collapse };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp, { once: true });
   }
@@ -181,47 +233,55 @@ export default function Canvas({ page, image, imageOpacity = 1, showBoxes = true
   function onMove(event) {
     const drag = dragRef.current;
     if (!drag) return;
+    const base = drag.origin[drag.primary];
+    if (!base) return;
     const pt = pointOf(event);
     const dx = pt.x - drag.start.x;
     const dy = pt.y - drag.start.y;
-    const [x1, y1, x2, y2] = drag.origin;
-    let bbox;
-    const { xs, ys } = edges();
+    const step = Math.max(1, Number(grid) || 4);
+    const round = (v) => Math.round(v / step) * step;
 
     if (drag.mode === 'move') {
-      bbox = [x1 + dx, y1 + dy, x2 + dx, y2 + dy];
-      const sx = snap(bbox[0], xs);
-      const sy = snap(bbox[1], ys);
-      const ox = sx - bbox[0];
-      const oy = sy - bbox[1];
-      bbox = [bbox[0] + ox, bbox[1] + oy, bbox[2] + ox, bbox[3] + oy];
+      const moved = [base[0] + dx, base[1] + dy, base[2] + dx, base[3] + dy];
+      const { xs, ys } = edges();
+      const ox = snap(moved[0], xs) - moved[0];
+      const oy = snap(moved[1], ys) - moved[1];
       setGuides(
         Math.abs(ox) > 0.5 || Math.abs(oy) > 0.5
           ? [
-              ...(Math.abs(ox) > 0.5 ? [{ x: sx, y1: 0, y2: H }] : []),
-              ...(Math.abs(oy) > 0.5 ? [{ y: sy, x1: 0, x2: W }] : []),
+              ...(Math.abs(ox) > 0.5 ? [{ x: moved[0] + ox, y1: 0, y2: H }] : []),
+              ...(Math.abs(oy) > 0.5 ? [{ y: moved[1] + oy, x1: 0, x2: W }] : []),
             ]
           : []
       );
-    } else {
-      bbox = [...drag.origin];
-      if (drag.mode.includes('w')) bbox[0] = x1 + dx;
-      if (drag.mode.includes('e')) bbox[2] = x2 + dx;
-      if (drag.mode.includes('n')) bbox[1] = y1 + dy;
-      if (drag.mode.includes('s')) bbox[3] = y2 + dy;
-      if (bbox[2] - bbox[0] < MIN_SIZE) {
-        if (drag.mode.includes('w')) bbox[0] = bbox[2] - MIN_SIZE;
-        else bbox[2] = bbox[0] + MIN_SIZE;
-      }
-      if (bbox[3] - bbox[1] < MIN_SIZE) {
-        if (drag.mode.includes('n')) bbox[1] = bbox[3] - MIN_SIZE;
-        else bbox[3] = bbox[1] + MIN_SIZE;
-      }
+      drag.moved = true;
+      onChange?.(
+        drag.ids.map((id) => {
+          const b = drag.origin[id];
+          return { id, bbox: [b[0] + dx + ox, b[1] + dy + oy, b[2] + dx + ox, b[3] + dy + oy].map(round) };
+        })
+      );
+      return;
+    }
+
+    // 手柄：只改一个
+    const [x1, y1, x2, y2] = base;
+    const bbox = [x1, y1, x2, y2];
+    if (drag.mode.includes('w')) bbox[0] = x1 + dx;
+    if (drag.mode.includes('e')) bbox[2] = x2 + dx;
+    if (drag.mode.includes('n')) bbox[1] = y1 + dy;
+    if (drag.mode.includes('s')) bbox[3] = y2 + dy;
+    if (bbox[2] - bbox[0] < MIN_SIZE) {
+      if (drag.mode.includes('w')) bbox[0] = bbox[2] - MIN_SIZE;
+      else bbox[2] = bbox[0] + MIN_SIZE;
+    }
+    if (bbox[3] - bbox[1] < MIN_SIZE) {
+      if (drag.mode.includes('n')) bbox[1] = bbox[3] - MIN_SIZE;
+      else bbox[3] = bbox[1] + MIN_SIZE;
     }
 
     drag.moved = true;
-    const step = Math.max(1, Number(grid) || 4);
-    onChange(drag.id, bbox.map((v) => Math.round(v / step) * step));
+    onChange?.([{ id: drag.primary, bbox: bbox.map(round) }]);
   }
 
 
@@ -230,7 +290,12 @@ export default function Canvas({ page, image, imageOpacity = 1, showBoxes = true
     window.removeEventListener('pointermove', onMove);
     setGuides([]);
     dragRef.current = null;
-    if (drag?.moved) onCommit?.();
+    if (!drag) return;
+    if (drag.moved) return onCommit?.();
+    if (drag.collapse) {
+      const item = page.items.find((it) => it.id === drag.collapse);
+      if (item) onSelect?.({ kind: item.type, id: item.id, ids: [item.id] });
+    }
   }
 
   useEffect(() => () => window.removeEventListener('pointermove', onMove), []);
@@ -251,7 +316,9 @@ export default function Canvas({ page, image, imageOpacity = 1, showBoxes = true
     ];
   };
 
-  const selectedItem = selection ? page.items.find((it) => it.id === selection.id) : null;
+  const selIds = idsOf(selection);
+  const primaryId = selection?.id || selIds[selIds.length - 1] || null;
+  const selectedItem = primaryId ? page.items.find((it) => it.id === primaryId) : null;
   const panelIndex = (item) => page.items.filter((it) => it.type === 'panel').findIndex((it) => it.id === item.id);
 
   return html`<div class="page-frame">
@@ -261,7 +328,7 @@ export default function Canvas({ page, image, imageOpacity = 1, showBoxes = true
         viewBox=${`0 0 ${W} ${H}`}
         width=${W * scale}
         height=${H * scale}
-        onPointerDown=${() => onSelect?.(null)}
+        onPointerDown=${onCanvasDown}
       >
         <rect x="0" y="0" width=${W} height=${H} fill="#ffffff" />
         ${image ? html`<image href=${image} x="0" y="0" width=${W} height=${H} preserveAspectRatio="xMidYMid slice" opacity=${imageOpacity} />` : null}
@@ -271,10 +338,8 @@ export default function Canvas({ page, image, imageOpacity = 1, showBoxes = true
           item=${item}
           page=${page}
           index=${item.type === 'panel' ? panelIndex(item) : i}
-          selected=${selection?.id === item.id}
-          onSelect=${onSelect}
-          onBegin=${onBegin}
-          onDragStart=${startDrag}
+          selected=${selIds.includes(item.id)}
+          primary=${item.id === primaryId}
         />`) : null}
 
         ${guides.map((g) =>
@@ -283,7 +348,7 @@ export default function Canvas({ page, image, imageOpacity = 1, showBoxes = true
             : html`<line class="guide" x1=${g.x1} y1=${g.y} x2=${g.x2} y2=${g.y} />`
         )}
 
-        ${showBoxes && selectedItem
+        ${showBoxes && selectedItem && selIds.length === 1
           ? handles(selectedItem.bbox).map(
               ([mode, x, y]) =>
                 html`<rect
@@ -294,7 +359,7 @@ export default function Canvas({ page, image, imageOpacity = 1, showBoxes = true
                   height="12"
                   onPointerDown=${(e) => {
                     e.stopPropagation();
-                    startDrag(e, selectedItem.id, mode);
+                    startDrag(e, [selectedItem.id], mode, selectedItem.id);
                   }}
                 />`
             )

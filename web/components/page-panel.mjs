@@ -58,5 +58,7 @@ export default function PagePanel({ page, mutate, setSelection }) {
           )
         : html`<span class="hint">还没有内容，用画布右下角的按钮加一个。</span>`}
     </div>
+    <div class="divider"></div>
+    <div class="hint">Alt + 点击：从上往下穿透，选中被压住的格子。Shift + 点击：多选，可整体拖动。</div>
   </div>`;
 }

@@ -1,4 +1,4 @@
-﻿// 画布：把每个 item 画成「带标签的框」。
+// 画布：把每个 item 画成「带标签的框」。
 import { canvasLabel } from '../../config/manga.mjs';
 //
 // 不渲染真实气泡形状——标注清楚比画得像更重要：
@@ -11,14 +11,14 @@ import { html, useRef, useState, useEffect } from '../lib.mjs';
 const MIN_SIZE = 40;
 const SNAP = 6;
 
-/** 类型颜色：按名字确定性推导，永远浅色 */
+/** 类型颜色：按名字确定性推导。描边要实，底色仍很浅（底下生成图得透出来） */
 function typeColor(name) {
   let hash = 0;
   for (const ch of String(name || '')) hash = (hash * 31 + ch.codePointAt(0)) % 997;
   const hue = Math.round((hash * 137.508) % 360);
   return {
-    fill: `hsla(${hue}, 45%, 87%, 0.30)`,
-    stroke: `hsla(${hue}, 42%, 45%, 0.75)`,
+    fill: `hsla(${hue}, 48%, 80%, 0.34)`,
+    stroke: `hsla(${hue}, 62%, 34%, 0.95)`,
   };
 }
 

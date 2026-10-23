@@ -775,13 +775,14 @@ a { color: inherit; }
   left: 14px;
   z-index: 6;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 5px 12px;
-  max-width: calc(100% - 320px);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
   font-family: var(--mono);
   font-size: 10px;
+  line-height: 1.35;
   letter-spacing: 0.06em;
+  white-space: nowrap;
   color: var(--mid);
   pointer-events: none;
   user-select: none;

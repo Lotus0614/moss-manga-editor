@@ -55,7 +55,29 @@ node manga.mjs doctor          # 未配置就先读 INSTALL.md
 - 面板：**编号必须有**，后面接方位与横竖，最后写画面：`PANEL ONE, top-left horizontal panel — …`、`PANEL THREE, the tall panel across the FULL WIDTH at the TOP — …`；一页之内连续、不重复
 - 左右并排：`PANEL TWO, the RIGHT panel of the middle row, to the RIGHT of PANEL THREE`
 - 气泡：`in the TOP LEFT of PANEL ONE, SPOKEN BY CHARACTER ONE - SHION`（**不要靠尾巴方向指认说话人**，气泡已经没有尾巴字段了）
-- summary：`summaryCaption` 自己写格数、排布、每格剧情；角色表不用写，编译器会自动追加
+- 剧情与版式一律写 `scene`，**不要填 `summaryCaption`**（填了就等于把自动的格数、文字数、角色表、text lock 全部关掉）；角色表会由 character 项自动追加
+
+## desc 三段分工（重要）
+
+一页出问题，九成是这三段写重了：
+
+| 写在 | 写什么 | 不要写 |
+|---|---|---|
+| `panel.desc` | `PANEL n` + 方位 + **房间、道具、光、机位** | 人物长相、衣服、姿势（特写格除外：手、腕、皮肤这种没有 character 项的格子才写） |
+| `character.desc` | 一句：`CHARACTER ONE — SHION, inside PANEL ONE only, at the LEFT of PANEL ONE, 姿势` | 外貌（在角色表）、解释句（「这是她唯一一次出现」会被画出来） |
+| `bubble.desc` | 谁说的 + 尾巴朝哪：`spoken by CHARACTER TWO - TOUMA, pointing down toward his head`；不在画面里写 `no point, no tail, round speed bubbles` | 不要重复 `WHITE OVAL speech bubble with…`，`kind` 已经给了 |
+
+三条硬规矩：
+
+1. **同一个人只能在一处描述**。`panel.desc` 和 `character.desc` 各写一遍 → 模型画两份（第 12 页第一格画成三个人就是这个原因）。
+2. **文字里的方位必须和 `bbox` 一致**。desc 说 `at the LEFT`，bbox 就得在左半边；说 RIGHT 就在右半边。
+3. **人物 bbox 收紧到 150–300px 宽**，别占满整格，占太宽模型会往空处再塞人。
+
+`scene` 只写三段：`SETTING:`（地点时间光）、`LAYOUT:`（几格、每格在哪、左右谁先读）、`STORY:`（每格发生什么）。不写 `BREAKOUT`、不写「谁是谁」的备注、不写阅读方向（编译器会加）。
+
+## 破框要压到别的格子上
+
+破框不是让人物冲到空白纸上——那块白纸本来就没内容，冲上去等于白扔版面。**破框是人物压到相邻那一格**：把他的 `bbox` 越过自己的格线 60–120px 伸进旁边那格的画面里，`desc` 写 `her hair sweeps UP across the top border of PANEL FOUR and is painted ON TOP of the panel above, its panel line passing BEHIND her hair`。头发、腿、手臂都行，前提是相邻那格是同一个场景。
 
 ## 多格页面容易踩的坑
 
@@ -117,7 +139,7 @@ node manga.mjs page new --title "第 1 页"
 node manga.mjs compile --page 1
 ```
 
-   有 `error` 就不能渲染，先修（空 caption、越界、文字溢出、气泡重叠都会报）。
+   有 `error` 就不能渲染，先修（空 caption、越界、类型不认识都会报）。
 
 6. **出图**
 

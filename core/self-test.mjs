@@ -271,18 +271,6 @@ test('空页会被拦下', () => {
   assert.ok(warnings.some((w) => w.level === 'error'));
 });
 
-test('文字超预算会被警告', () => {
-  const page = createPage({ size: SIZE });
-  page.items = [
-    createPanelItem({ bbox: [8, 8, 760, 400] }),
-    createBubbleItem({ text: '字'.repeat(300), bbox: [40, 40, 120, 100], size: 24 }),
-  ];
-  const warnings = validatePage(page, compilePage(page).doc);
-  assert.ok(warnings.some((w) => w.code === 'bubble.overflow'));
-});
-
-// ---------------------------------------------------------------- 反编译
-
 test('编译产物能反编译回同一组坐标', () => {
   const page = decompile(compiled.json, SIZE);
   assert.equal(page.items.filter((it) => it.type === 'panel').length, 4);

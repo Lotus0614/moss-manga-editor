@@ -136,37 +136,36 @@ test('旁白项用白底方框或裸字，不会被画成气泡', () => {
   assert.ok(/caption box|no bubble, no box|floating freely/i.test(text.caption), text.caption);
 });
 
-test('character 类型：外貌来自角色表，caption 只做补充或覆盖', () => {
-  const project = { characters: [{ id: 'reina', name: 'Reina', look: 'long black hair' }] };
+test('character 类型：格子文案由作者写全，外貌只出现在 summary 角色表', () => {
+  const project = { characters: [{ id: 'shion', name: 'CHARACTER ONE - SHION', look: 'long silver hair' }] };
   const page = createPage({ size: SIZE });
-  page.items = [createPanelItem({ bbox: [8, 8, 760, 800] })];
+  page.items = [
+    createPanelItem({ bbox: [8, 8, 760, 800], desc: 'room' }),
+    { type: 'character', id: 'c1', ref: 'shion', bbox: [560, 900, 740, 1200], desc: 'CHARACTER ONE - SHION, inside PANEL ONE only, kneeling' },
+  ];
+  const out = compilePage(page, project);
+  const item = out.doc.items.find((i) => i.label === 'character');
 
-  // 1) 只有 ref：用角色表外貌，不带任何位置文案
-  page.items.push({ type: 'character', id: 'c1', ref: 'reina', bbox: [560, 900, 740, 1200] });
-  const plain = compilePage(page, project);
-  const plainItem = plain.doc.items.find((i) => i.label === 'character');
-  assert.ok(plainItem, '应该编译出一个 character item');
-  assert.ok(plainItem.caption.includes('Reina'), plainItem.caption);
-  assert.ok(plainItem.caption.includes('long black hair'), plainItem.caption);
-  assert.ok(!/position of PANEL/i.test(plainItem.caption), '不该再生成位置文案');
-  assert.ok(/CHARACTERS IN THIS PAGE/.test(plain.doc.summary.caption));
-  assert.ok(plain.doc.summary.caption.includes('long black hair'));
+  // 格子里的文案就是作者写的那段，不再自动拼「character 名字: 外貌」
+  assert.ok(item.caption.startsWith('CHARACTER ONE - SHION, inside PANEL ONE only, kneeling'), item.caption);
+  assert.ok(!/^character CHARACTER/i.test(item.caption), '不该再自动加 character 前缀');
+  assert.ok(!item.caption.includes('long silver hair'), '外貌不该进格子');
 
-  // 2) 普通 desc：追加，不替换
-  page.items[1] = { ...page.items[1], desc: 'seen from behind' };
-  const appended = compilePage(page, project).doc.items.find((i) => i.label === 'character');
-  assert.ok(appended.caption.includes('long black hair'), appended.caption);
-  assert.ok(appended.caption.includes('In this box: seen from behind'), appended.caption);
+  // 外貌只在 summary 的角色表里出现一次
+  assert.ok(/CHARACTERS IN THIS PAGE/.test(out.doc.summary.caption));
+  assert.ok(out.doc.summary.caption.includes('CHARACTER ONE - SHION: long silver hair'));
 
-  // 3) ! 覆盖：整段替换，且不进 summary 的角色表
-  page.items[1] = { ...page.items[1], desc: '!completely naked' };
+  // 没写 desc 就不出图；! 开头的那一格不进角色表
+  page.items[1] = { type: 'character', id: 'c2', ref: 'shion', bbox: [560, 900, 740, 1200] };
+  assert.equal(compilePage(page, project).doc.items.filter((i) => i.label === 'character').length, 0);
+
+  page.items[1] = { type: 'character', id: 'c3', ref: 'shion', bbox: [560, 900, 740, 1200], desc: '!completely naked' };
   const over = compilePage(page, project);
   const overItem = over.doc.items.find((i) => i.label === 'character');
-  assert.ok(overItem.caption.includes('completely naked'), overItem.caption);
-  assert.ok(!overItem.caption.includes('long black hair'), overItem.caption);
-  assert.ok(!/CHARACTERS IN THIS PAGE/.test(over.doc.summary.caption));
+  assert.ok(overItem.caption.startsWith('completely naked'), overItem.caption);
+  assert.ok(!overItem.caption.startsWith('!'), '! 只是标记，不该留在提示词里');
+  assert.ok(!/CHARACTERS IN THIS PAGE/.test(over.doc.summary.caption), '用了 ! 的角色不进角色表');
 });
-
 test('编译无 error 级告警', () => {
   const errs = compiled.warnings.filter((w) => w.level === 'error');
   assert.deepEqual(errs, []);
@@ -252,18 +251,6 @@ test('角色表自动追加；手写 summary 则整段覆盖（连角色表也�
   page.items = items();
   const summary = compilePage(page, project).doc.summary;
   assert.equal(summary.caption, '手写的格数与剧情');
-});
-
-test('角色名里的编号会带进 caption', () => {
-  const project = { characters: [{ id: 'shion', name: 'CHARACTER ONE - SHION', look: 'long silver hair' }] };
-  const page = createPage({ size: SIZE });
-  page.items = [
-    createPanelItem({ bbox: [8, 8, 760, 800], desc: 'room' }),
-    { type: 'character', id: 'c1', ref: 'shion', bbox: [40, 40, 400, 700], desc: 'kneeling' },
-  ];
-  const item = compilePage(page, project).doc.items.find((i) => i.label === 'character');
-  assert.ok(item.caption.includes('CHARACTER ONE - SHION'), item.caption);
-  assert.ok(item.caption.includes('kneeling'), item.caption);
 });
 
 test('本身已包含全部允许字段，没有多余键', () => {

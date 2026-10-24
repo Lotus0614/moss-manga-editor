@@ -499,14 +499,17 @@ async function cmdPage() {
       bbox:
         bbox ||
         [40 + (existing % 4) * 36, 900 + (existing % 3) * 28, 300 + (existing % 4) * 36, 1240 + (existing % 3) * 28],
-      ...(flags.caption ? { caption: String(flags.caption) } : {}),
+      ...(flags.desc ? { desc: String(flags.desc) } : {}),
     });
 
     const next = { ...page, items: [...page.items, item] };
     const saved = await savePage(DIR, project.slug, next, { actor: 'cli' });
+    const hint = flags.desc
+      ? ''
+      : '\n还没有 desc：这一格不会出图，补上「CHARACTER ONE - 名字, inside PANEL ONE only, 姿势」才会进提示词';
     return out(
       { ok: true, item, page: saved.page, rev: saved.rev },
-      `已把「${ref}」加到第 ${page.index} 页（${item.id}，rev ${saved.rev}），拖到想要的位置即可`,
+      `已把「${ref}」加到第 ${page.index} 页（${item.id}，rev ${saved.rev}），拖到想要的位置即可${hint}`,
     );
   }
 

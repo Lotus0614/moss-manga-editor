@@ -1,4 +1,4 @@
-﻿# AGENT
+# AGENT
 
 在这个工作区里画漫画的操作手册。默认按这里做，不要临时发明流程。
 
@@ -62,9 +62,9 @@ node manga.mjs doctor          # 未配置就先读 INSTALL.md
 - 角色一次写进项目：`node manga.mjs character add --id shion --name "CHARACTER ONE - SHION" --look "18, long straight black hair, NO glasses"`（网页里是顶栏「角色表」）
 - **名字必须带编号**：`CHARACTER ONE - SHION` 这种形式，summary 的角色表靠它自动解析编号和名字
 - 页面上加人：`node manga.mjs page add-character --page 12 --ref shion`，或者网页右栏「本页角色」勾选
-- 人物项只有 `ref` + 可选 `desc`：**位置只靠 bbox**，朝向/遮挡/表情写在 `desc` 里，不写就不写
-- **格子里只写编号 + 名字 + 姿势**，外貌不要重复（外貌在角色表里，summary 会自动带上）
-- 这一格整段不一样（裸体、受伤、换装）：`desc` 前面加 `!`，整段替换角色表外貌
+- 人物项是 `ref` + 必填 `desc`：**这一格的文案你自己写全**——编号 + 名字 + 位置 + 姿势，编译器不补任何东西
+- **格子里不写外貌**：外貌只写在角色表，summary 末尾的 `CHARACTERS IN THIS PAGE` 会自动带上
+- 这一格跟角色表不一样（裸体、受伤、换装）：`desc` 开头加 `!`，该角色就不进本页角色表，外貌你自己在这格里写
 - **格子只写场景**：`panel.desc` 不写人物长相、衣服、表情
 - **提示词里名字只写罗马音**（汉字会被画到画面上）；但**对话台词里叫名字要用中文**（紫苑 / 冬真 / 枫）
 

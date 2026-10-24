@@ -109,16 +109,16 @@ manga character remove --id reina
 
 - `--id` 只允许 ASCII，页面上用它
 - `--look` 是英文外貌（发型、五官、服装、体型）；**不要写汉字名**，汉字会被模型画到画面上
-- `compile` / `render` 会自动带上项目角色表：产物里出现 `character Reina: <look>. This figure appears only inside its own box`，summary 末尾追加 `CHARACTERS IN THIS PAGE:`
+- 角色格里的文案由你自己写在 `desc` 里；summary 末尾会自动追加 `CHARACTERS IN THIS PAGE:`，外貌只在那里面出现一次
 
 页面上用 `page add-character` 加人（也可以走网页里的「本页角色」勾选）：
 
 ```bash
-manga page add-character --page 12 --ref reina [--bbox 40,900,300,1240] [--caption "seen from behind"]
+manga page add-character --page 12 --ref shion [--bbox 40,900,300,1240] [--desc "CHARACTER ONE - SHION, inside PANEL ONE only, kneeling"]
 ```
 
 - 一次只加一个；同一角色同一页可以加多次（远景 + 特写）
-- `--caption` 以 `!` 开头 = 这一格整段替换角色表外貌（裸体、受伤、换装）
+- `--desc` 是这一格的完整画面（编号 + 名字 + 位置 + 姿势），不写就不出图；开头写 `!` = 这格跟角色表不同，该角色不进本页角色表
 
 ---
 

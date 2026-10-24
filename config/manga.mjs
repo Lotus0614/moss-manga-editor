@@ -181,27 +181,17 @@ export const MOSS_LABELS = [
 ];
 
 // ---------------------------------------------------------------- 角色
-// 人物不预设任何字段：只认「这是谁」（ref）和「这一格有什么不一样」（caption）。
-// 外貌存在项目的角色表里，编译时通过 resolveCharacter 回调注入——
-// 这个文件不知道项目/存档长什么样。
+// 角色格只认「这是谁」（ref）和「这一格画什么」（desc，作者写全）。
+// 外貌存在项目的角色表里，只用来拼 summary 末尾的角色表；
+// 这个文件不知道项目/存档长什么样，通过 resolveCharacter 回调取。
 
-/**
- * 一个 character 项的最终描述。
- *   desc 空         → 用角色表 look
- *   desc 普通文本    → look + "In this box: <desc>"
- *   desc 以 ! 开头   → 整段替换 look（裸体、受伤、换装这类特例）
- */
-function characterText(item, resolveCharacter) {
-    const desc = String(item.desc || '').trim();
+/** summary 角色表里的一行：名字 + 外貌（来自角色表） */
+function castLine(item, resolveCharacter) {
     const char = resolveCharacter ? resolveCharacter(item.ref) : null;
-    const name = char?.name || item.ref || 'character';
-    const look = String(char?.look || '').trim();
-
-    if (desc.startsWith('!')) {
-        return { name, text: desc.slice(1).trim() };
-    }
-    const extra = desc ? `In this box: ${desc}` : '';
-    return { name, text: [look, extra].filter(Boolean).join('. ') };
+    return {
+        name: char?.name || item.ref || 'character',
+        text: String(char?.look || '').trim(),
+    };
 }
 
 // ---------------------------------------------------------------- 句子模板
@@ -372,23 +362,20 @@ export const TYPES = [
             {
                 key: 'desc',
                 type: 'longtext',
-                label: '这一格的补充（背面／遮挡／做了什么；以 ! 开头则替换外貌）',
+                label: '这一格的画面（自己写全：编号 + 名字 + 位置 + 姿势）',
+                required: true,
             },
             ...BASE_FIELDS,
         ],
-        compile({ item, page, resolveCharacter }) {
-            // 还没选角色就不出图（右上「＋角色」加出来是空的，选完才有内容）
-            if (!item.ref) return null;
+        compile({ item, page }) {
+            // 这一格的文案由作者写全（外貌在角色表里，summary 会自动带上）；没写就不出图
+            // 开头写 ! 表示「这一格和角色表不一样」，只影响 summary 要不要列这个角色，本身不带进提示词
+            const body = String(item.desc || '').replace(/^!/, '').trim();
+            if (!item.ref || !body) return null;
             const style = styleOf(page);
-            const { name, text } = characterText(item, resolveCharacter);
-            const parts = [
-                `character ${name}${text ? `: ${text}` : ''}`,
-                'This figure appears only inside its own box',
-            ];
-            if (style.guard) parts.push(style.guard);
             return {
                 label: 'character',
-                caption: parts.join('. '),
+                caption: [body, style.guard].filter(Boolean).join('. '),
             };
         },
     },
@@ -494,15 +481,14 @@ export function buildSummary({ page, items, resolveCharacter }) {
     if (page.note) parts.push(page.note);
     if (style.guard) parts.push(style.guard);
 
-    // 角色表由代码从角色表 + 本页 character 项解析（手写 summary 时不追加）
+    // 角色表：本页出现的角色，外貌只在这里写一次（手写 summary 时不追加）
     const cast = [];
     const seen = new Set();
     for (const item of page.items || []) {
         if (item.type !== 'character' || !item.ref || seen.has(item.ref)) continue;
         if (String(item.desc || '').trim().startsWith('!')) continue;
         seen.add(item.ref);
-        const { name, text } = characterText(item, resolveCharacter);
-        cast.push({ name, text });
+        cast.push(castLine(item, resolveCharacter));
     }
     const castBlock = cast.length
         ? `CHARACTERS IN THIS PAGE (each one appears only inside its own box):\n${cast

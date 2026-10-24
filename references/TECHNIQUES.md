@@ -50,6 +50,17 @@
 - 一页做一次出血就够，做多了冲击力会被稀释
 - 出血框也要遵守 16 的倍数，越界部分算负数或超过画布宽高都允许
 
+### 多格页面的硬规则
+
+违反这几条时最典型的失败是「多画一颗头」和「人物跨格」：
+
+1. **局部特写用原生项**：眼睛、嘴唇、手、衣褶、招牌这类放大格写成 `native`（`label: text` 或 `label: object`），caption 开头写 `Extreme close-up inset showing ONLY the …`。任何 `label: character` 的格子都会被当成「这里要画一个人」，特写格里就会长出多余的头。
+2. **两个人就两个框**：同格双人拆成两个 `character` 项，两个 `bbox` 的 X 之间留 30–140px 空档，caption 写 `standing far apart on opposite ends of the panel`；写进同一个框会画成肩贴肩。
+3. **并排小格对齐上边界**：左右并列的两格，`bbox` 的 `y1` 取同一个值，否则其中一格的人会半截身子跨进旁边那格。
+4. **小格用半身景别**：一页 6–7 格时，小格的 caption 写 `waist-up medium shot` 或 `thigh-up medium shot`，不要写 `full-body`，否则人物被压成四头身。
+5. **留白放标题**：页面顶部或斜角留白处放一个 `native` 写标题字（`Ornate stylized manga title logo in bold typography`），比让模型自己找地方塞字稳。
+6. **只出草图时全用原生项**：把整页 `character` 都换成 `native`，caption 写「只画几何体、不画五官」，得到的是分镜占位图。
+
 ### 节奏原则
 
 1. 先排节奏再排内容：格密节奏快，格疏节奏慢，一页留一两处停顿
@@ -86,3 +97,9 @@ white loose socks bunched at the calves; dark loafers; school bag; large bust.
 ```
 
 分格复述：`W in her white sailor blouse and navy skirt, black hair with a clip`
+
+### 多格页面里的三条
+
+1. **每格都要重复骨相与瞳色的短句**：`our tall slender 16-year-old girl with a softly tapered chin and sharp green eyes` 这类短句不能省。省掉瞳色以后，同一个框里 `blush` 一类的词会把眼睛染成粉色。
+2. **不要写幼龄词，连否定句也不要**：`petite`、`child`、`10 years old`、`little` 在多格里会被单独提取出来，写 `neither a 10-year-old child` 一样会把人物画幼。
+3. **图内印字和设定年龄分开处理**：名牌上印 `12岁` 会把人物画幼，印 `AGE 19` 会把身材带胖；需要时改印 `15岁`，并在正文里补纤细体型描写。

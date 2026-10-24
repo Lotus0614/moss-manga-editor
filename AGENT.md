@@ -57,6 +57,20 @@ node manga.mjs doctor          # 未配置就先读 INSTALL.md
 - 气泡：`in the TOP LEFT of PANEL ONE, SPOKEN BY CHARACTER ONE - SHION`（**不要靠尾巴方向指认说话人**，气泡已经没有尾巴字段了）
 - summary：`summaryCaption` 自己写格数、排布、每格剧情；角色表不用写，编译器会自动追加
 
+## 多格页面容易踩的坑
+
+写完一页，按这五条自查（细节在 `references/TECHNIQUES.md` 的「多格页面的硬规则」）：
+
+- **特写格不要用角色项**：眼睛、手、衣褶这类放大格用 `native` 加 `Extreme close-up inset showing ONLY …`，用 `character` 会长出多余的头
+- **双人拆两个框**：两个 `character` 项 X 之间留 30–140px，caption 写 `standing far apart on opposite ends of the panel`
+- **并排小格对齐上边界**：左右并列两格的 `y1` 取同一个值，否则人物跨格
+- **小格用半身景别**：6–7 格的页面里写 `waist-up medium shot`，不要 `full-body`，否则人物变四头身
+- **气泡别贴着别人的头**：气泡 `bbox` 离其他人的头至少 80px；画面外的人说话要写 `tail-less bubble, NO pointer tail`（句式见 `references/FORMAT.md` 的 bubble 一节）
+
+## 语序：先光后物
+
+文本编码器是单向的，写在后面的词影响不到前面。所以 `desc` 和 `summaryCaption` 都按这个顺序：**镜头与光 → 人物与环境 → 动作表情 → 收尾否定句**。多角色同页时主角写第一段，第二个角色开头用 `In sharp contrast, …NO…` 切断它继承的色调与骨相。
+
 ## 人物的写法（重要）
 
 - 角色一次写进项目：`node manga.mjs character add --id shion --name "CHARACTER ONE - SHION" --look "18, long straight black hair, NO glasses"`（网页里是顶栏「角色表」）

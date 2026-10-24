@@ -133,6 +133,25 @@ in the LEFT EDGE of PANEL TWO. It is the narrator, not a character speaking.
 
 旁白和拟声词同样要写位置（`laid over the CENTRE of PANEL ONE`、`in the TOP EDGE of PANEL TWO`）。
 
+### 按说话人身份选句式
+
+气泡不写 `label`，靠 `caption` 里的形状描述区分种类；说话人身份不同，句式也不同：
+
+| 身份 | 写法 |
+| --- | --- |
+| 画面里的角色开口 | `SPOKEN BY CHARACTER ONE - SHION, tail on the bottom edge pointing DOWN to her head.` 气泡 `bbox` 贴着她自己的头，**和别人的头至少隔 80px** |
+| 画面外的人（POV、内心吐槽） | 明确写 **无尾**：`tail-less oval bubble, NO pointer tail pointing to anyone in the panel` |
+| 客观旁白、姓名年龄牌 | 直角矩形框，不写尾巴：`sharp-cornered white rectangular box with a thin black border` |
+| 咆哮、惊叫 | 短句（2–6 字）才用 `jagged burst bubble`；超过十几个字要换 `wide rounded bubble`，锯齿会向内吃掉约三成排版面积 |
+
+气泡离别人的头太近、或画面外的人用了带尾气泡时，模型会把尾巴连到最近的那颗头上——`bbox` 的距离和「谁说的」两件事都要写清。
+
+### 竖排里的数字与名字
+
+- 竖排（`vertical: true`）的气泡和名牌里，**数字写成汉字**：`720日元` → `七百二十日元`，`28岁` → `二十八岁`。阿拉伯数字在竖排里会被压进同一个字格叠成乱码。
+- 商品包装、屏幕上的横排标识照常写阿拉伯数字。
+- 人名中间**不留半角空格**：`白石 凛` 的空格会被画成圆圈 `O`，写成 `白石凛`。
+
 ## character
 
 人物格只认两件事：**这是谁**（`ref`）和**这一格画什么**（`desc`）。
@@ -282,6 +301,25 @@ panel / bubble / character 上的 `caption` 一旦填了，编译器拼的东西
 ```
 PANEL TWO, a small inset with a thick white border and a soft drop shadow… Pure black ink and bare white paper only…（黑白页的锁色句）
 ```
+
+## 语序
+
+文本编码器是单向的：**写在后面的词影响不到前面的词**。同一段 caption 里，前面把光影和色温定死，后面的衣物、皮肤才会跟着变色；反过来先写 `white shirt`、末尾才补 `lit only by a green neon tube`，只有灯管会变绿，衬衫和脸还是暖白平光。
+
+所以按这个顺序写：
+
+1. **镜头与光**：`low-angle shot in a dim corridor, lit only by one cool green fluorescent tube`
+2. **人物与环境**：谁、穿什么、房间长什么样
+3. **动态与表情**：这一格在做什么
+4. **收尾约束**：`no text other than the given lettering` 之类的否定句放最后
+
+多角色同页时还有一条连带效应：**第一段描述的角色会给后面所有人定调**（人种骨相、年龄感、整体色调）。所以主角写第一段，第二个角色开头就写反特征切断它：
+
+```
+In sharp contrast, the girl on the right has NO glasses and spotless skin with zero freckles.
+```
+
+页面级的 `summary` 同理：画风 → 格数 → 文字锁 → 场景 → 角色表 → 收尾守卫，顺序不要打乱。
 
 ## versions.json
 

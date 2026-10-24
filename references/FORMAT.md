@@ -1,4 +1,4 @@
-# 存档格式
+﻿# 存档格式
 
 配置和存档是两棵树：配置（含工作流）在固定的配置根，存档只放项目数据。
 
@@ -24,12 +24,23 @@ data    默认 config/archive（config.archive 或 --dir 可改）
 
 所有元素都在同一个数组里，用 `type` 区分：
 
-| type     | 是什么                     | 主要字段                                       |
-| -------- | -------------------------- | ---------------------------------------------- |
-| `panel`  | 一个分格                   | `bbox` `shape` `frame` `camera` `caption`      |
-| `character` | 一个指定位置的人物      | `bbox` `ref` `caption?`                        |
-| `bubble` | 一条文字                   | `bbox` `kind` `text` `size` `tail` `vertical?` |
-| `native` | 原生 Moss item，绕过语义层 | `bbox` `label` `caption` `text?`               |
+| type     | 是什么                     | 专有字段                                | 共有字段                        |
+| -------- | -------------------------- | --------------------------------------- | ------------------------------- |
+| `panel`  | 一个分格                   | `bbox` `shape` `frame` `camera` `desc`  | `note` `caption` `tags` `palette` |
+| `character` | 一个指定位置的人物      | `bbox` `ref` `desc?`                    | `note` `caption` `tags` `palette` |
+| `bubble` | 一条文字                   | `bbox` `kind` `text` `tail` `vertical?` | `note` `caption` `tags` `palette` |
+| `native` | 原生 Moss item，绕过语义层 | `bbox` `label` `text?`                  | `note` `caption` `tags` `palette` |
+
+`native` 是基础格子，四种类型都带同一组共有字段：
+
+| 共有字段  | 作用                                                                 |
+| --------- | -------------------------------------------------------------------- |
+| `note`    | 备注，**写中文**，只给人看，不进提示词（画布上优先显示它）           |
+| `caption` | 整段覆盖。留空就按类型自动拼；填了就只用这段，其余字段不再进提示词   |
+| `tags`    | 透传给 Moss，也当分类用                                               |
+| `palette` | 透传给 Moss（`#RRGGBB` 数组）                                        |
+
+旧存档（`version` 缺失或 1）读取时会自动迁移：当时的 `caption` 本来是画面描述，会被搬到 `desc`，并存成 `version: 2`。
 
 ```jsonc
 {
@@ -37,11 +48,14 @@ data    默认 config/archive（config.archive 或 --dir 可改）
     "index": 1,
     "title": "车厢",
     "rev": 7,
+    "version": 2,
     "size": [768, 1280],
     "style": "mono", // mono | color | sketch
     "vertical": true, // 全局文字竖排；单条 bubble 可用自己的 vertical 覆盖
     "scene": "a half-empty train carriage, fluorescent light",
     "note": "",
+    "summaryMeta": [], // 留空 = 用画风自带的 meta
+    "summaryCaption": "", // 填了就整段替换自动拼的 summary
     "items": [
         {
             "type": "panel",
@@ -50,7 +64,8 @@ data    默认 config/archive（config.archive 或 --dir 可改）
             "shape": "rect",
             "frame": "border",
             "camera": "wide",
-            "caption": "wide shot of a crowded platform, grey silhouettes",
+            "desc": "wide shot of a crowded platform, grey silhouettes",
+            "note": "第一格：交代站台和人群",
             "tags": ["crowded_platform", "grey_silhouettes"],
         },
 
@@ -84,11 +99,11 @@ data    默认 config/archive（config.archive 或 --dir 可改）
 | `shape`   | `rect` `slant-top` `slant-side` `bleed-top` `bleed-bottom` `bleed-left` `bleed-right` `bleed-all` `circle` |
 | `frame`   | `border` 描边（默认） `none` 无边 `thick` 粗边                                                             |
 | `camera`  | `eye` `high` `low` `wide` `medium` `close` `xclose` `ots` `dutch`                                          |
-| `caption` | 这一格**看得见**的东西：谁 + 在哪 + 做什么，**开头带编号和位置**                                           |
+| `desc`    | 这一格**看得见**的东西：谁 + 在哪 + 做什么，**开头带编号和位置**                                           |
 
 出血格（`bleed-*`）可以超出画布；其它形状超出只会被裁。
 
-**caption 开头写位置**（编号由编译器自动加，不写）：
+**desc 开头写位置**（编号由编译器自动加，不写）：
 
 ```
 PANEL 3, LEFT TALL PANEL — a pitch black void with one point of pure white light…
@@ -104,27 +119,27 @@ PANEL 1, the wide band across the top — a crowded platform at dusk
 | `kind`    | `speech` 对话 `shout` 喊叫 `whisper` 小声 `tremble` 颤抖 `thought` 内心 `heart` 心之声 `narration` 旁白 `sfx` 拟声词 |
 | `text`    | 要渲染的字，原样；换行用 `\n`                                                                                        |
 | `tail`    | `down-left` `down` `down-right` `left` `right` `up-left` `up` `up-right` `none`；`none` = 说话者不在画面             |
-| `caption` | 选填，给枚举覆盖不到的特殊文字补充说明                                                                               |
+| `desc`    | 选填，给枚举覆盖不到的特殊文字补充说明                                                                               |
 | `vertical` | 不写就跟随页面 `vertical`；写 `true`/`false` 单独覆盖（不在表单里，手写页面时才用）                                 |
 
 **文字不用写在哪一格**：编译器按 bbox 自动加 `inside PANEL N` 或 `at the edge of PANEL N`。
 
 ## character
 
-人物只有两个字段：**这是谁**、**这一格有什么不一样**。外貌不写在页面上，存在项目的角色表里，也不写汉字名（模型会把汉字当成要渲染的字）。
+人物只有两个字段：**这是谁**（`ref`）、**这一格有什么不一样**（`desc`）。外貌不写在页面上，存在项目的角色表里，也不写汉字名（模型会把汉字当成要渲染的字）。
 
 | 字段      | 值                                                                                     |
 | --------- | -------------------------------------------------------------------------------------- |
 | `ref`     | 项目 `characters[].id`，必填                                                             |
-| `caption` | 选填，自由文本：背面、遮挡、正在做什么，要写才写；**以 `!` 开头则整段替换角色表的外貌**   |
+| `desc`    | 选填，自由文本：背面、遮挡、正在做什么，要写才写；**以 `!` 开头则整段替换角色表的外貌**   |
 
 ```jsonc
 { "type": "character", "id": "c1", "ref": "reina", "bbox": [560, 900, 740, 1200] }
-{ "type": "character", "id": "c2", "ref": "reina", "bbox": [...], "caption": "seen from behind, no face" }
-{ "type": "character", "id": "c3", "ref": "reina", "bbox": [...], "caption": "!completely naked, only the red armband" }
+{ "type": "character", "id": "c2", "ref": "reina", "bbox": [...], "desc": "seen from behind, no face" }
+{ "type": "character", "id": "c3", "ref": "reina", "bbox": [...], "desc": "!completely naked, only the red armband" }
 ```
 
-**位置只由 bbox 表达**，编译器不生成任何位置文案。人物朝向由格子里的构图和 `caption` 决定：背身就不要写表情。
+**位置只由 bbox 表达**，编译器不生成任何位置文案。人物朝向由格子里的构图和 `desc` 决定：背身就不要写表情。
 
 角色表在 `project.json` 里，用顶栏「角色表」维护，或者走 CLI：
 
@@ -147,7 +162,7 @@ CHARACTERS IN THIS PAGE (each one appears only inside its own box):
 - Reina: 18, long straight black hair, ...
 ```
 
-**格子只写场景**：`panel.caption` 不写人物长相、衣服、表情——那些属于 character 项。
+**格子只写场景**：`panel.desc` 不写人物长相、衣服、表情——那些属于 character 项。
 
 ## native
 
@@ -251,17 +266,18 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 {
   key: 'sfx',                       // 存进 page.json 的 type
   label: '拟声',                    // 按钮和右栏标题
-  fields: [                         // 右栏表单按这个生成
+  fields: [                         // 右栏表单按这个生成；note/caption/tags/palette 从 BASE_FIELDS 继承
     { key: 'text', type: 'text', label: '拟声词', required: true },
-    { key: 'caption', type: 'longtext', label: '写法说明' },
+    { key: 'desc', type: 'text', label: '写法说明' },
   ],
   compile({ item, page }) {         // 返回合法 Moss item（不要给 bbox）
-    return { label: 'text', caption: item.caption, text: item.text };
+    return { label: 'text', caption: item.desc, text: item.text };
   },
 }
 ```
 
-- `fields[].type` 可选：`text` / `longtext` / `number` / `enum` / `bool` / `tags` / `palette`
+- 所有类型都从 `BASE_FIELDS` 继承 `note` / `caption` / `tags` / `palette`，自己只写专有字段
+- `fields[].type` 可选：`text` / `longtext` / `number` / `enum` / `bool` / `tags` / `palette` / `characterRef`
 - `enum` 的 `options` 直接给数组：`[{ value: 'eye', label: '平视', phrase: 'eye-level shot' }]`
 - `compile` 返回值只能是 `label` / `caption` / `text` / `tags` / `palette`，`bbox` 由核心补
 - 页面级字段在同一个文件的 `page` 数组里，格式与 item 字段完全一样

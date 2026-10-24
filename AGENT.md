@@ -22,6 +22,7 @@
 ## 读什么
 
 画的时候只读这两份：`references/FORMAT.md`（页面 JSON 怎么写）、`references/TECHNIQUES.md`（版式、节奏、人物与背景）。
+**画成人向页面时先读 `references/R18-MANGA.md`**（满版、嵌格、同格双视角、文字与提示词模板）。
 要查命令再加 `references/CLI.md`，要换工作流才读 `references/WORKFLOW.md`。
 
 下面这些**画漫画时不要读**，只有加功能或改 bug 时才看：
@@ -38,13 +39,22 @@ core/   scripts/   server.mjs   web/   tools/   references/MOSSS_LAYOUT.md
 node manga.mjs doctor          # 未配置就先读 INSTALL.md
 ```
 
+## 每个格子都要有中文备注（重要）
+
+- 每个 item 的 `note` 写**中文**，一句话说清「这一格在干什么」：谁在做什么、这格的作用、关键道具
+- `note` **不进提示词**，只是给人看的；画布上优先显示它，没有备注的格子会把英文提示词铺满，用户看不懂
+- 用户提意见时，**先改 `note` / `desc` 让人看懂，再改 `desc` 里的具体画面**；两边分工：
+  - `note` 中文，给人看
+  - `desc` 英文，进提示词（面板=画面描述，气泡=特殊文字补充，角色=这一格的差异）
+- 需要完全自己控制某一格的提示词时，填 `caption`（填了就只用它，其他字段不再进提示词）
+
 ## 人物的写法（重要）
 
 - 角色一次写进项目：`node manga.mjs character add --id reina --name Reina --look "18, long straight black hair, red armband, NO glasses"`（网页里是顶栏「角色表」）
 - 页面上加人：`node manga.mjs page add-character --page 12 --ref reina`，或者网页右栏「本页角色」勾选
-- 人物项只有 `ref` + 可选 `caption`：**位置只靠 bbox**，朝向/遮挡/表情写在 `caption` 里，不写就不写
-- 这一格整段不一样（裸体、受伤、换装）：`caption` 前面加 `!`，整段替换角色表外貌
-- **格子只写场景**：`panel.caption` 不写人物长相、衣服、表情
+- 人物项只有 `ref` + 可选 `desc`：**位置只靠 bbox**，朝向/遮挡/表情写在 `desc` 里，不写就不写
+- 这一格整段不一样（裸体、受伤、换装）：`desc` 前面加 `!`，整段替换角色表外貌
+- **格子只写场景**：`panel.desc` 不写人物长相、衣服、表情
 - **名字只写罗马音**：提示词里的汉字会被模型当成「要画在画面上的字」
 
 ## 动手前必须先问

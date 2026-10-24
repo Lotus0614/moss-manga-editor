@@ -105,7 +105,7 @@ export function createPanelItem(patch = {}) {
     shape: 'rect',
     frame: 'border',
     camera: 'medium',
-    caption: '',
+    desc: '',
     ...patch,
   };
 }
@@ -163,17 +163,32 @@ export function createPage(patch = {}) {
     index: 1,
     title: '',
     rev: 0,
+    version: SCHEMA_VERSION,
     size,
     style: 'mono',
     vertical: true,
     scene: '',
     note: '',
+    summaryMeta: [],
+    summaryCaption: '',
     items: [],
     ...patch,
   };
 }
 
 // ---------------------------------------------------------------- 归一化
+
+/** 页面格式版本：v2 起「画面描述」叫 desc，caption 变成整段覆盖 */
+export const SCHEMA_VERSION = 2;
+
+/** v1 → v2：把旧的 caption（当时是画面描述）搬到 desc，caption 留空 */
+function migrateItems(items) {
+  return items.map((item) => {
+    if (!item || item.type === 'native' || item.desc !== undefined || !item.caption) return item;
+    const { caption, ...rest } = item;
+    return { ...rest, desc: caption };
+  });
+}
 
 function normalizeBubbleItem(b) {
   return {
@@ -185,8 +200,8 @@ function normalizeBubbleItem(b) {
     size: Number(b.size || b.fontSize) || 22,
     tail: b.tail || (b.tailOff ? 'none' : b.tailDir) || 'down-left',
     ...(typeof b.vertical === 'boolean' ? { vertical: b.vertical } : {}),
-    ...(b.caption ? { caption: String(b.caption) } : {}),
-    ...extras(b),
+    ...(b.desc ? { desc: String(b.desc) } : {}),
+    ...common(b),
   };
 }
 
@@ -194,10 +209,11 @@ function normalizeBubbleItem(b) {
 export function normalizePage(raw = {}) {
   const size = pageSize(raw);
   const style = typeof raw.style === 'string' ? raw.style : raw.style?.preset;
+  const version = Number(raw.version) || 1;
 
   let items = [];
   if (Array.isArray(raw.items)) {
-    items = raw.items.map((it) => normalizeItem(it, size));
+    items = (version >= SCHEMA_VERSION ? raw.items : migrateItems(raw.items)).map((it) => normalizeItem(it, size));
   } else {
     // v2 存档迁移
     for (const p of raw.panels || []) {
@@ -240,19 +256,24 @@ export function normalizePage(raw = {}) {
     index: Number(raw.index) || 1,
     title: String(raw.title || ''),
     rev: Number(raw.rev) || 0,
+    version: SCHEMA_VERSION,
     size: [size.width, size.height],
     style: isValidStyle(style) ? style : 'mono',
     vertical: raw.vertical !== false,
     scene: String(raw.scene || ''),
     note: String(raw.note || ''),
+    summaryMeta: Array.isArray(raw.summaryMeta) ? raw.summaryMeta.map(String) : [],
+    summaryCaption: String(raw.summaryCaption || ''),
     items,
   };
   return page;
 }
 
-/** 可选字段：tags / palette（模板里 item 级才有） */
-function extras(raw) {
+/** 所有格子共用的可选字段：备注、整段覆盖、tags / palette */
+function common(raw) {
   const out = {};
+  if (raw?.note) out.note = String(raw.note);
+  if (raw?.caption) out.caption = String(raw.caption);
   if (Array.isArray(raw?.tags) && raw.tags.length) out.tags = raw.tags.map(String);
   if (Array.isArray(raw?.palette) && raw.palette.length) out.palette = raw.palette.map(String);
   return out;
@@ -274,9 +295,8 @@ function normalizeItem(raw = {}, size) {
       id: raw.id || uid('nt'),
       bbox,
       label: ['object', 'text', 'character'].includes(raw.label) ? raw.label : 'object',
-      caption: String(raw.caption || ''),
       ...(raw.text ? { text: String(raw.text) } : {}),
-      ...extras(raw),
+      ...common(raw),
     };
   }
   if (type && type !== 'panel') {
@@ -287,7 +307,7 @@ function normalizeItem(raw = {}, size) {
       if (value === undefined || value === null || value === '') continue;
       kept[field.key] = typeof value === 'string' ? String(value) : value;
     }
-    return { ...kept, ...extras(raw) };
+    return { ...kept, ...common(raw) };
   }
   return {
     type: 'panel',
@@ -296,8 +316,8 @@ function normalizeItem(raw = {}, size) {
     shape: raw.shape || 'rect',
     frame: raw.frame || 'border',
     camera: raw.camera || 'medium',
-    caption: String(raw.caption || ''),
-    ...extras(raw),
+    ...(raw.desc ? { desc: String(raw.desc) } : {}),
+    ...common(raw),
   };
 }
 

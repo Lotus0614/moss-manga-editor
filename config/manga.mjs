@@ -241,20 +241,20 @@ export const MOSS_LABELS = [
 
 /**
  * 一个 character 项的最终描述。
- *   caption 空         → 用角色表 look
- *   caption 普通文本    → look + "In this box: <caption>"
- *   caption 以 ! 开头   → 整段替换 look（裸体、受伤、换装这类特例）
+ *   desc 空         → 用角色表 look
+ *   desc 普通文本    → look + "In this box: <desc>"
+ *   desc 以 ! 开头   → 整段替换 look（裸体、受伤、换装这类特例）
  */
 function characterText(item, resolveCharacter) {
-    const caption = String(item.caption || '').trim();
+    const desc = String(item.desc || '').trim();
     const char = resolveCharacter ? resolveCharacter(item.ref) : null;
     const name = char?.name || item.ref || 'character';
     const look = String(char?.look || '').trim();
 
-    if (caption.startsWith('!')) {
-        return { name, text: caption.slice(1).trim() };
+    if (desc.startsWith('!')) {
+        return { name, text: desc.slice(1).trim() };
     }
-    const extra = caption ? `In this box: ${caption}` : '';
+    const extra = desc ? `In this box: ${desc}` : '';
     return { name, text: [look, extra].filter(Boolean).join('. ') };
 }
 
@@ -383,9 +383,40 @@ export const PAGE = [
     { key: 'vertical', type: 'bool', label: '全局竖排', default: true },
     { key: 'scene', type: 'text', label: '场景' },
     { key: 'note', type: 'text', label: '补充说明' },
+    {
+        key: 'summaryMeta',
+        type: 'tags',
+        label: 'summary.meta（留空 = 用画风自带的）',
+    },
+    {
+        key: 'summaryCaption',
+        type: 'longtext',
+        label: 'summary.caption（填了就整段替换自动拼的 summary）',
+    },
 ];
 
 // ---------------------------------------------------------------- item 类型
+
+/**
+ * 所有格子共用的字段（native 是基础格子，其他类型都继承这一组）。
+ *   note     备注，中文，只给人看，不进提示词
+ *   caption  整段覆盖：填了就用它当产物 caption，自动拼的那套全部让位
+ *   tags / palette  原样透传
+ */
+const BASE_FIELDS = [
+    {
+        key: 'note',
+        type: 'longtext',
+        label: '备注（中文，说明这一格是干什么的；不进提示词）',
+    },
+    {
+        key: 'caption',
+        type: 'longtext',
+        label: '整段覆盖（留空 = 自动拼；填了就用这段，其他字段不再进提示词）',
+    },
+    { key: 'tags', type: 'tags', label: 'tags' },
+    { key: 'palette', type: 'palette', label: 'palette' },
+];
 
 export const TYPES = [
     {
@@ -394,7 +425,7 @@ export const TYPES = [
         role: 'panel',
         fields: [
             {
-                key: 'caption',
+                key: 'desc',
                 type: 'longtext',
                 label: '画面描述',
                 required: true,
@@ -422,8 +453,7 @@ export const TYPES = [
                 options: FRAMES,
                 default: 'border',
             },
-            { key: 'tags', type: 'tags', label: 'tags' },
-            { key: 'palette', type: 'palette', label: 'palette' },
+            ...BASE_FIELDS,
         ],
         compile({ item, page }) {
             const style = styleOf(page);
@@ -433,7 +463,7 @@ export const TYPES = [
             if (item.camera) parts.push(pick(CAMERAS, item.camera)?.phrase);
 
             const number = panelNumber(page, item);
-            const body = (item.caption || '').trim();
+            const body = (item.desc || '').trim();
             const tag = number ? `PANEL ${number}` : '';
             if (body || tag)
                 parts.push(
@@ -459,11 +489,11 @@ export const TYPES = [
                 canvas: true,
             },
             {
-                key: 'caption',
+                key: 'desc',
                 type: 'longtext',
                 label: '这一格的补充（背面／遮挡／做了什么；以 ! 开头则替换外貌）',
             },
-            { key: 'tags', type: 'tags', label: 'tags' },
+            ...BASE_FIELDS,
         ],
         compile({ item, page, resolveCharacter }) {
             // 还没选角色就不出图（右上「＋角色」加出来是空的，选完才有内容）
@@ -501,16 +531,15 @@ export const TYPES = [
                 options: TAILS,
                 default: 'down-left',
             },
-            { key: 'caption', type: 'text', label: '补充说明（特殊文字用）' },
-            { key: 'tags', type: 'tags', label: 'tags' },
-            { key: 'palette', type: 'palette', label: 'palette' },
+            { key: 'desc', type: 'text', label: '补充说明（特殊文字用）' },
+            ...BASE_FIELDS,
         ],
         compile({ item, page }) {
             const style = styleOf(page);
             const parts = [bubblePhrase(item)];
             const where = locateInPanel(page, item);
             if (where) parts.push(where);
-            if (item.caption) parts.push(String(item.caption));
+            if (item.desc) parts.push(String(item.desc));
             parts.push(`placed in the ${placementOf(page, item.bbox)}`);
             parts.push(textLayoutOf(page, item));
             if (style.guard) parts.push(style.guard);
@@ -534,18 +563,11 @@ export const TYPES = [
                 canvas: true,
             },
             {
-                key: 'caption',
-                type: 'longtext',
-                label: 'caption',
-                required: true,
-            },
-            {
                 key: 'text',
                 type: 'longtext',
                 label: 'text（label=text 时必填）',
             },
-            { key: 'tags', type: 'tags', label: 'tags' },
-            { key: 'palette', type: 'palette', label: 'palette' },
+            ...BASE_FIELDS,
         ],
         compile({ item }) {
             return {
@@ -599,7 +621,7 @@ export function buildSummary({ page, items, resolveCharacter }) {
     const seen = new Set();
     for (const item of page.items || []) {
         if (item.type !== 'character' || !item.ref || seen.has(item.ref)) continue;
-        if (String(item.caption || '').trim().startsWith('!')) continue;
+        if (String(item.desc || '').trim().startsWith('!')) continue;
         seen.add(item.ref);
         const { name, text } = characterText(item, resolveCharacter);
         cast.push({ name, text });
@@ -615,11 +637,17 @@ export function buildSummary({ page, items, resolveCharacter }) {
     if (page.note) parts.push(page.note);
     if (style.guard) parts.push(style.guard);
 
+    const meta =
+        Array.isArray(page.summaryMeta) && page.summaryMeta.length
+            ? page.summaryMeta
+            : style.meta;
+    const override = String(page.summaryCaption || '').trim();
+
     return {
-        meta: style.meta,
+        meta,
         canvas:
             panels.length > 1 || texts.length > 1 ? 'multi_panel' : 'single',
-        caption: parts.filter(Boolean).join('\n\n'),
+        caption: override || parts.filter(Boolean).join('\n\n'),
     };
 }
 

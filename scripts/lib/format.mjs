@@ -12,7 +12,7 @@ export function pageOutline(page) {
     const [x1, y1, x2, y2] = item.bbox;
     const box = `[${x1},${y1},${x2},${y2}]`;
     if (item.type === 'panel') {
-      const caption = item.caption ? item.caption.slice(0, 48) : '（未写描述）';
+      const caption = (item.note || item.desc || item.caption || '（未写描述）').slice(0, 48);
       lines.push(`  格 ${item.id} ${box} ${item.shape}/${item.camera}  ${caption}`);
     } else if (item.type === 'bubble') {
       const text = (item.text || '').replace(/\n/g, '⏎').slice(0, 40);

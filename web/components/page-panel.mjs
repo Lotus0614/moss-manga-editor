@@ -9,8 +9,13 @@ function Field({ field, value, onChange }) {
   if (field.type === 'enum') {
     return html`<div class="field" key=${field.key}>
       <label>${field.label}</label>
-      <select class="select" value=${value ?? field.default ?? ''} onChange=${(e) => onChange(e.currentTarget.value)}>
+      <select
+        class="select"
+        value=${value ?? field.default ?? ''}
+        onChange=${(e) => onChange(e.currentTarget.value === '' ? undefined : e.currentTarget.value)}
+      >
         ${optionsOf(field).map((option) => html`<option value=${option.value}>${option.label}</option>`)}
+        <option value="">✕ 清空</option>
       </select>
     </div>`;
   }

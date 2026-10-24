@@ -76,14 +76,16 @@ function ItemBox({ item, page, index, selected, primary, fillAlpha, characters }
       : canvasLabel(item, index);
 
   const fs = Math.max(17, Math.min(w / 13, h / 4.5, 30));
+  // 画布优先显示中文备注：英文提示词是给模型看的，不是给人看的
   const body =
-    item.type === 'character'
-      ? item.caption || character?.look || ''
+    item.note ||
+    (item.type === 'character'
+      ? item.desc || character?.look || ''
       : isBubble
-        ? item.text
+        ? item.text || item.desc
         : isNative
           ? item.text || item.caption
-          : item.caption;
+          : item.desc || item.caption);
 
   // 画布只做排版预览：文字一律横排显示，竖排设置只影响生成的提示词
   const vertical = false;

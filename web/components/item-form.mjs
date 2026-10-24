@@ -13,8 +13,12 @@ function Field({ field, value, onChange, characters }) {
     const list = characters || [];
     return html`<div class="field">
       ${label}
-      <select class="select" value=${value ?? ''} onChange=${(e) => onChange(e.currentTarget.value)}>
-        <option value="">（选择角色）</option>
+      <select
+        class="select"
+        value=${value ?? ''}
+        onChange=${(e) => onChange(e.currentTarget.value === '' ? undefined : e.currentTarget.value)}
+      >
+        <option value="">✕ 清空</option>
         ${list.map((char) => html`<option value=${char.id}>${char.name}（${char.id}）</option>`)}
       </select>
       ${list.length ? null : html`<span class="hint">项目还没有角色，点顶栏「角色表」添加。</span>`}
@@ -34,8 +38,13 @@ function Field({ field, value, onChange, characters }) {
   if (field.type === 'enum') {
     return html`<div class="field">
       ${label}
-      <select class="select" value=${value ?? field.default ?? ''} onChange=${(e) => onChange(e.currentTarget.value)}>
+      <select
+        class="select"
+        value=${value ?? field.default ?? ''}
+        onChange=${(e) => onChange(e.currentTarget.value === '' ? undefined : e.currentTarget.value)}
+      >
         ${optionsOf(field).map((option) => html`<option value=${option.value}>${option.label}</option>`)}
+        <option value="">✕ 清空</option>
       </select>
     </div>`;
   }

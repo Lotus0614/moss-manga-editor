@@ -40,7 +40,8 @@ export function validatePage(page, doc) {
       if (!shape?.bleed && (x1 < 0 || y1 < 0 || x2 > size.width || y2 > size.height)) {
         add('warn', 'panel.out', `${name} 超出画布，内容可能被裁掉`, item.id);
       }
-      if (!item.caption?.trim()) add('warn', 'panel.blank', `${name} 没写画面描述，只会画出一个空框`, item.id);
+      if (!item.desc?.trim() && !item.caption?.trim())
+        add('warn', 'panel.blank', `${name} 没写画面描述，只会画出一个空框`, item.id);
       if (!shape) add('warn', 'panel.shape', `${name} 的形状「${item.shape}」不认识`, item.id);
     }
 

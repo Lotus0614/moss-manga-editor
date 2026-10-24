@@ -1,4 +1,4 @@
-// 编辑页：左页序 / 中画布 + 工作台 / 右属性面板。
+﻿// 编辑页：左页序 / 中画布 + 工作台 / 右属性面板。
 // 页面是单层 items；快捷键 Delete 删除、Ctrl+C/V 复制粘贴、Ctrl+Z 撤销。
 
 import {
@@ -730,7 +730,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
                 if (!it) return null;
                 return html`<div class="rowitem" onClick=${() => select({ kind: it.type, id })}>
                   <span class="mono small">${itemType(it.type)?.label || it.type}</span>
-                  <span class="grow ellipsis">${(it.text || it.caption || '（空）').slice(0, 40)}</span>
+                  <span class="grow ellipsis">${(it.note || it.text || it.desc || it.caption || '（空）').slice(0, 40)}</span>
                 </div>`;
               })}
             </div>

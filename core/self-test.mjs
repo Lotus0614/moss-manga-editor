@@ -1,11 +1,11 @@
-// 自测：编译契约的黄金用例。
+﻿// 自测：编译契约的黄金用例。
 // 运行：node core/self-test.mjs
 //
 // 这些断言对应 Moss 模板文档里的硬性约定，任何一条挂了都说明产物会被模型拒绝或画歪。
 
 import assert from 'node:assert/strict';
 import { compilePage } from './compile.mjs';
-import { createPage, createPanelItem, createBubbleItem, toMoss, fromMoss } from './manga-doc.mjs';
+import { createPage, createPanelItem, createBubbleItem, toMoss, fromMoss, normalizePage } from './manga-doc.mjs';
 import { validatePage } from './validate.mjs';
 import { decompile } from './decompile.mjs';
 import { fillGraph, scanTokens, MissingParam, describeWorkflow } from './placeholders.mjs';
@@ -72,7 +72,7 @@ function buildDocPage() {
   const page = createPage({ size: SIZE });
   page.items = [
     ...DOC_PANELS.map((moss, i) =>
-      createPanelItem({ bbox: fromMoss(moss, SIZE_OBJ), caption: `panel content ${i + 1}` })
+      createPanelItem({ bbox: fromMoss(moss, SIZE_OBJ), desc: `panel content ${i + 1}`, note: `第 ${i + 1} 格备注` })
     ),
     ...DOC_BUBBLES.map((moss, i) =>
       createBubbleItem({ bbox: fromMoss(moss, SIZE_OBJ), text: `测试台词${i + 1}`, kind: i === 1 ? 'thought' : 'speech' })
@@ -152,14 +152,14 @@ test('character 类型：外貌来自角色表，caption 只做补充或覆盖',
   assert.ok(/CHARACTERS IN THIS PAGE/.test(plain.doc.summary.caption));
   assert.ok(plain.doc.summary.caption.includes('long black hair'));
 
-  // 2) 普通 caption：追加，不替换
-  page.items[1] = { ...page.items[1], caption: 'seen from behind' };
+  // 2) 普通 desc：追加，不替换
+  page.items[1] = { ...page.items[1], desc: 'seen from behind' };
   const appended = compilePage(page, project).doc.items.find((i) => i.label === 'character');
   assert.ok(appended.caption.includes('long black hair'), appended.caption);
   assert.ok(appended.caption.includes('In this box: seen from behind'), appended.caption);
 
   // 3) ! 覆盖：整段替换，且不进 summary 的角色表
-  page.items[1] = { ...page.items[1], caption: '!completely naked' };
+  page.items[1] = { ...page.items[1], desc: '!completely naked' };
   const over = compilePage(page, project);
   const overItem = over.doc.items.find((i) => i.label === 'character');
   assert.ok(overItem.caption.includes('completely naked'), overItem.caption);
@@ -170,6 +170,40 @@ test('character 类型：外貌来自角色表，caption 只做补充或覆盖',
 test('编译无 error 级告警', () => {
   const errs = compiled.warnings.filter((w) => w.level === 'error');
   assert.deepEqual(errs, []);
+});
+
+test('caption 填了就整段接管，note 不进产物', () => {
+  const page = createPage({ size: SIZE });
+  page.items = [
+    createPanelItem({
+      bbox: [8, 8, 760, 400],
+      desc: 'a crowded platform',
+      note: '第一格：交代场景',
+      caption: 'my own caption, nothing else',
+    }),
+  ];
+  const item = compilePage(page).doc.items[0];
+  assert.equal(item.caption, 'my own caption, nothing else');
+  assert.ok(!item.caption.includes('rectangular panel'), '形状短语应该让位');
+  assert.equal(item.note, undefined, 'note 是给人看的，不进 Moss item');
+});
+
+test('旧数据迁移：caption（当时的画面描述）搬到 desc', () => {
+  const migrated = normalizePage({
+    size: SIZE,
+    items: [{ type: 'panel', id: 'pn_a', bbox: [8, 8, 760, 400], caption: '旧的画面描述' }],
+  });
+  assert.equal(migrated.version, 2);
+  assert.equal(migrated.items[0].desc, '旧的画面描述');
+  assert.equal(migrated.items[0].caption, undefined);
+});
+
+test('页面的 summaryMeta / summaryCaption 能整段覆盖 summary', () => {
+  const page = createPage({ size: SIZE, summaryMeta: ['custom meta'], summaryCaption: '整段自定义 summary' });
+  page.items = [createPanelItem({ bbox: [8, 8, 760, 400], desc: 'x' })];
+  const summary = compilePage(page).doc.summary;
+  assert.deepEqual(summary.meta, ['custom meta']);
+  assert.equal(summary.caption, '整段自定义 summary');
 });
 
 test('本身已包含全部允许字段，没有多余键', () => {

@@ -55,7 +55,7 @@ export function decompile(input, size = DEFAULT_SIZE) {
         bbox,
         shape: guessShape(item.caption),
         frame: /no border/i.test(item.caption || '') ? 'none' : 'border',
-        caption: stripMeta(item.caption || ''),
+        desc: stripMeta(item.caption || ''),
       });
     }
     return createNativeItem({

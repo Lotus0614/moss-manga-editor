@@ -20,7 +20,14 @@ export function compilePage(page, project = null) {
     const compiled = type.compile({ item, page, resolveCharacter });
     // compile 返回空值 = 这一项还不完整（例如角色项没选人），跳过
     if (!compiled) continue;
-    const out = { label: compiled.label, caption: compiled.caption, bbox: toMoss(item.bbox, size) };
+
+    // native 的字段优先：label 显式给了就用，caption 非空就整段接管（其余拼出来的全让位）
+    const override = String(item.caption || '').trim();
+    const out = {
+      label: item.label || compiled.label,
+      caption: override || compiled.caption,
+      bbox: toMoss(item.bbox, size),
+    };
     if (compiled.text) out.text = compiled.text;
     if (Array.isArray(item.tags) && item.tags.length) out.tags = item.tags;
     if (Array.isArray(item.palette) && item.palette.length) out.palette = item.palette;

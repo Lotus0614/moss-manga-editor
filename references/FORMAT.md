@@ -173,7 +173,7 @@ in the LEFT EDGE of PANEL TWO. It is the narrator, not a character speaking.
   "desc": "!CHARACTER ONE - SHION, inside PANEL TWO only, completely naked, only the red armband" }
 ```
 
-产物就是 `desc` 原文（加画风 guard），**没有位置、没有编号、没有外貌的自动补全**：
+产物就是 `desc` 原文，**没有位置、没有编号、没有外貌、没有画风尾巴的自动补全**：
 
 ```
 CHARACTER ONE - SHION, inside PANEL ONE only, filling the CENTRE of PANEL ONE, kneeling, upper body turned to the side. Black ink, white paper and grey screentone only, zero colour.
@@ -250,7 +250,7 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 
 工具不再提供 band-3 / 四宫格之类的预设——漫画排版本来就不该被模板限制。新建页只给**一个占满整页的框**当起手，怎么切、怎么斜、怎么出血，自己拖或者让 AI 按故事来定。
 
-同样地，**编号、位置、文字落在哪一格，编译器一个都不算**。它只负责把 `shape` / `frame` / `camera` 拼成形制短语、把角色表外貌注入进去、把画风守卫补到末尾。版式是读得懂文字的人才说得清的事，所以这些全部由作者写在 `desc` 里。
+同样地，**编号、位置、文字落在哪一格，编译器一个都不算**。它只负责把 `shape` / `frame` / `camera` 拼成形制短语、把角色表外貌注入进去。版式是读得懂文字的人才说得清的事，所以这些全部由作者写在 `desc` 里。
 
 ## 提示词手写约定
 
@@ -298,10 +298,10 @@ Render ONLY the text listed below, with the exact wording given.
 
 ### 注意：`caption` 是整段覆盖
 
-panel / bubble / character 上的 `caption` 一旦填了，编译器拼的东西**全部让位**（形制短语、机位、画风守卫都没了）。只有需要完全控制时才用，用了就要自己补边框和画风：
+panel / bubble / character 上的 `caption` 一旦填了，编译器拼的东西**全部让位**（形制短语、机位都没了）。只有需要完全控制时才用，用了就要自己写清边框与画风：
 
 ```
-PANEL TWO, a small inset with a thick white border and a soft drop shadow… Pure black ink and bare white paper only…（黑白页的锁色句）
+PANEL TWO, a small inset with a thick white border and a soft drop shadow, a small wooden sign hanging off its corner…
 ```
 
 ## 语序
@@ -321,7 +321,7 @@ PANEL TWO, a small inset with a thick white border and a soft drop shadow… Pur
 In sharp contrast, the girl on the right has NO glasses and spotless skin with zero freckles.
 ```
 
-页面级的 `summary` 同理：画风 → 格数 → 文字锁 → 场景 → 角色表 → 收尾守卫，顺序不要打乱。
+页面级的 `summary` 同理：画风 → 格数 → 文字锁 → 场景 → 角色表，顺序不要打乱。
 
 ## versions.json
 
@@ -449,7 +449,7 @@ export const CAMERAS = [
 
 有的项还会多带自己专用的键，就写在那一项里：
 
-- 画风 `STYLES`：`meta`（进 `summary.meta`）、`guard`（补到每一项末尾的硬约束）
+- 画风 `STYLES`：`meta`（进 `summary.meta`）和 `phrase`（summary 开头那一句，整页只写一次）
 - 文字载体 `BUBBLES`：只有 `value` / `label` / `phrase`，形态完全由 `kind` 决定
 - 形状 `SHAPES`：`bleed`（可以超出画布，校验时不再报越界）
 
@@ -501,7 +501,7 @@ export function buildSummary({ page, items }) {
 
 两段来源：
 
-1. **前半段**——填了 `page.summaryCaption` 就整段用它（格数、排布、每格剧情都自己写）；没填就用自动骨架（画风、格数、文字条数、`scene`、`note`、画风守卫）。
+1. **前半段**——填了 `page.summaryCaption` 就整段用它（格数、排布、每格剧情都自己写）；没填就用自动骨架（画风、格数、文字条数、`scene`、`note`、角色表）。
 2. **后半段**——`CHARACTERS IN THIS PAGE` 是自动的：从本页的 character 项里按 `ref` 去重，名字和外形都取自角色表。角色名要起成 `CHARACTER ONE - SHION`，编号和名字才能自动带出来。\n3. 手写 `summaryCaption` 时整段覆盖（连角色表也不追加），等于这一页的 summary 完全由你负责。
 
 用 `!` 覆盖外貌的那几格不进这段角色表（外貌已经在那一格自己的 caption 里了）。

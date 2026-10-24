@@ -15,52 +15,52 @@ export const SHAPES = [
     {
         value: 'rect',
         label: '矩形',
-        phrase: 'rectangular panel with straight edges',
+        phrase: 'rectangular panel',
     },
     {
         value: 'slant-top',
         label: '斜切上边',
-        phrase: 'trapezoid panel with a slanted top edge cutting diagonally',
+        phrase: 'panel with a slanted top edge',
     },
     {
         value: 'slant-side',
         label: '斜切侧边',
-        phrase: 'panel with a sharply angled slanted side edge',
+        phrase: 'panel with a slanted side edge',
     },
     {
         value: 'bleed-top',
         label: '出血·上',
-        phrase: 'panel bleeding off the TOP edge of the page, no border',
+        phrase: 'panel bleeding off the top edge, no border',
         bleed: true,
     },
     {
         value: 'bleed-bottom',
         label: '出血·下',
-        phrase: 'panel bleeding off the BOTTOM edge of the page, no border',
+        phrase: 'panel bleeding off the bottom edge, no border',
         bleed: true,
     },
     {
         value: 'bleed-left',
         label: '出血·左',
-        phrase: 'panel bleeding off the LEFT edge of the page, no border',
+        phrase: 'panel bleeding off the left edge, no border',
         bleed: true,
     },
     {
         value: 'bleed-right',
         label: '出血·右',
-        phrase: 'panel bleeding off the RIGHT edge of the page, no border',
+        phrase: 'panel bleeding off the right edge, no border',
         bleed: true,
     },
     {
         value: 'bleed-all',
         label: '满版',
-        phrase: 'full-bleed panel covering the whole page, no border, artwork running off all four edges',
+        phrase: 'full-bleed panel, no border',
         bleed: true,
     },
     {
         value: 'circle',
         label: '圆形',
-        phrase: 'circular panel with a clean round border',
+        phrase: 'circular panel',
     },
 ];
 
@@ -69,12 +69,12 @@ export const FRAMES = [
     {
         value: 'border',
         label: '描边',
-        phrase: 'crisp black panel border with a white gutter around it',
+        phrase: 'crisp black panel border',
     },
     {
         value: 'none',
         label: '无边',
-        phrase: 'no border, artwork fills the panel edge to edge',
+        phrase: 'no border',
     },
     { value: 'thick', label: '粗边', phrase: 'heavy black panel border' },
 ];
@@ -98,30 +98,26 @@ export const CAMERAS = [
 
 /**
  * 画风：整页总基调。
- * phrase 进 summary 开头；guard 会补到每一项末尾，用来压住模型跑偏（彩色/网点/线稿）。
- * meta 进 summary.meta。
+ * phrase 进 summary 开头（只写一次，靠语序影响后面所有 item），meta 进 summary.meta。
  */
 export const STYLES = [
     {
         value: 'mono',
         label: '黑白网点',
-        meta: ['japanese manga page', 'monochrome'],
-        phrase: 'STRICTLY BLACK AND WHITE PRINTED MANGA PAGE, black ink only. Every tone is either PURE BLACK INK, BARE WHITE PAPER, or a VISIBLE SCREENTONE DOT PATTERN — screentone is always a pattern of discrete dots, never a flat grey fill, never a smooth gradient, never an airbrushed grey wash, never grey paint. ZERO COLOUR: no flesh colour, no skin tone, no blue, no cyan, no yellow, no brown, no colour wash. Skin is bare white paper with black line hatching and dot screentone, never a grey fill. Shadows are dense black crosshatching or dense dot patterns, highlights are untouched white paper.',
-        guard: 'Pure black ink and bare white paper only, every tone is visible dot screentone, no flat grey fill, no gradient, no airbrush, zero colour.',
+        meta: ['comic', 'multi_panel', 'digital_painting', 'monochrome'],
+        phrase: 'High-taste, black and white vertical 2D manga comic, black ink on white paper, grey screentone dots only, zero colour.',
     },
     {
         value: 'color',
         label: '彩色',
-        meta: ['japanese manga page', 'full color'],
-        phrase: 'FULL COLOUR JAPANESE MANGA PAGE: clean ink lineart with soft muted digital colouring, pale skin tones, desaturated palette, consistent light direction across all panels.',
-        guard: '',
+        meta: ['comic', 'multi_panel', 'digital_painting', 'full color'],
+        phrase: 'High-taste, fully colored vertical 2D digital painting comic, clean ink lineart with soft muted colouring.',
     },
     {
         value: 'sketch',
         label: '线稿',
-        meta: ['manga lineart', 'monochrome'],
-        phrase: 'MANGA LINEART ONLY, clean black ink lines on pure white, no screentone, no shading fills, no colour at all.',
-        guard: 'Black ink on white only, zero tone, zero colour.',
+        meta: ['comic', 'multi_panel', 'digital_painting', 'monochrome'],
+        phrase: 'High-taste, vertical 2D manga lineart, black ink lines only on white paper, no tone, no colour.',
     },
 ];
 
@@ -133,49 +129,49 @@ export const BUBBLES = [
     {
         value: 'speech',
         label: '对话',
-        phrase: 'WHITE OVAL speech bubble, smooth even outline, thin black line',
+        phrase: 'white oval speech bubble, thin black outline',
     },
     {
         value: 'shout',
         label: '喊叫',
-        phrase: 'JAGGED EXPLOSIVE speech bubble with sharp spiky edges',
+        phrase: 'jagged spiky speech bubble',
     },
     {
         value: 'whisper',
         label: '小声',
-        phrase: 'small round WHITE OVAL speech bubble, its tail made of three tiny circles trailing away in a line',
+        phrase: 'small round white speech bubble, tail of tiny circles',
     },
     {
         value: 'tremble',
         label: '颤抖',
-        phrase: 'WHITE speech bubble with a SHAKY WAVY outline',
+        phrase: 'white speech bubble with a shaky wavy outline',
     },
     {
         value: 'thought',
         label: '内心',
-        phrase: 'WHITE CLOUD-shaped thought bubble, scalloped edge, thin black outline, NO tail',
+        phrase: 'white cloud-shaped thought bubble, scalloped edge',
     },
     {
         value: 'heart',
         label: '心之声',
-        phrase: 'speech bubble with a DASHED black outline, white interior, NO tail',
+        phrase: 'speech bubble with a dashed outline',
     },
     {
         value: 'narration',
         label: '旁白·白框',
         // 压在细节多的画面上也能读清，日漫常见的白底小方框
-        phrase: 'narration lettering set in a plain white rectangular caption box with a thin black border, box edges straight and parallel to the panel edge, box covers the artwork behind it',
+        phrase: 'narration in a plain white rectangular box with a thin black border',
     },
     {
         value: 'narration-bare',
         label: '旁白·裸字',
         // 无框：字直接压在画面上，靠白色描边浮起来
-        phrase: 'narration lettering printed DIRECTLY on the artwork with no box and no bubble, floating freely, thin white outline so the strokes stay readable against the drawing',
+        phrase: 'narration printed directly on the artwork, no box, thin white outline',
     },
     {
         value: 'sfx',
         label: '拟声词',
-        phrase: 'hand-lettered sound effect, bold brush strokes, slightly rotated, thin white outline, no bubble',
+        phrase: 'hand-lettered sound effect, bold brush strokes, no bubble',
     },
 ];
 
@@ -212,7 +208,6 @@ export const SNIPPETS = {
         'Dialogue uses white speech bubbles with tails, thoughts use white cloud bubbles with no tail, and narration sits in a small plain white rectangular caption box. Every bubble and caption box stays INSIDE one panel and never crosses a panel border.',
     noLettering:
         'This page contains NO lettering at all: no speech bubbles, no captions, no sound effects, no text of any kind.',
-    boxPrefix: 'This box contains only:',
 };
 
 const fill = (template, vars = {}) =>
@@ -238,15 +233,9 @@ function textLayoutOf(page, item) {
         : 'horizontal lettering';
 }
 
-/** 一条文字的形态描述：只有形态，位置和说话人由作者写进 desc */
+/** 一条文字的形态描述：只有形态，位置、说话人、留边都写在 desc 里 */
 function bubblePhrase(bubble) {
-    const kind = pick(BUBBLES, bubble.kind) || pick(BUBBLES, 'speech');
-    const parts = [kind.phrase];
-    // 文字贴到气泡轮廓上会糊成一团，明确要求留边
-    parts.push(
-        'the lettering sits well inside the bubble with a clear margin, never touching the outline',
-    );
-    return parts.join(', ');
+    return (pick(BUBBLES, bubble.kind) || pick(BUBBLES, 'speech')).phrase;
 }
 
 const styleOf = (page) => pick(STYLES, page.style) || pick(STYLES, 'mono');
@@ -337,16 +326,13 @@ export const TYPES = [
             ...BASE_FIELDS,
         ],
         compile({ item, page }) {
-            const style = styleOf(page);
             const shape = pick(SHAPES, item.shape);
             const parts = [shape?.phrase];
             if (!shape?.bleed) parts.push(pick(FRAMES, item.frame)?.phrase);
             if (item.camera) parts.push(pick(CAMERAS, item.camera)?.phrase);
 
             const body = (item.desc || '').trim();
-            if (body)
-                parts.push(`${SNIPPETS.boxPrefix} ${body}`);
-            if (style.guard) parts.push(style.guard);
+            if (body) parts.push(body);
 
             return {
                 label: 'object',
@@ -376,12 +362,14 @@ export const TYPES = [
         compile({ item, page }) {
             // 这一格的文案由作者写全（外貌在角色表里，summary 会自动带上）；没写就不出图
             // 开头写 ! 表示「这一格和角色表不一样」，只影响 summary 要不要列这个角色，本身不带进提示词
-            const body = String(item.desc || '').replace(/^!/, '').trim();
+            const body = String(item.desc || '')
+                .replace(/^!/, '')
+                .trim()
+                .replace(/[.。]+$/, '');
             if (!item.ref || !body) return null;
-            const style = styleOf(page);
             return {
                 label: 'character',
-                caption: [body, style.guard].filter(Boolean).join('. '),
+                caption: `${body}.`,
             };
         },
     },
@@ -406,11 +394,9 @@ export const TYPES = [
             ...BASE_FIELDS,
         ],
         compile({ item, page }) {
-            const style = styleOf(page);
             const parts = [bubblePhrase(item)];
             if (item.desc) parts.push(String(item.desc));
             parts.push(textLayoutOf(page, item));
-            if (style.guard) parts.push(style.guard);
             return {
                 label: 'text',
                 caption: parts.filter(Boolean).join(', '),
@@ -485,7 +471,6 @@ export function buildSummary({ page, items, resolveCharacter }) {
     if (page.scene) parts.push(page.scene);
 
     if (page.note) parts.push(page.note);
-    if (style.guard) parts.push(style.guard);
 
     // 角色表：本页出现的角色，外貌只在这里写一次（手写 summary 时不追加）
     const cast = [];

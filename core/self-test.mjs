@@ -9,7 +9,6 @@ import { createPage, createPanelItem, createBubbleItem, toMoss, fromMoss, normal
 import { validatePage } from './validate.mjs';
 import { decompile } from './decompile.mjs';
 import { fillGraph, scanTokens, MissingParam, describeWorkflow } from './placeholders.mjs';
-import { pageField, optionOf } from '../config/manga.mjs';
 
 let passed = 0;
 const failures = [];
@@ -119,21 +118,18 @@ test('summary.caption 非空且含黑白锁色句', () => {
   assert.ok(/zero colour/i.test(compiled.doc.summary.caption));
 });
 
-test('每个 item 的 caption 都带收尾的锁色句', () => {
-  // 锁色句由画风定义，这里跟着配置走，改措辞不会让测试假红
-  const style = optionOf(pageField('style'), compiled.doc.summary.meta.includes('monochrome') ? 'mono' : 'color');
-  if (!style?.guard) return;
-  for (const item of compiled.doc.items) {
-    assert.ok(item.caption.includes(style.guard), item.caption);
-  }
-});
-
-test('旁白项用白底方框或裸字，不会被画成气泡', () => {
+test('两种旁白：白框与裸字互不混淆', () => {
   const page = createPage({ size: SIZE });
-  page.items = [createPanelItem({ bbox: [8, 8, 760, 400] }), createBubbleItem({ kind: 'narration', text: '旁白', bbox: [40, 40, 400, 120] })];
-  const out = compilePage(page);
-  const text = out.doc.items.find((i) => i.label === 'text');
-  assert.ok(/caption box|no bubble, no box|floating freely/i.test(text.caption), text.caption);
+  page.items = [
+    createPanelItem({ bbox: [8, 8, 760, 400] }),
+    createBubbleItem({ kind: 'narration', text: '白框旁白', bbox: [40, 40, 400, 120] }),
+    createBubbleItem({ kind: 'narration-bare', text: '裸字旁白', bbox: [40, 140, 400, 220] }),
+  ];
+  const [boxed, bare] = compilePage(page).doc.items.filter((i) => i.label === 'text');
+  assert.ok(/rectangular box/i.test(boxed.caption), boxed.caption);
+  assert.ok(!/no box/i.test(boxed.caption), boxed.caption);
+  assert.ok(/no box|printed directly/i.test(bare.caption), bare.caption);
+  assert.ok(!/rectangular box/i.test(bare.caption), bare.caption);
 });
 
 test('character 类型：格子文案由作者写全，外貌只出现在 summary 角色表', () => {

@@ -80,14 +80,10 @@ function guessBubbleType(caption = '') {
 }
 
 function stripMeta(caption) {
+  // 老产物会带 `This box contains only:` 前缀，剥掉它留下的就是作者写的画面描述
   const m = caption.match(/This box contains only:\s*(.+)$/i);
-  if (m) {
-    return m[1]
-      .replace(/\s*,\s*Black ink[\s\S]*$/i, '')
-      .replace(/\s*,\s*$/, '')
-      .trim();
-  }
+  if (m) return m[1].replace(/\s*,\s*$/, '').trim();
   // 编译产物里若不是作者内容，就是「形状 + 边框 + 机位」这类套话，直接清空
-  if (/rectangular panel|trapezoid panel|panel bleeding|circular panel|panel border|no border, artwork/i.test(caption)) return '';
-  return caption.replace(/Black ink, white paper and grey screentone only, zero colour\.?/gi, '').replace(/\s*,\s*$/, '').trim();
+  if (/rectangular panel|trapezoid panel|panel bleeding|circular panel|panel border|no border/i.test(caption)) return '';
+  return caption.replace(/\s*,\s*$/, '').trim();
 }

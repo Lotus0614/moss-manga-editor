@@ -15,6 +15,7 @@ import {
   toast,
   cls,
   setApp,
+  useApp,
 
 } from '../lib.mjs';
 import Canvas from '../components/canvas.mjs';
@@ -47,10 +48,12 @@ function readFillAlpha() {
   return DEFAULT_FILL_ALPHA;
 }
 
-const TYPE_NAME = { panel: '分格', bubble: '文字', native: '原生项' };
-
 export default function EditorPage({ projectId, pageId, config, onOpenSettings }) {
   const [project, setProject] = useState(null);
+  // 角色表由「角色表」弹窗维护，存完走 app.project；这里以最新的那份为准
+  const liveProject = useApp().project;
+  const currentProject = liveProject && liveProject.slug === projectId ? liveProject : project;
+  const characters = currentProject?.characters || [];
   const [pages, setPages] = useState([]);
   const [pagesLoaded, setPagesLoaded] = useState(false);
   const [page, setPage] = useState(null);
@@ -362,7 +365,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
       .map((it) => JSON.parse(JSON.stringify(it)));
     if (!items.length) return;
     clipboard.current = items;
-    toast(items.length > 1 ? `已复制 ${items.length} 项` : `已复制${TYPE_NAME[items[0].type] || '项'}`);
+    toast(items.length > 1 ? `已复制 ${items.length} 项` : `已复制${itemType(items[0].type)?.label || '项'}`);
   }
 
   function paste() {
@@ -410,11 +413,11 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const compiled = useMemo(() => {
     if (!page) return null;
     try {
-      return compilePage(page);
+      return compilePage(page, currentProject);
     } catch (err) {
       return { json: '', warnings: [{ level: 'error', code: 'compile', message: err.message }], stats: {} };
     }
-  }, [page]);
+  }, [page, currentProject]);
 
   async function generate() {
     if (!page || generating) return;
@@ -525,16 +528,21 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const scale = fitScale * zoom;
 
   function addItem(type) {
+    if (type === 'character' && !characters.length) {
+      toast('项目还没有角色：点顶栏「角色表」先添加', 'bad');
+      return;
+    }
     const def = itemType(type);
     const patch = {};
     for (const f of def?.fields || []) {
       if (f.default !== undefined) patch[f.key] = f.default;
       else if (f.type === 'tags' || f.type === 'palette') patch[f.key] = [];
     }
-    const bbox = type === 'bubble' ? [400, 140, 680, 320] : type === 'native' ? [40, 40, 400, 160] : [40, 420, 728, 780];
+    const bbox = type === 'bubble' ? [400, 140, 680, 320] : type === 'native' ? [40, 40, 400, 160] : type === 'character' ? [40, 900, 300, 1240] : [40, 420, 728, 780];
     const item = createItem(type, { bbox, ...(type === 'bubble' ? { text: '新台词' } : {}), ...patch });
     mutate((cur) => ({ ...cur, items: [...cur.items, item] }));
     select({ kind: item.type, id: item.id });
+    if (type === 'character') toast('在右栏选一下这是谁');
     setTimeout(saveNow, 60);
   }
 
@@ -649,6 +657,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
           grid=${grid}
           scale=${scale}
           selection=${selection}
+          characters=${characters}
           onSelect=${select}
           onBegin=${snapshot}
           onChange=${updateBbox}
@@ -711,7 +720,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     </section>
 
     <aside class="inspect">
-      <div class="inspect-head">${multi ? `已选 ${selectedIds.length} 项` : selected ? `${TYPE_NAME[selected.type]}属性` : '页面属性'}</div>
+      <div class="inspect-head">${multi ? `已选 ${selectedIds.length} 项` : selected ? `${itemType(selected.type)?.label || selected.type}属性` : '页面属性'}</div>
       <div class="inspect-body">${multi
         ? html`<div class="col">
             <div class="hint">多选：可以直接在画布上整体拖动，右侧不提供逐项编辑。Shift + 点击可加减选。</div>
@@ -733,12 +742,13 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         : selected
           ? html`<${ItemForm}
               item=${selected}
+              characters=${characters}
               patchItem=${patchItem}
               removeItem=${removeItem}
               onBack=${() => setSelection(null)}
               onCopy=${copySelected}
             />`
-          : html`<${PagePanel} page=${page} mutate=${mutate} setSelection=${select} />`}</div>
+          : html`<${PagePanel} page=${page} mutate=${mutate} setSelection=${select} characters=${characters} />`}</div>
     </aside>
 
     ${showExport

@@ -1,4 +1,4 @@
-﻿# 存档格式
+# 存档格式
 
 配置和存档是两棵树：配置（含工作流）在固定的配置根，存档只放项目数据。
 
@@ -27,6 +27,7 @@ data    默认 config/archive（config.archive 或 --dir 可改）
 | type     | 是什么                     | 主要字段                                       |
 | -------- | -------------------------- | ---------------------------------------------- |
 | `panel`  | 一个分格                   | `bbox` `shape` `frame` `camera` `caption`      |
+| `character` | 一个指定位置的人物      | `bbox` `ref` `caption?`                        |
 | `bubble` | 一条文字                   | `bbox` `kind` `text` `size` `tail` `vertical?` |
 | `native` | 原生 Moss item，绕过语义层 | `bbox` `label` `caption` `text?`               |
 
@@ -107,6 +108,46 @@ PANEL 1, the wide band across the top — a crowded platform at dusk
 | `vertical` | 不写就跟随页面 `vertical`；写 `true`/`false` 单独覆盖（不在表单里，手写页面时才用）                                 |
 
 **文字不用写在哪一格**：编译器按 bbox 自动加 `inside PANEL N` 或 `at the edge of PANEL N`。
+
+## character
+
+人物只有两个字段：**这是谁**、**这一格有什么不一样**。外貌不写在页面上，存在项目的角色表里，也不写汉字名（模型会把汉字当成要渲染的字）。
+
+| 字段      | 值                                                                                     |
+| --------- | -------------------------------------------------------------------------------------- |
+| `ref`     | 项目 `characters[].id`，必填                                                             |
+| `caption` | 选填，自由文本：背面、遮挡、正在做什么，要写才写；**以 `!` 开头则整段替换角色表的外貌**   |
+
+```jsonc
+{ "type": "character", "id": "c1", "ref": "reina", "bbox": [560, 900, 740, 1200] }
+{ "type": "character", "id": "c2", "ref": "reina", "bbox": [...], "caption": "seen from behind, no face" }
+{ "type": "character", "id": "c3", "ref": "reina", "bbox": [...], "caption": "!completely naked, only the red armband" }
+```
+
+**位置只由 bbox 表达**，编译器不生成任何位置文案。人物朝向由格子里的构图和 `caption` 决定：背身就不要写表情。
+
+角色表在 `project.json` 里，用顶栏「角色表」维护，或者走 CLI：
+
+```bash
+manga character add --id reina --name Reina --look "18, long straight black hair, red armband, NO glasses"
+```
+
+编译产物：
+
+```
+character Reina: 18, long straight black hair, ..., NO glasses. This figure appears only inside its own box
+character Reina: 18, ... . In this box: seen from behind, no face. This figure appears only inside its own box
+character Reina: completely naked, only the red armband. This figure appears only inside its own box
+```
+
+整页 summary 末尾追加（用 `!` 覆盖的那几格不进来）：
+
+```
+CHARACTERS IN THIS PAGE (each one appears only inside its own box):
+- Reina: 18, long straight black hair, ...
+```
+
+**格子只写场景**：`panel.caption` 不写人物长相、衣服、表情——那些属于 character 项。
 
 ## native
 

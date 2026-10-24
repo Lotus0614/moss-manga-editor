@@ -7,7 +7,7 @@ import { readWorkflow, buildValues, fillWorkflow } from './workflow.mjs';
 import { saveImage, addVersion } from './archive.mjs';
 
 export async function prepareRender({ dir, configDir = dir, project, page, config, opts = {} }) {
-  const compiled = compilePage(page);
+  const compiled = compilePage(page, project);
   const errors = blocking(compiled.warnings);
   if (errors.length) return { ok: false, error: `这一页还有错误：${errors[0].message}`, warnings: compiled.warnings };
 

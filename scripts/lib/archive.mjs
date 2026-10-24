@@ -1,4 +1,4 @@
-﻿// 存档读写：项目 / 页面 / 版本 / 变更日志。
+// 存档读写：项目 / 页面 / 版本 / 变更日志。
 //
 // 目录结构：
 //   <archive>/config.json  state.json  journal.jsonl
@@ -74,6 +74,7 @@ export async function getProject(dir, slug) {
   const project = await readJson(join(projectDir(dir, slug), 'project.json'), null);
   if (!project) return null;
   project.pages = Array.isArray(project.pages) ? project.pages : [];
+  project.characters = Array.isArray(project.characters) ? project.characters : [];
   return project;
 }
 
@@ -96,6 +97,7 @@ export async function createProject(dir, { name, size = 'page', canvas, defaults
     size,
     canvas: Array.isArray(canvas) ? canvas : [768, 1280],
     defaults: defaults || { style: 'mono', vertical: true },
+    characters: [],
     pages: [],
     createdAt: now(),
   };

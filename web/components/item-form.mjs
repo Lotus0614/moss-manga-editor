@@ -1,4 +1,4 @@
-﻿// 元素属性表单：完全由 config/manga.mjs 的字段声明生成，代码里不出现任何具体字段名。
+// 元素属性表单：完全由 config/manga.mjs 的字段声明生成，代码里不出现任何具体字段名。
 // 加一个新类型/新字段，这里自动多出对应控件。
 
 import { html, cls } from '../lib.mjs';
@@ -6,8 +6,20 @@ import { fieldsOf, itemType, optionsOf } from '../../config/manga.mjs';
 
 const TYPE_LABEL = (key) => itemType(key)?.label || key;
 
-function Field({ field, value, onChange }) {
+function Field({ field, value, onChange, characters }) {
   const label = html`<label>${field.label}${field.required ? html`<span class="req">*</span>` : null}</label>`;
+
+  if (field.type === 'characterRef') {
+    const list = characters || [];
+    return html`<div class="field">
+      ${label}
+      <select class="select" value=${value ?? ''} onChange=${(e) => onChange(e.currentTarget.value)}>
+        <option value="">（选择角色）</option>
+        ${list.map((char) => html`<option value=${char.id}>${char.name}（${char.id}）</option>`)}
+      </select>
+      ${list.length ? null : html`<span class="hint">项目还没有角色，点顶栏「角色表」添加。</span>`}
+    </div>`;
+  }
 
   if (field.type === 'bool') {
     return html`<div class="field">
@@ -85,7 +97,7 @@ function Field({ field, value, onChange }) {
 }
 
 /** 单个元素：字段由注册表决定，全部展示（右栏不做可见性过滤） */
-export default function ItemForm({ item, patchItem, removeItem, onBack, onCopy }) {
+export default function ItemForm({ item, patchItem, removeItem, onBack, onCopy, characters }) {
   const fields = fieldsOf(item.type);
 
   return html`<div class="col">
@@ -123,6 +135,7 @@ export default function ItemForm({ item, patchItem, removeItem, onBack, onCopy }
         key=${field.key}
         field=${field}
         value=${item[field.key]}
+        characters=${characters}
         onChange=${(v) => patchItem(item.id, { [field.key]: v })}
       />`
     )}

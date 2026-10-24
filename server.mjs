@@ -34,6 +34,7 @@ import {
 import { listWorkflows, readWorkflow, saveWorkflow, checkWorkflow } from './scripts/lib/workflow.mjs';
 import { renderPage } from './scripts/lib/render.mjs';
 import { compilePage } from './core/compile.mjs';
+import { normalizeCharacters } from './core/characters.mjs';
 import { createPanelItem } from './core/manga-doc.mjs';
 import { ComfyClient } from './scripts/lib/comfy.mjs';
 
@@ -236,7 +237,7 @@ async function route(req, res, url) {
       if (project && page) {
         group.index = page.index;
         group.title = page.title;
-        group.warnings = compilePage(page).warnings.length;
+        group.warnings = compilePage(page, project).warnings.length;
       }
     }
     return json(res, 200, result);
@@ -324,6 +325,7 @@ async function route(req, res, url) {
         if (payload.generation) project.generation = { ...(project.generation || {}), ...payload.generation };
         if (Array.isArray(payload.canvas)) project.canvas = payload.canvas;
         if (payload.params) project.params = { ...(project.params || {}), ...payload.params };
+        if (Array.isArray(payload.characters)) project.characters = normalizeCharacters(payload.characters);
         await saveProject(ARCHIVE, project);
         return json(res, 200, project);
       }
@@ -361,7 +363,7 @@ async function route(req, res, url) {
       if (!page) return fail(res, 404, '页面不存在');
 
       if (action === 'compile' && method === 'POST') {
-        const compiled = compilePage(page);
+        const compiled = compilePage(page, await getProject(ARCHIVE, slug));
         return json(res, 200, { json: compiled.json, doc: compiled.doc, warnings: compiled.warnings, stats: compiled.stats });
       }
 

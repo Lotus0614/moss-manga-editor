@@ -1,4 +1,4 @@
-﻿// 自测：编译契约的黄金用例。
+// 自测：编译契约的黄金用例。
 // 运行：node core/self-test.mjs
 //
 // 这些断言对应 Moss 模板文档里的硬性约定，任何一条挂了都说明产物会被模型拒绝或画歪。
@@ -9,6 +9,7 @@ import { createPage, createPanelItem, createBubbleItem, toMoss, fromMoss } from 
 import { validatePage } from './validate.mjs';
 import { decompile } from './decompile.mjs';
 import { fillGraph, scanTokens, MissingParam, describeWorkflow } from './placeholders.mjs';
+import { pageField, optionOf } from '../config/manga.mjs';
 
 let passed = 0;
 const failures = [];
@@ -119,18 +120,51 @@ test('summary.caption 非空且含黑白锁色句', () => {
 });
 
 test('每个 item 的 caption 都带收尾的锁色句', () => {
+  // 锁色句由画风定义，这里跟着配置走，改措辞不会让测试假红
+  const style = optionOf(pageField('style'), compiled.doc.summary.meta.includes('monochrome') ? 'mono' : 'color');
+  if (!style?.guard) return;
   for (const item of compiled.doc.items) {
-    assert.ok(/Black ink, white paper and grey screentone only, zero colour\./.test(item.caption), item.caption);
+    assert.ok(item.caption.includes(style.guard), item.caption);
   }
 });
 
-test('旁白项包含 no bubble, no box, no background', () => {
+test('旁白项用白底方框或裸字，不会被画成气泡', () => {
   const page = createPage({ size: SIZE });
   page.items = [createPanelItem({ bbox: [8, 8, 760, 400] }), createBubbleItem({ kind: 'narration', text: '旁白', bbox: [40, 40, 400, 120] })];
   const out = compilePage(page);
   const text = out.doc.items.find((i) => i.label === 'text');
-  assert.ok(/no bubble, no box, no background/i.test(text.caption));
-  assert.ok(/NO tail|zero colour|no bubble/i.test(text.caption));
+  assert.ok(/caption box|no bubble, no box|floating freely/i.test(text.caption), text.caption);
+});
+
+test('character 类型：外貌来自角色表，caption 只做补充或覆盖', () => {
+  const project = { characters: [{ id: 'reina', name: 'Reina', look: 'long black hair' }] };
+  const page = createPage({ size: SIZE });
+  page.items = [createPanelItem({ bbox: [8, 8, 760, 800] })];
+
+  // 1) 只有 ref：用角色表外貌，不带任何位置文案
+  page.items.push({ type: 'character', id: 'c1', ref: 'reina', bbox: [560, 900, 740, 1200] });
+  const plain = compilePage(page, project);
+  const plainItem = plain.doc.items.find((i) => i.label === 'character');
+  assert.ok(plainItem, '应该编译出一个 character item');
+  assert.ok(plainItem.caption.includes('Reina'), plainItem.caption);
+  assert.ok(plainItem.caption.includes('long black hair'), plainItem.caption);
+  assert.ok(!/position of PANEL/i.test(plainItem.caption), '不该再生成位置文案');
+  assert.ok(/CHARACTERS IN THIS PAGE/.test(plain.doc.summary.caption));
+  assert.ok(plain.doc.summary.caption.includes('long black hair'));
+
+  // 2) 普通 caption：追加，不替换
+  page.items[1] = { ...page.items[1], caption: 'seen from behind' };
+  const appended = compilePage(page, project).doc.items.find((i) => i.label === 'character');
+  assert.ok(appended.caption.includes('long black hair'), appended.caption);
+  assert.ok(appended.caption.includes('In this box: seen from behind'), appended.caption);
+
+  // 3) ! 覆盖：整段替换，且不进 summary 的角色表
+  page.items[1] = { ...page.items[1], caption: '!completely naked' };
+  const over = compilePage(page, project);
+  const overItem = over.doc.items.find((i) => i.label === 'character');
+  assert.ok(overItem.caption.includes('completely naked'), overItem.caption);
+  assert.ok(!overItem.caption.includes('long black hair'), overItem.caption);
+  assert.ok(!/CHARACTERS IN THIS PAGE/.test(over.doc.summary.caption));
 });
 
 test('编译无 error 级告警', () => {

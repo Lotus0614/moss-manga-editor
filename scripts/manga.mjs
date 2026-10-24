@@ -45,6 +45,7 @@ import { prepareRender, renderPage } from './lib/render.mjs';
 import { compilePage } from '../core/compile.mjs';
 import { diffPage, describeOp } from './lib/diff.mjs';
 import { createItem } from '../core/manga-doc.mjs';
+import { normalizeCharacters } from '../core/characters.mjs';
 import { pageOutline, projectOutline, warningsText, table, diffText } from './lib/format.mjs';
 
 const HERE = import.meta.dirname;
@@ -374,6 +375,50 @@ async function cmdProject() {
   fail('用法：manga project new|list|show|delete');
 }
 
+async function cmdCharacter() {
+  const project = await needProject();
+  const action = positional[1] || 'list';
+  // 跟 normalizeCharacters 对齐：id 一律小写，页面里的 ref 也永远是小写
+  project.characters = normalizeCharacters(project.characters);
+
+  if (action === 'list') {
+    const rows = project.characters.map((char) => [char.id, char.name, char.look]);
+    return out(
+      { ok: true, characters: project.characters },
+      rows.length ? table(rows, ['id', '名字', '外貌（英文）']) : '这个项目还没有角色，用 `manga character add --id reina --name Reina --look "..."` 加一个',
+    );
+  }
+
+  const id = normalizeCharacters([{ id: flags.id }])[0]?.id || '';
+
+  if (action === 'add' || action === 'set') {
+    if (!id) fail('需要 --id，只允许 ASCII（例如 reina）');
+    const name = String(flags.name || id).trim();
+    const look = String(flags.look || '').trim();
+    if (!look) fail('需要 --look：英文外貌描述（发型、五官、服装、体型），不要写汉字名');
+
+    const existing = project.characters.find((char) => char.id === id);
+    if (existing) {
+      existing.name = name;
+      existing.look = look;
+    } else {
+      project.characters.push({ id, name, look });
+    }
+    await saveProject(DIR, project);
+    return out({ ok: true, character: { id, name, look } }, `已${existing ? '更新' : '添加'}角色 ${name}（${id}）`);
+  }
+
+  if (action === 'remove') {
+    const before = project.characters.length;
+    project.characters = project.characters.filter((char) => char.id !== id);
+    if (project.characters.length === before) fail(`没有这个角色：${id}`);
+    await saveProject(DIR, project);
+    return out({ ok: true }, `已删除角色 ${id}`);
+  }
+
+  fail('用法：manga character list|add|set|remove [--id ID --name 名字 --look "英文外貌"]');
+}
+
 async function cmdPage() {
   const action = positional[1] || 'list';
   const project = await needProject();
@@ -424,13 +469,47 @@ async function cmdPage() {
   }
 
 
+  if (action === 'add-character') {
+    const page = await needPage(project);
+    const ref = String(flags.ref || '').trim().toLowerCase();
+    if (!ref) fail('需要 --ref（项目角色表里的 id），先用 `manga character list` 看有哪些');
+    const chars = Array.isArray(project.characters) ? project.characters : [];
+    if (!chars.some((char) => char.id === ref)) {
+      fail(`项目里没有这个角色：${ref}（现有：${chars.map((c) => c.id).join(', ') || '无'}）`);
+    }
+
+    let bbox = null;
+    const raw = String(flags.bbox || '').trim();
+    if (raw) {
+      const nums = raw.split(/[,\s]+/).filter(Boolean).map(Number);
+      if (nums.length !== 4 || nums.some((n) => !Number.isFinite(n))) fail('--bbox 要四个数：x1,y1,x2,y2');
+      bbox = nums;
+    }
+
+    const existing = page.items.filter((it) => it.type === 'character').length;
+    const item = createItem('character', {
+      ref,
+      bbox:
+        bbox ||
+        [40 + (existing % 4) * 36, 900 + (existing % 3) * 28, 300 + (existing % 4) * 36, 1240 + (existing % 3) * 28],
+      ...(flags.caption ? { caption: String(flags.caption) } : {}),
+    });
+
+    const next = { ...page, items: [...page.items, item] };
+    const saved = await savePage(DIR, project.slug, next, { actor: 'cli' });
+    return out(
+      { ok: true, item, page: saved.page, rev: saved.rev },
+      `已把「${ref}」加到第 ${page.index} 页（${item.id}，rev ${saved.rev}），拖到想要的位置即可`,
+    );
+  }
+
   if (action === 'delete') {
     const page = await needPage(project);
     await removePage(DIR, project.slug, page.id);
     return out({ ok: true }, `已删除第 ${page.index} 页`);
   }
 
-  fail('用法：manga page new|list|show|set|apply|delete');
+  fail('用法：manga page new|list|show|set|add-character|apply|delete');
 }
 
 /**
@@ -485,7 +564,7 @@ function checkScope(config, ops) {
 async function cmdCompile() {
   const project = await needProject();
   const page = await needPage(project);
-  const compiled = compilePage(page);
+  const compiled = compilePage(page, project);
   const warnings = compiled.warnings;
   if (JSON_MODE) return out({ ok: true, json: compiled.json, doc: compiled.doc, warnings, stats: compiled.stats }, '');
   return out(
@@ -543,7 +622,7 @@ async function cmdChanges() {
     const project = await getProject(DIR, group.project);
     const page = await getPage(DIR, group.project, group.page);
     if (project && page) {
-      const compiled = compilePage(page);
+      const compiled = compilePage(page, project);
       group.warnings = compiled.warnings.length;
       group.title = page.title;
       group.index = page.index;
@@ -659,6 +738,10 @@ function cmdHelp() {
   项目与页面
     manga project new --name "名字" [--size page]
     manga project list | show | delete
+    manga character list                         项目角色表（外貌只写一次）
+    manga character add --id reina --name Reina --look "18, long straight black hair, ..."
+    manga character set --id reina --look "..."  改某个角色
+    manga character remove --id reina
     manga page new [--title 标题] [--blank]     默认给一个整页框，排版自己定
     manga page list
     manga page show --page N [--summary]
@@ -685,6 +768,7 @@ const COMMANDS = {
   config: cmdConfig,
   workflow: cmdWorkflow,
   project: cmdProject,
+  character: cmdCharacter,
   page: cmdPage,
   compile: cmdCompile,
   render: cmdRender,

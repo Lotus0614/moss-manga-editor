@@ -234,6 +234,30 @@ export const MOSS_LABELS = [
     { value: 'text', label: 'text' },
 ];
 
+// ---------------------------------------------------------------- 角色
+// 人物不预设任何字段：只认「这是谁」（ref）和「这一格有什么不一样」（caption）。
+// 外貌存在项目的角色表里，编译时通过 resolveCharacter 回调注入——
+// 这个文件不知道项目/存档长什么样。
+
+/**
+ * 一个 character 项的最终描述。
+ *   caption 空         → 用角色表 look
+ *   caption 普通文本    → look + "In this box: <caption>"
+ *   caption 以 ! 开头   → 整段替换 look（裸体、受伤、换装这类特例）
+ */
+function characterText(item, resolveCharacter) {
+    const caption = String(item.caption || '').trim();
+    const char = resolveCharacter ? resolveCharacter(item.ref) : null;
+    const name = char?.name || item.ref || 'character';
+    const look = String(char?.look || '').trim();
+
+    if (caption.startsWith('!')) {
+        return { name, text: caption.slice(1).trim() };
+    }
+    const extra = caption ? `In this box: ${caption}` : '';
+    return { name, text: [look, extra].filter(Boolean).join('. ') };
+}
+
 // ---------------------------------------------------------------- 句子模板
 // 编译器里所有会进提示词的固定句式；{xxx} 是占位符。
 
@@ -424,6 +448,40 @@ export const TYPES = [
         },
     },
     {
+        key: 'character',
+        label: '角色',
+        fields: [
+            {
+                key: 'ref',
+                type: 'characterRef',
+                label: '角色',
+                required: true,
+                canvas: true,
+            },
+            {
+                key: 'caption',
+                type: 'longtext',
+                label: '这一格的补充（背面／遮挡／做了什么；以 ! 开头则替换外貌）',
+            },
+            { key: 'tags', type: 'tags', label: 'tags' },
+        ],
+        compile({ item, page, resolveCharacter }) {
+            // 还没选角色就不出图（右上「＋角色」加出来是空的，选完才有内容）
+            if (!item.ref) return null;
+            const style = styleOf(page);
+            const { name, text } = characterText(item, resolveCharacter);
+            const parts = [
+                `character ${name}${text ? `: ${text}` : ''}`,
+                'This figure appears only inside its own box',
+            ];
+            if (style.guard) parts.push(style.guard);
+            return {
+                label: 'character',
+                caption: parts.join('. '),
+            };
+        },
+    },
+    {
         key: 'bubble',
         label: '气泡',
         fields: [
@@ -506,7 +564,7 @@ const PANEL_KEYS = new Set(
     TYPES.filter((type) => type.role === 'panel').map((type) => type.key),
 );
 
-export function buildSummary({ page, items }) {
+export function buildSummary({ page, items, resolveCharacter }) {
     const style = styleOf(page);
     const panels = panelsOf(page);
     const texts = items.filter((item) => item.label === 'text');
@@ -535,6 +593,25 @@ export function buildSummary({ page, items }) {
     }
 
     if (page.scene) parts.push(page.scene);
+
+    // 本页共用同一套外貌的角色：只列一次；用 ! 覆盖的那几格不进来
+    const cast = [];
+    const seen = new Set();
+    for (const item of page.items || []) {
+        if (item.type !== 'character' || !item.ref || seen.has(item.ref)) continue;
+        if (String(item.caption || '').trim().startsWith('!')) continue;
+        seen.add(item.ref);
+        const { name, text } = characterText(item, resolveCharacter);
+        cast.push({ name, text });
+    }
+    if (cast.length) {
+        parts.push(
+            `CHARACTERS IN THIS PAGE (each one appears only inside its own box):\n${cast
+                .map((char) => `- ${char.name}${char.text ? `: ${char.text}` : ''}`)
+                .join('\n')}`,
+        );
+    }
+
     if (page.note) parts.push(page.note);
     if (style.guard) parts.push(style.guard);
 

@@ -1,4 +1,4 @@
-﻿# CLI 参考
+# CLI 参考
 
 入口：`node scripts/manga.mjs <命令> [参数]`。所有命令支持 `--json`，失败时退出码非零。
 
@@ -93,6 +93,32 @@ manga project delete [--project slug]
 ```
 
 `project new` 返回 slug（ASCII，用于后续所有命令）。中文名只作显示。
+
+---
+
+## character
+
+角色的外貌只写一次，存在 `project.json` 的 `characters` 里；页面上用 `{"type":"character","ref":"<id>"}` 引用。
+
+```bash
+manga character list [--project slug]
+manga character add --id reina --name Reina --look "18, long straight black hair, red armband, NO glasses"
+manga character set --id reina --look "18, long straight black hair, red armband, glasses"
+manga character remove --id reina
+```
+
+- `--id` 只允许 ASCII，页面上用它
+- `--look` 是英文外貌（发型、五官、服装、体型）；**不要写汉字名**，汉字会被模型画到画面上
+- `compile` / `render` 会自动带上项目角色表：产物里出现 `character Reina: <look>. This figure appears only inside its own box`，summary 末尾追加 `CHARACTERS IN THIS PAGE:`
+
+页面上用 `page add-character` 加人（也可以走网页里的「本页角色」勾选）：
+
+```bash
+manga page add-character --page 12 --ref reina [--bbox 40,900,300,1240] [--caption "seen from behind"]
+```
+
+- 一次只加一个；同一角色同一页可以加多次（远景 + 特写）
+- `--caption` 以 `!` 开头 = 这一格整段替换角色表外貌（裸体、受伤、换装）
 
 ---
 

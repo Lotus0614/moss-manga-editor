@@ -1,4 +1,4 @@
-﻿// 漫画页面文档（v3）：单层 items。
+// 漫画页面文档（v3）：单层 items。
 //
 // 页面只有一串 items，每个 item 用 type 区分：
 //   panel  —— 一个分格：坐标、形状、边框、机位、画面描述
@@ -20,7 +20,7 @@ export const SIZE_PRESETS = {
 
 // ---------------------------------------------------------------- 基础工具
 
-import { pageField, itemType, optionsOf } from '../config/manga.mjs';
+import { pageField, itemType, optionsOf, fieldsOf } from '../config/manga.mjs';
 
 /** 画风取值校验：以注册的页面字段为准，认不出就退回默认 */
 function isValidStyle(value) {
@@ -135,6 +135,16 @@ export function createNativeItem(patch = {}) {
   };
 }
 
+export function createCharacterItem(patch = {}) {
+  return {
+    type: 'character',
+    id: uid('ch'),
+    bbox: [40, 900, 300, 1240],
+    ref: '',
+    ...patch,
+  };
+}
+
 export function createItem(type = 'panel', patch = {}) {
   if (type && typeof type === 'object') {
     patch = type;
@@ -142,6 +152,7 @@ export function createItem(type = 'panel', patch = {}) {
   }
   if (type === 'bubble') return createBubbleItem(patch);
   if (type === 'native') return createNativeItem(patch);
+  if (type === 'character') return createCharacterItem(patch);
   return createPanelItem(patch);
 }
 
@@ -267,6 +278,16 @@ function normalizeItem(raw = {}, size) {
       ...(raw.text ? { text: String(raw.text) } : {}),
       ...extras(raw),
     };
+  }
+  if (type && type !== 'panel') {
+    // 配置里注册的非 panel 类型（如 character）：按字段表保留，别退化成面板
+    const kept = { type, id: raw.id || uid(type.slice(0, 2)), bbox };
+    for (const field of fieldsOf(type)) {
+      const value = raw[field.key];
+      if (value === undefined || value === null || value === '') continue;
+      kept[field.key] = typeof value === 'string' ? String(value) : value;
+    }
+    return { ...kept, ...extras(raw) };
   }
   return {
     type: 'panel',

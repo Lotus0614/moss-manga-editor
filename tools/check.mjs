@@ -38,7 +38,7 @@ console.log(failed ? `\n${failed} / ${checked} 个文件有语法错误` : `\n${
 
 // 方言配置：枚举必须有选项、value 不重复、default 落在选项里
 const problems = [];
-const FIELD_TYPES = new Set(['text', 'longtext', 'number', 'enum', 'bool', 'tags', 'palette']);
+const FIELD_TYPES = new Set(['text', 'longtext', 'number', 'enum', 'bool', 'tags', 'palette', 'characterRef']);
 
 function checkFields(fields, where) {
   const keys = new Set();

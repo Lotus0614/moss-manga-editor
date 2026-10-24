@@ -38,6 +38,15 @@ core/   scripts/   server.mjs   web/   tools/   references/MOSSS_LAYOUT.md
 node manga.mjs doctor          # 未配置就先读 INSTALL.md
 ```
 
+## 人物的写法（重要）
+
+- 角色一次写进项目：`node manga.mjs character add --id reina --name Reina --look "18, long straight black hair, red armband, NO glasses"`（网页里是顶栏「角色表」）
+- 页面上加人：`node manga.mjs page add-character --page 12 --ref reina`，或者网页右栏「本页角色」勾选
+- 人物项只有 `ref` + 可选 `caption`：**位置只靠 bbox**，朝向/遮挡/表情写在 `caption` 里，不写就不写
+- 这一格整段不一样（裸体、受伤、换装）：`caption` 前面加 `!`，整段替换角色表外貌
+- **格子只写场景**：`panel.caption` 不写人物长相、衣服、表情
+- **名字只写罗马音**：提示词里的汉字会被模型当成「要画在画面上的字」
+
 ## 动手前必须先问
 
 每个项目问一次。**没得到回答就不要建项目、不要写页面、不要开始想分镜。**

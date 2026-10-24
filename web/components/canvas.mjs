@@ -60,18 +60,30 @@ function horizontalLines(text, bbox, fs) {
 
 
 
-function ItemBox({ item, page, index, selected, primary, fillAlpha }) {
+function ItemBox({ item, page, index, selected, primary, fillAlpha, characters }) {
   const [x1, y1, x2, y2] = item.bbox;
   const w = Math.max(0, x2 - x1);
   const h = Math.max(0, y2 - y1);
   const isBubble = item.type === 'bubble';
   const isNative = item.type === 'native';
+  const character =
+    item.type === 'character' ? (characters || []).find((c) => c.id === item.ref) : null;
   const color = typeColor(item.type, fillAlpha);
 
-  const label = canvasLabel(item, index);
+  const label =
+    item.type === 'character'
+      ? `角色 · ${character?.name || item.ref || '未选'}`
+      : canvasLabel(item, index);
 
   const fs = Math.max(17, Math.min(w / 13, h / 4.5, 30));
-  const body = isBubble ? item.text : isNative ? item.text || item.caption : item.caption;
+  const body =
+    item.type === 'character'
+      ? item.caption || character?.look || ''
+      : isBubble
+        ? item.text
+        : isNative
+          ? item.text || item.caption
+          : item.caption;
 
   // 画布只做排版预览：文字一律横排显示，竖排设置只影响生成的提示词
   const vertical = false;
@@ -98,7 +110,7 @@ function ItemBox({ item, page, index, selected, primary, fillAlpha }) {
   </g>`;
 }
 
-export default function Canvas({ page, image, showBoxes = true, grid = 4, scale, selection, fillAlpha = 0.5, onSelect, onBegin, onChange, onCommit }) {
+export default function Canvas({ page, image, showBoxes = true, grid = 4, scale, selection, fillAlpha = 0.5, characters = [], onSelect, onBegin, onChange, onCommit }) {
   const [W, H] = page.size;
   const svgRef = useRef(null);
   const dragRef = useRef(null);
@@ -317,6 +329,7 @@ export default function Canvas({ page, image, showBoxes = true, grid = 4, scale,
           selected=${selIds.includes(item.id)}
           primary=${item.id === primaryId}
           fillAlpha=${fillAlpha}
+          characters=${characters}
         />`) : null}
 
         ${guides.map((g) =>

@@ -5,6 +5,7 @@ import ProjectsPage from './pages/projects.mjs';
 import EditorPage from './pages/editor.mjs';
 import SettingsModal from './components/settings-modal.mjs';
 import ProjectSettings from './components/project-settings.mjs';
+import CharactersModal from './components/characters-modal.mjs';
 
 function Toasts() {
   const items = useToasts();
@@ -13,7 +14,7 @@ function Toasts() {
   </div>`;
 }
 
-function Topbar({ route, onOpenSettings, onOpenProjectSettings }) {
+function Topbar({ route, onOpenSettings, onOpenProjectSettings, onOpenCharacters }) {
   const app = useApp();
   const project = app.project;
   const page = app.page;
@@ -25,6 +26,7 @@ function Topbar({ route, onOpenSettings, onOpenProjectSettings }) {
       : html`<div class="crumb">项目</div>`}
     <div class="spacer"></div>
     ${route.name === 'editor' ? html`<button class="btn ghost" onClick=${() => go('/projects')}>项目列表</button>` : null}
+    ${route.name === 'editor' ? html`<button class="btn ghost" onClick=${onOpenCharacters}>角色表</button>` : null}
     ${route.name === 'editor' ? html`<button class="btn ghost" onClick=${onOpenProjectSettings}>项目设置</button>` : null}
     <button class="btn" onClick=${onOpenSettings}>设置</button>
   </div>`;
@@ -35,6 +37,7 @@ function App() {
   const [config, setConfig] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [projectSettingsOpen, setProjectSettingsOpen] = useState(false);
+  const [charactersOpen, setCharactersOpen] = useState(false);
 
   useEffect(() => {
     Promise.all([api('/api/config'), api('/api/health')])
@@ -67,7 +70,12 @@ function App() {
   }
 
   return html`<div>
-    <${Topbar} route=${route} onOpenSettings=${() => setSettingsOpen(true)} onOpenProjectSettings=${() => setProjectSettingsOpen(true)} />
+    <${Topbar}
+      route=${route}
+      onOpenSettings=${() => setSettingsOpen(true)}
+      onOpenProjectSettings=${() => setProjectSettingsOpen(true)}
+      onOpenCharacters=${() => setCharactersOpen(true)}
+    />
     ${body}
     <${ProjectSettings}
       slug=${route.params.projectId}
@@ -75,6 +83,12 @@ function App() {
       onClose=${() => setProjectSettingsOpen(false)}
       onSaved=${(p) => setApp({ project: p })}
       onOpenGlobal=${() => { setProjectSettingsOpen(false); setSettingsOpen(true); }}
+    />
+    <${CharactersModal}
+      slug=${route.params.projectId}
+      open=${charactersOpen}
+      onClose=${() => setCharactersOpen(false)}
+      onSaved=${(p) => setApp({ project: p })}
     />
     <${SettingsModal} open=${settingsOpen} config=${config} onClose=${() => setSettingsOpen(false)} onSaved=${applyConfig} />
     <${Toasts} />

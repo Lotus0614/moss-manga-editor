@@ -1,4 +1,4 @@
-﻿// 自测：编译契约的黄金用例。
+// 自测：编译契约的黄金用例。
 // 运行：node core/self-test.mjs
 //
 // 这些断言对应 Moss 模板文档里的硬性约定，任何一条挂了都说明产物会被模型拒绝或画歪。
@@ -204,6 +204,66 @@ test('页面的 summaryMeta / summaryCaption 能整段覆盖 summary', () => {
   const summary = compilePage(page).doc.summary;
   assert.deepEqual(summary.meta, ['custom meta']);
   assert.equal(summary.caption, '整段自定义 summary');
+});
+
+// ---------------------------------------------------------------- 编号与位置由作者写
+
+test('面板不再自动编号：desc 没写 PANEL 就不会出现', () => {
+  const page = createPage({ size: SIZE });
+  page.items = [createPanelItem({ bbox: [8, 8, 760, 400], desc: 'a quiet room' })];
+  const item = compilePage(page).doc.items.find((i) => i.label === 'object');
+  assert.ok(!/PANEL \d/.test(item.caption), item.caption);
+  assert.ok(item.caption.includes('a quiet room'), item.caption);
+});
+
+test('气泡不再自动定位：不出现 inside PANEL / 九宫格 / 尾巴方向', () => {
+  const page = createPage({ size: SIZE });
+  page.items = [
+    createPanelItem({ bbox: [8, 8, 760, 800], desc: 'room' }),
+    createBubbleItem({
+      text: '台词',
+      bbox: [40, 40, 200, 200],
+      desc: 'in the TOP LEFT of PANEL ONE, SPOKEN BY CHARACTER ONE - SHION',
+    }),
+  ];
+  const item = compilePage(page).doc.items.find((i) => i.label === 'text');
+  assert.ok(!/inside PANEL|at the edge of PANEL/.test(item.caption), item.caption);
+  assert.ok(!/area of the page/.test(item.caption), item.caption);
+  assert.ok(!/tail pointing|NO tail because/.test(item.caption), item.caption);
+  assert.ok(item.caption.includes('CHARACTER ONE - SHION'), item.caption);
+});
+
+test('角色表自动追加；手写 summary 则整段覆盖（连角色表也不追加）', () => {
+  const project = { characters: [{ id: 'shion', name: 'CHARACTER ONE - SHION', look: 'long silver hair' }] };
+  const items = () => [
+    createPanelItem({ bbox: [8, 8, 760, 800], desc: 'room' }),
+    { type: 'character', id: 'c1', ref: 'shion', bbox: [40, 40, 400, 700] },
+  ];
+
+  // 没手写：角色表由代码追加
+  const auto = createPage({ size: SIZE });
+  auto.items = items();
+  const autoSummary = compilePage(auto, project).doc.summary;
+  assert.ok(/CHARACTERS IN THIS PAGE/.test(autoSummary.caption), autoSummary.caption);
+  assert.ok(autoSummary.caption.includes('long silver hair'), autoSummary.caption);
+
+  // 手写了：整段覆盖，什么都不追加
+  const page = createPage({ size: SIZE, summaryCaption: '手写的格数与剧情' });
+  page.items = items();
+  const summary = compilePage(page, project).doc.summary;
+  assert.equal(summary.caption, '手写的格数与剧情');
+});
+
+test('角色名里的编号会带进 caption', () => {
+  const project = { characters: [{ id: 'shion', name: 'CHARACTER ONE - SHION', look: 'long silver hair' }] };
+  const page = createPage({ size: SIZE });
+  page.items = [
+    createPanelItem({ bbox: [8, 8, 760, 800], desc: 'room' }),
+    { type: 'character', id: 'c1', ref: 'shion', bbox: [40, 40, 400, 700], desc: 'kneeling' },
+  ];
+  const item = compilePage(page, project).doc.items.find((i) => i.label === 'character');
+  assert.ok(item.caption.includes('CHARACTER ONE - SHION'), item.caption);
+  assert.ok(item.caption.includes('kneeling'), item.caption);
 });
 
 test('本身已包含全部允许字段，没有多余键', () => {

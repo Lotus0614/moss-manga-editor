@@ -1,4 +1,4 @@
-﻿# 存档格式
+# 存档格式
 
 配置和存档是两棵树：配置（含工作流）在固定的配置根，存档只放项目数据。
 
@@ -28,7 +28,7 @@ data    默认 config/archive（config.archive 或 --dir 可改）
 | -------- | -------------------------- | --------------------------------------- | ------------------------------- |
 | `panel`  | 一个分格                   | `bbox` `shape` `frame` `camera` `desc`  | `note` `caption` `tags` `palette` |
 | `character` | 一个指定位置的人物      | `bbox` `ref` `desc?`                    | `note` `caption` `tags` `palette` |
-| `bubble` | 一条文字                   | `bbox` `kind` `text` `tail` `vertical?` | `note` `caption` `tags` `palette` |
+| `bubble` | 一条文字                   | `bbox` `kind` `text` `vertical?`        | `note` `caption` `tags` `palette` |
 | `native` | 原生 Moss item，绕过语义层 | `bbox` `label` `text?`                  | `note` `caption` `tags` `palette` |
 
 `native` 是基础格子，四种类型都带同一组共有字段：
@@ -76,7 +76,6 @@ data    默认 config/archive（config.archive 或 --dir 可改）
             "kind": "narration",
             "text": "每天早上八点十七分，我在同一节车厢里。",
             "size": 20,
-            "tail": "none",
             "vertical": false,
         },
 
@@ -99,18 +98,21 @@ data    默认 config/archive（config.archive 或 --dir 可改）
 | `shape`   | `rect` `slant-top` `slant-side` `bleed-top` `bleed-bottom` `bleed-left` `bleed-right` `bleed-all` `circle` |
 | `frame`   | `border` 描边（默认） `none` 无边 `thick` 粗边                                                             |
 | `camera`  | `eye` `high` `low` `wide` `medium` `close` `xclose` `ots` `dutch`                                          |
-| `desc`    | 这一格**看得见**的东西：谁 + 在哪 + 做什么，**开头带编号和位置**                                           |
+| `desc`    | 这一格**看得见**的东西：谁 + 在哪 + 做什么，**开头自己写 PANEL 编号和位置**                                 |
 
 出血格（`bleed-*`）可以超出画布；其它形状超出只会被裁。
 
-**desc 开头写位置**（编号由编译器自动加，不写）：
+**`desc` 开头写编号和位置**——编译器不会替你编号，也不会替你描述版式：
 
 ```
-PANEL 3, LEFT TALL PANEL — a pitch black void with one point of pure white light…
-PANEL 1, the wide band across the top — a crowded platform at dusk
+PANEL ONE, the tall panel across the FULL WIDTH at the TOP of the page — a dark study at night…
+PANEL TWO, the RIGHT panel of the middle row, to the RIGHT of PANEL THREE — close up of her face…
+PANEL THREE, a small inset stuck onto the BOTTOM LEFT corner of PANEL ONE — the corridor outside…
 ```
 
-位置不套格式，`LEFT TALL PANEL`、`the small inset at the bottom right`、`the huge panel bleeding off the bottom` 都行；编号要连续、不重复，增删格子后重排。
+- 编号写英文单词（`PANEL ONE` / `PANEL TWO`），一页之内连续、不重复，增删格子后自己重排。
+- 位置不套固定格式，`the tall panel across the full width`、`the RIGHT panel of the middle row, to the RIGHT of PANEL THREE`、`a small inset stuck onto the TOP LEFT corner of PANEL ONE` 都行，但**第几格、在哪、和别的格什么关系**要一眼读得出来。
+- 左右并排的两格一定要写出「右格是谁、左格是谁」，只说内容模型很容易把先后画反。
 
 ## bubble
 
@@ -118,15 +120,24 @@ PANEL 1, the wide band across the top — a crowded platform at dusk
 | --------- | -------------------------------------------------------------------------------------------------------------------- |
 | `kind`    | `speech` 对话 `shout` 喊叫 `whisper` 小声 `tremble` 颤抖 `thought` 内心 `heart` 心之声 `narration` 旁白 `sfx` 拟声词 |
 | `text`    | 要渲染的字，原样；换行用 `\n`                                                                                        |
-| `tail`    | `down-left` `down` `down-right` `left` `right` `up-left` `up` `up-right` `none`；`none` = 说话者不在画面             |
-| `desc`    | 选填，给枚举覆盖不到的特殊文字补充说明                                                                               |
+| `desc`    | **位置 + 说话人**，自己写                                                                                            |
 | `vertical` | 不写就跟随页面 `vertical`；写 `true`/`false` 单独覆盖（不在表单里，手写页面时才用）                                 |
 
-**文字不用写在哪一格**：编译器按 bbox 自动加 `inside PANEL N` 或 `at the edge of PANEL N`。
+气泡没有「尾巴方向」这个字段了：形态只由 `kind` 决定，**不要靠尾巴指认说话人**，谁说的直接写在 `desc` 里：
+
+```
+in the TOP LEFT of PANEL ONE, SPOKEN BY CHARACTER ONE - SHION
+in the LOWER RIGHT of PANEL ONE, between PANEL ONE and PANEL THREE, SPOKEN BY CHARACTER TWO - TOUMA
+in the LEFT EDGE of PANEL TWO. It is the narrator, not a character speaking.
+```
+
+旁白和拟声词同样要写位置（`laid over the CENTRE of PANEL ONE`、`in the TOP EDGE of PANEL TWO`）。
 
 ## character
 
 人物只有两个字段：**这是谁**（`ref`）、**这一格有什么不一样**（`desc`）。外貌不写在页面上，存在项目的角色表里，也不写汉字名（模型会把汉字当成要渲染的字）。
+
+**角色名必须是 `CHARACTER ONE - SHION` 这种带编号的写法**（编号用英文单词，名字用罗马音）。summary 里的角色表是靠这个名字自动解析出来的，格子里再写一遍编号不会重复。
 
 | 字段      | 值                                                                                     |
 | --------- | -------------------------------------------------------------------------------------- |
@@ -219,6 +230,58 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 ## 没有版式预设
 
 工具不再提供 band-3 / 四宫格之类的预设——漫画排版本来就不该被模板限制。新建页只给**一个占满整页的框**当起手，怎么切、怎么斜、怎么出血，自己拖或者让 AI 按故事来定。
+
+同样地，**编号、位置、文字落在哪一格，编译器一个都不算**。它只负责把 `shape` / `frame` / `camera` 拼成形制短语、把角色表外貌注入进去、把画风守卫补到末尾。版式是读得懂文字的人才说得清的事，所以这些全部由作者写在 `desc` 里。
+
+## 提示词手写约定
+
+一页的提示词由四块文字组成，四块都要自己写：
+
+### 1. 面板（`panel.desc`）
+
+```
+PANEL ONE, the tall panel across the FULL WIDTH at the TOP of the page — <谁 + 在哪 + 做什么>
+```
+
+编号 + 位置放开头，画什么放后面。一页 3–5 格时，每格都要能看出它和别的格的关系。
+
+### 2. 角色（`character.desc`）
+
+```
+CHARACTER ONE - SHION, inside PANEL ONE only, filling the CENTRE of PANEL ONE. kneeling, upper body turned to the side
+```
+
+**格子里只写编号、名字和这一格的姿势，外貌不重复**——外貌在角色表里，summary 会自动带上。同一个角色在一页出现两次，就放两个 character 项，各自写清 `inside PANEL n only`。
+
+### 3. 气泡（`bubble.desc`）
+
+```
+in the TOP LEFT of PANEL ONE, SPOKEN BY CHARACTER ONE - SHION
+```
+
+位置 + 说话人。旁白写 `It is the narrator, not a character speaking.`
+
+### 4. summary（`summaryCaption`）
+
+写清：**几格、几条文字、怎么排、每格干什么**。角色表不用写——只要页面上有 character 项，编译器会自动追加 `CHARACTERS IN THIS PAGE`。
+
+```
+This page has exactly 5 panels and exactly 6 text elements. Panels are read RIGHT TO LEFT, top to bottom.
+
+LAYOUT: PANEL ONE is a tall panel across the FULL WIDTH at the TOP…
+
+STORY: PANEL ONE — …  PANEL TWO — …
+
+Render ONLY the text listed below, with the exact wording given.
+```
+
+### 注意：`caption` 是整段覆盖
+
+panel / bubble / character 上的 `caption` 一旦填了，编译器拼的东西**全部让位**（形制短语、机位、画风守卫都没了）。只有需要完全控制时才用，用了就要自己补边框和画风：
+
+```
+PANEL TWO, a small inset with a thick white border and a soft drop shadow… Pure black ink and bare white paper only…（黑白页的锁色句）
+```
 
 ## versions.json
 
@@ -347,7 +410,7 @@ export const CAMERAS = [
 有的项还会多带自己专用的键，就写在那一项里：
 
 - 画风 `STYLES`：`meta`（进 `summary.meta`）、`guard`（补到每一项末尾的硬约束）
-- 文字载体 `BUBBLES`：`tail`（这种载体画不画尾巴）
+- 文字载体 `BUBBLES`：只有 `value` / `label` / `phrase`，形态完全由 `kind` 决定
 - 形状 `SHAPES`：`bleed`（可以超出画布，校验时不再报越界）
 
 改措辞就改 `phrase`；加一个机位就在数组里加一项，下拉和提示词同时就有了。
@@ -376,7 +439,7 @@ export const CAMERAS = [
 {
   key: 'panel',                 // 存进 page.json 的 type
   label: '面板',                // 按钮与右栏标题
-  role: 'panel',                // 参与编号、能被文字定位
+  role: 'panel',                // 算作面板格数（只用来数，不参与编号）
   fields: [ … ],
   compile({ item, page }) {     // 返回 { label, caption, text?, tags?, palette? }，bbox 由核心补
     …
@@ -384,7 +447,7 @@ export const CAMERAS = [
 }
 ```
 
-`compile` 只拿到 `{ item, page }`；排版辅助函数（编号、定位、九宫格、竖排）就是同文件里的普通函数，直接用。
+`compile` 只拿到 `{ item, page }`；同文件里只剩两个辅助函数：`textLayoutOf`（竖排 / 横排）和 `panelsOf`（数格数）。编号、定位、九宫格都不再计算——版式由作者写在 `desc` 里。
 
 ## buildSummary
 
@@ -395,6 +458,13 @@ export function buildSummary({ page, items }) {
 ```
 
 `items` 已经是编译后的 Moss item，`caption` 就是整页那段总述。
+
+两段来源：
+
+1. **前半段**——填了 `page.summaryCaption` 就整段用它（格数、排布、每格剧情都自己写）；没填就用自动骨架（画风、格数、文字条数、`scene`、`note`、画风守卫）。
+2. **后半段**——`CHARACTERS IN THIS PAGE` 是自动的：从本页的 character 项里按 `ref` 去重，名字和外形都取自角色表。角色名要起成 `CHARACTER ONE - SHION`，编号和名字才能自动带出来。\n3. 手写 `summaryCaption` 时整段覆盖（连角色表也不追加），等于这一页的 summary 完全由你负责。
+
+用 `!` 覆盖外貌的那几格不进这段角色表（外貌已经在那一格自己的 caption 里了）。
 
 ## 编译流程
 

@@ -1,4 +1,4 @@
-# AGENT
+﻿# AGENT
 
 在这个工作区里画漫画的操作手册。默认按这里做，不要临时发明流程。
 
@@ -13,7 +13,7 @@
 
 **所有提示词相关的东西都在 `config/manga.mjs`**：
 
-- 词表（形状 / 机位 / 画风 / 气泡 / 尾巴）：一项就是 `{ value, label, phrase }`，`label` 是界面上的字，`phrase` 是喂给模型的英文
+- 词表（形状 / 机位 / 画风 / 文字载体）：一项就是 `{ value, label, phrase }`，`label` 是界面上的字，`phrase` 是喂给模型的英文
 - 类型与字段：页面字段和 item 字段是同一种格式，`compile({ item, page })` 决定怎么变成 Moss item
 - 句子模板和 `buildSummary`：整页 summary 怎么写
 
@@ -21,7 +21,7 @@
 
 ## 读什么
 
-画的时候只读这两份：`references/FORMAT.md`（页面 JSON 怎么写）、`references/TECHNIQUES.md`（版式、节奏、人物与背景）。
+画的时候只读这两份：`references/FORMAT.md`（页面 JSON 怎么写，**包括编号、位置、说话人、summary 的手写约定**）、`references/TECHNIQUES.md`（版式、节奏、人物与背景）。
 **画成人向页面时先读 `references/R18-MANGA.md`**（满版、嵌格、同格双视角、文字与提示词模板）。
 要查命令再加 `references/CLI.md`，要换工作流才读 `references/WORKFLOW.md`。
 
@@ -45,17 +45,28 @@ node manga.mjs doctor          # 未配置就先读 INSTALL.md
 - `note` **不进提示词**，只是给人看的；画布上优先显示它，没有备注的格子会把英文提示词铺满，用户看不懂
 - 用户提意见时，**先改 `note` / `desc` 让人看懂，再改 `desc` 里的具体画面**；两边分工：
   - `note` 中文，给人看
-  - `desc` 英文，进提示词（面板=画面描述，气泡=特殊文字补充，角色=这一格的差异）
-- 需要完全自己控制某一格的提示词时，填 `caption`（填了就只用它，其他字段不再进提示词）
+  - `desc` 英文，进提示词（面板=编号 + 位置 + 画面；气泡=位置 + 说话人；角色=这一格的差异）
+- 需要完全自己控制某一格的提示词时，填 `caption`（填了就只用它，其他字段不再进提示词；边框和画风守卫也得自己补）
+
+## 编号、位置、说话人都要自己写（重要）
+
+编译器**不算版式**：不排面板名次、不判断文字落在哪一格、不描述九宫格方位。这些都得写在 `desc` 里：
+
+- 面板：`PANEL ONE, the tall panel across the FULL WIDTH at the TOP of the page — …`
+- 左右并排：`PANEL TWO, the RIGHT panel of the middle row, to the RIGHT of PANEL THREE`
+- 气泡：`in the TOP LEFT of PANEL ONE, SPOKEN BY CHARACTER ONE - SHION`（**不要靠尾巴方向指认说话人**，气泡已经没有尾巴字段了）
+- summary：`summaryCaption` 自己写格数、排布、每格剧情；角色表不用写，编译器会自动追加
 
 ## 人物的写法（重要）
 
-- 角色一次写进项目：`node manga.mjs character add --id reina --name Reina --look "18, long straight black hair, red armband, NO glasses"`（网页里是顶栏「角色表」）
-- 页面上加人：`node manga.mjs page add-character --page 12 --ref reina`，或者网页右栏「本页角色」勾选
+- 角色一次写进项目：`node manga.mjs character add --id shion --name "CHARACTER ONE - SHION" --look "18, long straight black hair, NO glasses"`（网页里是顶栏「角色表」）
+- **名字必须带编号**：`CHARACTER ONE - SHION` 这种形式，summary 的角色表靠它自动解析编号和名字
+- 页面上加人：`node manga.mjs page add-character --page 12 --ref shion`，或者网页右栏「本页角色」勾选
 - 人物项只有 `ref` + 可选 `desc`：**位置只靠 bbox**，朝向/遮挡/表情写在 `desc` 里，不写就不写
+- **格子里只写编号 + 名字 + 姿势**，外貌不要重复（外貌在角色表里，summary 会自动带上）
 - 这一格整段不一样（裸体、受伤、换装）：`desc` 前面加 `!`，整段替换角色表外貌
 - **格子只写场景**：`panel.desc` 不写人物长相、衣服、表情
-- **名字只写罗马音**：提示词里的汉字会被模型当成「要画在画面上的字」
+- **提示词里名字只写罗马音**（汉字会被画到画面上）；但**对话台词里叫名字要用中文**（紫苑 / 冬真 / 枫）
 
 ## 动手前必须先问
 

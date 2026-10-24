@@ -405,7 +405,14 @@ async function cmdCharacter() {
       project.characters.push({ id, name, look });
     }
     await saveProject(DIR, project);
-    return out({ ok: true, character: { id, name, look } }, `已${existing ? '更新' : '添加'}角色 ${name}（${id}）`);
+    // 名字里的编号是 summary 自动解析角色表的依据，写错不拦，只提醒
+    const named = /^CHARACTER\s+\w+\s*-\s*\S+/i.test(name)
+      ? ''
+      : `\n提示：名字建议写成「CHARACTER ONE - ${name}」，summary 会自动带上这个编号`;
+    return out(
+      { ok: true, character: { id, name, look } },
+      `已${existing ? '更新' : '添加'}角色 ${name}（${id}）${named}`,
+    );
   }
 
   if (action === 'remove') {
@@ -739,9 +746,9 @@ function cmdHelp() {
     manga project new --name "名字" [--size page]
     manga project list | show | delete
     manga character list                         项目角色表（外貌只写一次）
-    manga character add --id reina --name Reina --look "18, long straight black hair, ..."
-    manga character set --id reina --look "..."  改某个角色
-    manga character remove --id reina
+    manga character add --id shion --name "CHARACTER ONE - SHION" --look "18, long straight black hair, ..."
+    manga character set --id shion --look "..."  改某个角色
+    manga character remove --id shion
     manga page new [--title 标题] [--blank]     默认给一个整页框，排版自己定
     manga page list
     manga page show --page N [--summary]

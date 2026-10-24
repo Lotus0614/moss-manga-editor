@@ -47,7 +47,6 @@ export function decompile(input, size = DEFAULT_SIZE) {
         bbox,
         kind: guessBubbleType(item.caption),
         text: item.text || '',
-        tail: /NO tail/i.test(item.caption || '') ? 'none' : 'down-left',
       });
     }
     if (item.label === 'object') {

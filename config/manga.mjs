@@ -125,105 +125,51 @@ export const STYLES = [
     },
 ];
 
-/** 文字载体：tail = 这种载体画不画尾巴 */
+/**
+ * 文字载体。尾巴方向不再由字段指定：气泡形态只由 kind 决定，
+ * 位置和说话人写进 desc（例：in the TOP LEFT of PANEL ONE, SPOKEN BY CHARACTER ONE - SHION）。
+ */
 export const BUBBLES = [
     {
         value: 'speech',
         label: '对话',
         phrase: 'WHITE OVAL speech bubble, smooth even outline, thin black line',
-        tail: true,
     },
     {
         value: 'shout',
         label: '喊叫',
         phrase: 'JAGGED EXPLOSIVE speech bubble with sharp spiky edges',
-        tail: true,
     },
     {
         value: 'whisper',
         label: '小声',
         phrase: 'small round WHITE OVAL speech bubble, its tail made of three tiny circles trailing away in a line',
-        tail: true,
     },
     {
         value: 'tremble',
         label: '颤抖',
         phrase: 'WHITE speech bubble with a SHAKY WAVY outline',
-        tail: true,
     },
     {
         value: 'thought',
         label: '内心',
         phrase: 'WHITE CLOUD-shaped thought bubble, scalloped edge, thin black outline, NO tail',
-        tail: false,
     },
     {
         value: 'heart',
         label: '心之声',
         phrase: 'speech bubble with a DASHED black outline, white interior, NO tail',
-        tail: false,
     },
     {
         value: 'narration',
         label: '旁白',
         // 旁白压在细节多的画面上根本读不清，改用日漫常见的白底小方框
         phrase: 'narration lettering set in a plain white rectangular caption box with a thin black border, box edges straight and parallel to the panel edge, box covers the artwork behind it',
-        tail: false,
     },
     {
         value: 'sfx',
         label: '拟声词',
         phrase: 'hand-lettered sound effect, bold brush strokes, slightly rotated, thin white outline, no bubble',
-        tail: false,
-    },
-];
-
-/** 尾巴方向：none = 说话者不在画面 */
-export const TAILS = [
-    {
-        value: 'none',
-        label: '无尾巴',
-        phrase: 'NO tail because the speaker is off panel',
-    },
-    {
-        value: 'down-left',
-        label: '左下',
-        phrase: 'a short tapering tail pointing down-left',
-    },
-    {
-        value: 'down',
-        label: '正下',
-        phrase: 'a short tapering tail pointing straight down',
-    },
-    {
-        value: 'down-right',
-        label: '右下',
-        phrase: 'a short tapering tail pointing down-right',
-    },
-    {
-        value: 'left',
-        label: '正左',
-        phrase: 'a short tapering tail pointing left',
-    },
-    {
-        value: 'right',
-        label: '正右',
-        phrase: 'a short tapering tail pointing right',
-    },
-    {
-        value: 'up-left',
-        label: '左上',
-        phrase: 'a short tapering tail pointing up-left',
-    },
-    {
-        value: 'up',
-        label: '正上',
-        phrase: 'a short tapering tail pointing straight up',
-    },
-    {
-        value: 'up-right',
-        label: '右上',
-        phrase: 'a short tapering tail pointing up-right',
     },
 ];
 
@@ -278,67 +224,11 @@ const fill = (template, vars = {}) =>
         vars[key] !== undefined ? String(vars[key]) : match,
     );
 
-// ---------------------------------------------------------------- 排版辅助
+// ---------------------------------------------------------------- 辅助
 
-/** 阅读顺序：同一横带内先右后左，再上→下（日漫固定右开） */
-function readingOrder(page) {
-    return [...panelsOf(page)].sort((a, b) => {
-        if (Math.abs(a.bbox[1] - b.bbox[1]) > 24) return a.bbox[1] - b.bbox[1];
-        return b.bbox[0] - a.bbox[0];
-    });
-}
-
+/** 面板格：只用来数格数，不参与编号 */
 function panelsOf(page) {
     return (page.items || []).filter((item) => PANEL_KEYS.has(item.type));
-}
-
-/** 面板编号：在阅读顺序里的 1-based 序号 */
-function panelNumber(page, item) {
-    const index = readingOrder(page).findIndex((panel) => panel.id === item.id);
-    return index >= 0 ? index + 1 : undefined;
-}
-
-/** 文字落在哪个面板：完全在里面 / 压到边缘 */
-function locateInPanel(page, item) {
-    const panels = panelsOf(page);
-    const [bx1, by1, bx2, by2] = item.bbox;
-    const cx = (bx1 + bx2) / 2;
-    const cy = (by1 + by2) / 2;
-    let chosen = null;
-    let bestArea = 0;
-
-    for (const panel of panels) {
-        const [x1, y1, x2, y2] = panel.bbox;
-        const inside = cx >= x1 && cx <= x2 && cy >= y1 && cy <= y2;
-        if (inside) {
-            chosen = panel;
-            break;
-        }
-        const ix = Math.min(bx2, x2) - Math.max(bx1, x1);
-        const iy = Math.min(by2, y2) - Math.max(by1, y1);
-        const area = ix > 0 && iy > 0 ? ix * iy : 0;
-        if (area > bestArea) {
-            bestArea = area;
-            chosen = panel;
-        }
-    }
-    if (!chosen) return '';
-
-    const [x1, y1, x2, y2] = chosen.bbox;
-    const fully =
-        bx1 >= x1 - 2 && bx2 <= x2 + 2 && by1 >= y1 - 2 && by2 <= y2 + 2;
-    const number = panelNumber(page, chosen);
-    return `${fully ? 'inside' : 'at the edge of'} PANEL ${number ?? '?'}`;
-}
-
-/** 页面区域：九宫格描述 */
-function placementOf(page, bbox) {
-    const [w, h] = page.size;
-    const rx = (bbox[0] + bbox[2]) / 2 / w;
-    const ry = (bbox[1] + bbox[3]) / 2 / h;
-    const vertical = ry < 0.34 ? 'upper' : ry > 0.66 ? 'lower' : 'middle';
-    const horizontal = rx < 0.34 ? 'left' : rx > 0.66 ? 'right' : 'centre';
-    return `${vertical} ${horizontal} area of the page`;
 }
 
 /** 竖排 / 横排描述 */
@@ -352,19 +242,14 @@ function textLayoutOf(page, item) {
         : 'horizontal lettering';
 }
 
-/** 一条文字的形态描述 */
+/** 一条文字的形态描述：只有形态，位置和说话人由作者写进 desc */
 function bubblePhrase(bubble) {
     const kind = pick(BUBBLES, bubble.kind) || pick(BUBBLES, 'speech');
     const parts = [kind.phrase];
-    if (kind.tail) {
-        parts.push(
-            (pick(TAILS, bubble.tail) || pick(TAILS, 'down-left')).phrase,
-        );
-        // 文字贴到气泡轮廓上会糊成一团，明确要求留边
-        parts.push(
-            'the lettering sits well inside the bubble with a clear margin, never touching the outline',
-        );
-    }
+    // 文字贴到气泡轮廓上会糊成一团，明确要求留边
+    parts.push(
+        'the lettering sits well inside the bubble with a clear margin, never touching the outline',
+    );
     return parts.join(', ');
 }
 
@@ -391,7 +276,7 @@ export const PAGE = [
     {
         key: 'summaryCaption',
         type: 'longtext',
-        label: 'summary.caption（填了就整段替换自动拼的 summary）',
+        label: 'summary.caption（填了就整段替换，包括角色表；留空才自动拼）',
     },
 ];
 
@@ -427,7 +312,7 @@ export const TYPES = [
             {
                 key: 'desc',
                 type: 'longtext',
-                label: '画面描述',
+                label: '画面描述（开头自己写 PANEL 编号和位置）',
                 required: true,
             },
             {
@@ -462,13 +347,9 @@ export const TYPES = [
             if (!shape?.bleed) parts.push(pick(FRAMES, item.frame)?.phrase);
             if (item.camera) parts.push(pick(CAMERAS, item.camera)?.phrase);
 
-            const number = panelNumber(page, item);
             const body = (item.desc || '').trim();
-            const tag = number ? `PANEL ${number}` : '';
-            if (body || tag)
-                parts.push(
-                    `${SNIPPETS.boxPrefix} ${[tag, body].filter(Boolean).join(', ')}`,
-                );
+            if (body)
+                parts.push(`${SNIPPETS.boxPrefix} ${body}`);
             if (style.guard) parts.push(style.guard);
 
             return {
@@ -525,22 +406,16 @@ export const TYPES = [
                 canvas: true,
             },
             {
-                key: 'tail',
-                type: 'enum',
-                label: '尾巴',
-                options: TAILS,
-                default: 'down-left',
+                key: 'desc',
+                type: 'longtext',
+                label: '位置与说话人（in PANEL TWO, SPOKEN BY CHARACTER ONE - SHION）',
             },
-            { key: 'desc', type: 'text', label: '补充说明（特殊文字用）' },
             ...BASE_FIELDS,
         ],
         compile({ item, page }) {
             const style = styleOf(page);
             const parts = [bubblePhrase(item)];
-            const where = locateInPanel(page, item);
-            if (where) parts.push(where);
             if (item.desc) parts.push(String(item.desc));
-            parts.push(`placed in the ${placementOf(page, item.bbox)}`);
             parts.push(textLayoutOf(page, item));
             if (style.guard) parts.push(style.guard);
             return {
@@ -581,7 +456,7 @@ export const TYPES = [
 
 // ---------------------------------------------------------------- 整页 summary
 
-/** 参与编号的类型：按 role 标记，不认具体 key */
+/** 算作面板格数的类型：按 role 标记，不认具体 key */
 const PANEL_KEYS = new Set(
     TYPES.filter((type) => type.role === 'panel').map((type) => type.key),
 );
@@ -616,7 +491,10 @@ export function buildSummary({ page, items, resolveCharacter }) {
 
     if (page.scene) parts.push(page.scene);
 
-    // 本页共用同一套外貌的角色：只列一次；用 ! 覆盖的那几格不进来
+    if (page.note) parts.push(page.note);
+    if (style.guard) parts.push(style.guard);
+
+    // 角色表由代码从角色表 + 本页 character 项解析（手写 summary 时不追加）
     const cast = [];
     const seen = new Set();
     for (const item of page.items || []) {
@@ -626,16 +504,12 @@ export function buildSummary({ page, items, resolveCharacter }) {
         const { name, text } = characterText(item, resolveCharacter);
         cast.push({ name, text });
     }
-    if (cast.length) {
-        parts.push(
-            `CHARACTERS IN THIS PAGE (each one appears only inside its own box):\n${cast
-                .map((char) => `- ${char.name}${char.text ? `: ${char.text}` : ''}`)
-                .join('\n')}`,
-        );
-    }
-
-    if (page.note) parts.push(page.note);
-    if (style.guard) parts.push(style.guard);
+    const castBlock = cast.length
+        ? `CHARACTERS IN THIS PAGE (each one appears only inside its own box):\n${cast
+              .map((char) => `- ${char.name}${char.text ? `: ${char.text}` : ''}`)
+              .join('\n')}`
+        : '';
+    if (castBlock) parts.push(castBlock);
 
     const meta =
         Array.isArray(page.summaryMeta) && page.summaryMeta.length

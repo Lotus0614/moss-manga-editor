@@ -65,7 +65,9 @@ export default function CharactersModal({ slug, open, onClose, onSaved }) {
       </header>
       <div class="body">
         <span class="hint">
-          外貌只写一次，页面上的角色项按 id 引用。名字用罗马音：提示词里的汉字会被画到画面上。
+          外貌只写一次，页面上的角色项按 id 引用。名字写成
+          <span class="mono">CHARACTER ONE - SHION</span>
+          这种带编号的形式，summary 会自动解析编号和名字；名字用罗马音，提示词里的汉字会被画到画面上。
         </span>
 
         ${list === null
@@ -78,7 +80,7 @@ export default function CharactersModal({ slug, open, onClose, onSaved }) {
                       <span class="mono small" style="min-width:64px">${char.id}</span>
                       <input
                         class="input"
-                        placeholder="显示名（罗马音，例如 Reina）"
+                        placeholder="CHARACTER ONE - SHION（编号+罗马音名字，summary 自动解析）"
                         value=${char.name}
                         onInput=${(e) => patch(i, { name: e.currentTarget.value })}
                       />

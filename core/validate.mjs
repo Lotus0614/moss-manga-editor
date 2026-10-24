@@ -97,9 +97,6 @@ export function validatePage(page, doc) {
     }
   }
 
-  const ambiguous = sameBandAmbiguity(page);
-  if (ambiguous) add('warn', 'order.ambiguous', ambiguous);
-
   if (doc) checkDocShape(doc, add);
   return out;
 }
@@ -187,22 +184,6 @@ export function textBudget(item) {
   const cols = item.vertical === false ? Math.max(1, Math.floor(w / (fs * 1.02))) : Math.max(1, Math.floor(w / (fs * 1.15)));
   const perCol = Math.max(1, Math.floor(h / (fs * 1.35)));
   return { cols, perCol, capacity: cols * perCol };
-}
-
-function sameBandAmbiguity(page) {
-  const panels = panelsOf(page);
-  for (let i = 0; i < panels.length; i += 1) {
-    for (let j = i + 1; j < panels.length; j += 1) {
-      const a = panels[i].bbox;
-      const b = panels[j].bbox;
-      const sameBand = Math.abs(a[1] - b[1]) < 24 && Math.abs(a[3] - b[3]) < 24;
-      const xOverlap = Math.min(a[2], b[2]) - Math.max(a[0], b[0]);
-      if (sameBand && xOverlap > 24) {
-        return `面板 ${panels[i].id} 与 ${panels[j].id} 在同一横带且位置重叠，右→左阅读顺序会歧义`;
-      }
-    }
-  }
-  return '';
 }
 
 export function blocking(warnings) {

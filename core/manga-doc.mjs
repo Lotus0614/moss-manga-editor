@@ -118,7 +118,6 @@ export function createBubbleItem(patch = {}) {
     kind: 'speech',
     text: '',
     size: 22,
-    tail: 'down-left',
     // vertical 不写 = 跟随页面全局
     ...patch,
   };
@@ -198,7 +197,6 @@ function normalizeBubbleItem(b) {
     kind: b.kind || b.bubbleType || 'speech',
     text: String(b.text || ''),
     size: Number(b.size || b.fontSize) || 22,
-    tail: b.tail || (b.tailOff ? 'none' : b.tailDir) || 'down-left',
     ...(typeof b.vertical === 'boolean' ? { vertical: b.vertical } : {}),
     ...(b.desc ? { desc: String(b.desc) } : {}),
     ...common(b),
@@ -242,7 +240,6 @@ export function normalizePage(raw = {}) {
             kind: b.type || b.kind,
             text: b.text,
             size: b.size || b.fontSize,
-            tail: b.tail || (b.tailOff ? 'none' : b.tailDir),
             vertical: b.vertical,
           },
           size

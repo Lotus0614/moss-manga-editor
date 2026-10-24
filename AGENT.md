@@ -52,7 +52,7 @@ node manga.mjs doctor          # 未配置就先读 INSTALL.md
 
 编译器**不算版式**：不排面板名次、不判断文字落在哪一格、不描述九宫格方位。这些都得写在 `desc` 里：
 
-- 面板：`PANEL ONE, the tall panel across the FULL WIDTH at the TOP of the page — …`
+- 面板：**编号必须有**，后面接方位与横竖，最后写画面：`PANEL ONE, top-left horizontal panel — …`、`PANEL THREE, the tall panel across the FULL WIDTH at the TOP — …`；一页之内连续、不重复
 - 左右并排：`PANEL TWO, the RIGHT panel of the middle row, to the RIGHT of PANEL THREE`
 - 气泡：`in the TOP LEFT of PANEL ONE, SPOKEN BY CHARACTER ONE - SHION`（**不要靠尾巴方向指认说话人**，气泡已经没有尾巴字段了）
 - summary：`summaryCaption` 自己写格数、排布、每格剧情；角色表不用写，编译器会自动追加
@@ -73,6 +73,7 @@ node manga.mjs doctor          # 未配置就先读 INSTALL.md
 
 ## 人物的写法（重要）
 
+- **只给主角建角色表**：需要跨页保持一致的人（1–3 个）才写进 `characters`，路人和背景人物直接用原生项（`label: object` / `label: character`）描述，不必建角色
 - 角色一次写进项目：`node manga.mjs character add --id shion --name "CHARACTER ONE - SHION" --look "18, long straight black hair, NO glasses"`（网页里是顶栏「角色表」）
 - **名字必须带编号**：`CHARACTER ONE - SHION` 这种形式，summary 的角色表靠它自动解析编号和名字
 - 页面上加人：`node manga.mjs page add-character --page 12 --ref shion`，或者网页右栏「本页角色」勾选

@@ -118,7 +118,7 @@ PANEL THREE, a small inset stuck onto the BOTTOM LEFT corner of PANEL ONE — th
 
 | 字段      | 值                                                                                                                   |
 | --------- | -------------------------------------------------------------------------------------------------------------------- |
-| `kind`    | `speech` 对话 `shout` 喊叫 `whisper` 小声 `tremble` 颤抖 `thought` 内心 `heart` 心之声 `narration` 旁白 `sfx` 拟声词 |
+| `kind`    | `speech` 对话 `shout` 喊叫 `whisper` 小声 `tremble` 颤抖 `thought` 内心 `heart` 心之声 `narration` 旁白·白框 `narration-bare` 旁白·裸字 `sfx` 拟声词 |
 | `text`    | 要渲染的字，原样；换行用 `\n`                                                                                        |
 | `desc`    | **位置 + 说话人**，自己写                                                                                            |
 | `vertical` | 不写就跟随页面 `vertical`；写 `true`/`false` 单独覆盖（不在表单里，手写页面时才用）                                 |
@@ -244,7 +244,7 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 
 ## 尺寸
 
-`size` 是 `[宽, 高]`，都必须是 16 的倍数。常用：`[768,1280]` 分镜页、`[1152,1920]` 高清、`[1024,1024]` 方图、`[1536,1024]` 横版。
+`size` 是 `[宽, 高]`，都必须是 16 的倍数。没有固定尺寸，按用途选：`[768,1280]` 快速试稿、`[1024,1536]` 常规连载页、`[1152,1920]` 文字密集页、`[1024,1024]` 方图、`[1536,1024]` 横版。选尺寸的依据见 `references/TECHNIQUES.md` 的「尺寸」。
 
 ## 没有版式预设
 
@@ -259,10 +259,12 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 ### 1. 面板（`panel.desc`）
 
 ```
-PANEL ONE, the tall panel across the FULL WIDTH at the TOP of the page — <谁 + 在哪 + 做什么>
+PANEL ONE, top-left horizontal panel — <谁 + 在哪 + 做什么>
+PANEL TWO, upper-right vertical panel: <…>
+PANEL THREE, the tall panel across the FULL WIDTH at the TOP — <…>
 ```
 
-编号 + 位置放开头，画什么放后面。一页 3–5 格时，每格都要能看出它和别的格的关系。
+**编号必须有**，一页之内连续、不重复，增删格子后自己重排。编号后面接方位与横竖（`top-left horizontal panel`、`lower-left vertical sub-panel`、`middle band`），最后才是画什么。一页 3–5 格时，每格都要能看出它和别的格的关系。
 
 ### 2. 角色（`character.desc`）
 

@@ -162,9 +162,15 @@ export const BUBBLES = [
     },
     {
         value: 'narration',
-        label: '旁白',
-        // 旁白压在细节多的画面上根本读不清，改用日漫常见的白底小方框
+        label: '旁白·白框',
+        // 压在细节多的画面上也能读清，日漫常见的白底小方框
         phrase: 'narration lettering set in a plain white rectangular caption box with a thin black border, box edges straight and parallel to the panel edge, box covers the artwork behind it',
+    },
+    {
+        value: 'narration-bare',
+        label: '旁白·裸字',
+        // 无框：字直接压在画面上，靠白色描边浮起来
+        phrase: 'narration lettering printed DIRECTLY on the artwork with no box and no bubble, floating freely, thin white outline so the strokes stay readable against the drawing',
     },
     {
         value: 'sfx',

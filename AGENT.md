@@ -87,7 +87,7 @@ node manga.mjs doctor          # 未配置就先读 INSTALL.md
 - **双人拆两个框**：两个 `character` 项 X 之间留 30–140px，caption 写 `standing far apart on opposite ends of the panel`
 - **并排小格对齐上边界**：左右并列两格的 `y1` 取同一个值，否则人物跨格
 - **小格用半身景别**：6–7 格的页面里写 `waist-up medium shot`，不要 `full-body`，否则人物变四头身
-- **气泡别贴着别人的头**：气泡 `bbox` 离其他人的头至少 80px；画面外的人说话要写 `tail-less bubble, NO pointer tail`（句式见 `references/FORMAT.md` 的 bubble 一节）
+- **气泡别贴着别人的头**：气泡 `bbox` 离其他人的头至少 80px；说话人不在画面里时把 `kind` 换成 `speech-notail`（对话·无指向），不要再靠尾巴指人（句式见 `references/FORMAT.md` 的 bubble 一节）
 
 ## 语序：先光后物
 

@@ -140,7 +140,7 @@ in the LEFT EDGE of PANEL TWO. It is the narrator, not a character speaking.
 | 身份 | 写法 |
 | --- | --- |
 | 画面里的角色开口 | `SPOKEN BY CHARACTER ONE - SHION, tail on the bottom edge pointing DOWN to her head.` 气泡 `bbox` 贴着她自己的头，**和别人的头至少隔 80px** |
-| 画面外的人（POV、内心吐槽） | 明确写 **无尾**：`tail-less oval bubble, NO pointer tail pointing to anyone in the panel` |
+| 画面外的人（POV、内心吐槽） | `kind` 选 **`speech-notail`（对话·无指向）**，形态里已经带 `no tail, no point, round bubbles`；`desc` 再写清是谁在说 |
 | 客观旁白、姓名年龄牌 | 直角矩形框，不写尾巴：`sharp-cornered white rectangular box with a thin black border` |
 | 咆哮、惊叫 | 短句（2–6 字）才用 `jagged burst bubble`；超过十几个字要换 `wide rounded bubble`，锯齿会向内吃掉约三成排版面积 |
 

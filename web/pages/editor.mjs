@@ -75,10 +75,12 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   // 修图：点「修图」才展开输入框；没配修图工作流时按钮不出现
   const [editOpen, setEditOpen] = useState(false);
   const [editText, setEditText] = useState('');
+  const [editBarH, setEditBarH] = useState(0);
   // 外部改动来了但手上有未保存的编辑 → 先提示，不覆盖
   const [external, setExternal] = useState('');
 
   const stageRef = useRef(null);
+  const editBarRef = useRef(null);
   const pageRef = useRef(null);
   const saveTimer = useRef(null);
   const dirtyRef = useRef(false);
@@ -169,6 +171,20 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     ro.observe(el);
     return () => ro.disconnect();
   }, [page?.size?.[0], page?.size?.[1], page]);
+
+  // 修图输入条把画布往下顶，右上角的缩放条得跟着让位（量实际高度，别估）
+  useEffect(() => {
+    const el = editBarRef.current;
+    if (!el) {
+      setEditBarH(0);
+      return;
+    }
+    const fit = () => setEditBarH(el.offsetHeight);
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [editOpen]);
 
   useEffect(() => {
     const es = new EventSource('/api/jobs/stream');
@@ -664,7 +680,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
       </div>
 
       ${editOpen
-        ? html`<div class="edit-bar">
+        ? html`<div class="edit-bar" ref=${editBarRef}>
             <span class="tip">修图</span>
             <input
               class="input"
@@ -742,7 +758,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         <span><span class="k">Ctrl</span><span class="k">Z</span>撤销</span>
         <span><span class="k">Del</span>删除</span>
       </div>
-      <div class="canvas-ctrl top">
+      <div class="canvas-ctrl top" style=${`top:${44 + editBarH}px`}>
         <input type="range" min="0.5" max="3" step="0.05" value=${zoom} title="缩放" style="width:90px" onInput=${(e) => setZoom(Number(e.currentTarget.value))} />
         <button class="icon-btn" title="适应画布" onClick=${() => setZoom(1)}>
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6">

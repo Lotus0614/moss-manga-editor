@@ -118,7 +118,7 @@ PANEL THREE, a small inset stuck onto the BOTTOM LEFT corner of PANEL ONE — th
 
 | 字段      | 值                                                                                                                   |
 | --------- | -------------------------------------------------------------------------------------------------------------------- |
-| `kind`    | `speech` 对话 `shout` 喊叫 `whisper` 小声 `tremble` 颤抖 `thought` 内心 `heart` 心之声 `narration` 旁白·白框 `narration-bare` 旁白·裸字 `sfx` 拟声词 |
+| `kind`    | `speech` 对话 `speech-notail` 对话·无指向 `shout` 喊叫 `whisper` 小声 `tremble` 颤抖 `thought` 内心 `heart` 心之声 `narration` 旁白·白框 `narration-bare` 旁白·裸字 `sfx` 拟声词 |
 | `text`    | 要渲染的字，原样；换行用 `\n`                                                                                        |
 | `desc`    | **位置 + 说话人**，自己写                                                                                            |
 | `vertical` | 不写就跟随页面 `vertical`；写 `true`/`false` 单独覆盖（不在表单里，手写页面时才用）                                 |

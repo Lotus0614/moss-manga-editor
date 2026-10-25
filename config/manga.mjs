@@ -132,6 +132,12 @@ export const BUBBLES = [
         phrase: 'white oval speech bubble, thin black outline',
     },
     {
+        value: 'speech-notail',
+        label: '对话·无指向',
+        // 说话人不在画面里、或不想让尾巴指人时用：无尾巴、无指向
+        phrase: 'white oval speech bubble, thin black outline, no tail, no point, round bubbles',
+    },
+    {
         value: 'shout',
         label: '喊叫',
         phrase: 'jagged spiky speech bubble',

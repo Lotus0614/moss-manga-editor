@@ -1,4 +1,4 @@
-// 修图：拿页面当前那一版当参考图 → 上传 ComfyUI → 填编辑工作流 → 取图 → 存新版本。
+// 修图：拿这一页的一版**渲染图**当参考图 → 上传 ComfyUI → 填编辑工作流 → 取图 → 存新版本。
 //
 // 和 render.mjs 对称：这里只认「配置里的文件名字」和「工作流里的占位符」，
 // 不认识模型、尺寸、步数——那些都写在工作流里，代码不覆盖。
@@ -15,12 +15,26 @@ import { getVersions, currentOf, imageBytes, saveImage, addVersion } from './arc
 /** 编辑工作流必须提供的两个占位符：参考图 + 指令 */
 export const EDIT_PARAMS = ['prompt', 'image'];
 
-/** 拿来当参考图的版本：当前采用的，其次该页最新一版 */
+/**
+ * 拿来当参考图的版本：当前采用的渲染版；当前是修图版时顺着 base 退回去。
+ * 修图永远从渲染图出发——在改过的图上再改，版式和画质会一次次跑偏。
+ */
 export function sourceVersion(store, pageId) {
   const items = (store?.items || []).filter((v) => v.page === pageId);
   if (!items.length) return null;
   const current = currentOf(store, pageId);
-  return items.find((v) => v.id === current) || items[items.length - 1];
+  const picked = items.find((v) => v.id === current) || items[items.length - 1];
+  if (picked.kind !== 'edit') return picked;
+
+  const byId = new Map(items.map((v) => [v.id, v]));
+  const seen = new Set();
+  let base = picked;
+  while (base && base.kind === 'edit' && !seen.has(base.id)) {
+    seen.add(base.id);
+    base = base.base ? byId.get(base.base) : null;
+  }
+  // 基准链断了（老数据没有 base）：退回这一页最早那版渲染
+  return base && base.kind !== 'edit' ? base : items.find((v) => v.kind !== 'edit') || null;
 }
 
 /** 提交给工作流的取值：用户参数（项目 > 全局）再叠自动项 */
@@ -54,7 +68,15 @@ export async function prepareEdit({ dir, configDir, project, page, config, opts 
 
   const store = await getVersions(dir, project.slug);
   const base = sourceVersion(store, page.id);
-  if (!base) return { ok: false, error: '这一页还没有图：先在网页点「生成」，或用 `manga render` 出一版，修图是改现成的图' };
+  if (!base) {
+    const hasAny = (store?.items || []).some((v) => v.page === page.id);
+    return {
+      ok: false,
+      error: hasAny
+        ? '这一页没有可当基准的渲染图（修图不从改过的图出发）：重新 `manga render --page N` 出一版再修'
+        : '这一页还没有图：先在网页点「生成」，或用 `manga render` 出一版，修图是改现成的图',
+    };
+  }
 
   const prompt = buildEditPrompt({ request: opts.prompt });
   if (!prompt) return { ok: false, error: '写一句要改什么：manga edit --page 3 --prompt "把左上角气泡的尾巴删掉"' };

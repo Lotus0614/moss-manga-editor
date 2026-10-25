@@ -127,6 +127,62 @@ await test('切到别的版本后，修图以当前采用的版本为准', async
   assert.equal(picked.seed, 11);
 });
 
+await test('当前版是修图版时，退回它的基准渲染版（不在改过的图上再改）', async () => {
+  const store = await getVersions(dir, project.slug);
+  const render = store.items.find((v) => v.seed === 11);
+  const edit = await addVersion(dir, project.slug, {
+    page: page.id,
+    pageIndex: 1,
+    image: '/media/x/e1.png',
+    kind: 'edit',
+    base: render.id,
+    editPrompt: '删掉尾巴',
+  });
+  await setCurrentVersion(dir, project.slug, page.id, edit.id);
+  const picked = sourceVersion(await getVersions(dir, project.slug), page.id);
+  assert.equal(picked.id, render.id);
+  assert.equal(picked.kind, 'render');
+});
+
+await test('基准链断掉时也退回渲染版，不会拿修图版开刀', async () => {
+  const store = await getVersions(dir, project.slug);
+  const render = store.items.find((v) => v.seed === 22);
+  const orphan = await addVersion(dir, project.slug, {
+    page: page.id,
+    pageIndex: 1,
+    image: '/media/x/e2.png',
+    kind: 'edit',
+    base: 'v999',
+    editPrompt: '改歪的版本',
+  });
+  await setCurrentVersion(dir, project.slug, page.id, orphan.id);
+  const picked = sourceVersion(await getVersions(dir, project.slug), page.id);
+  assert.equal(picked.kind, 'render');
+  assert.ok([render.id, store.items.find((v) => v.seed === 11).id].includes(picked.id));
+});
+
+await test('整页只有修图版时，明说没有可用的基准', async () => {
+  const lonely = await createPage(dir, project.slug, { title: '只有修图版' });
+  await addVersion(dir, project.slug, {
+    page: lonely.page.id,
+    pageIndex: lonely.page.index,
+    image: '/media/x/only-edit.png',
+    kind: 'edit',
+    base: 'v999',
+    editPrompt: '没有原图',
+  });
+  const got = await prepareEdit({
+    dir,
+    configDir,
+    project,
+    page: lonely.page,
+    config: { edit: { name: 'edit.json' } },
+    opts: { prompt: '删掉尾巴' },
+  });
+  assert.equal(got.ok, false);
+  assert.match(got.error, /没有可当基准的渲染图/);
+});
+
 await test('fillEdit 把参考图写成 LoadImage 的 image', () => {
   const prepared = { raw: EDIT_WF, values: { prompt: 'p', image: '', width: 768, height: 1280, seed: 7 } };
   const graph = fillEdit(prepared, 'moss/abc.png');

@@ -296,7 +296,7 @@ export function currentOf(store, pageId) {
 export async function addVersion(dir, slug, version) {
   const store = await getVersions(dir, slug);
   const id = `v${String(store.items.length + 1).padStart(3, '0')}`;
-  const item = { id, at: now(), ...version };
+  const item = { id, at: now(), kind: 'render', ...version };
   store.items.push(item);
   store.currentByPage[item.page] = id;
   await writeJson(versionsFile(dir, slug), store);

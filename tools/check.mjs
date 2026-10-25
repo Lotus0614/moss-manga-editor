@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
-import { PAGE, TYPES } from '../config/manga.mjs';
+import { PAGE, TYPES, EDIT, buildEditPrompt } from '../config/manga.mjs';
 
 const run = promisify(execFile);
 const ROOT = resolve(process.cwd());
@@ -77,7 +77,12 @@ for (const type of TYPES || []) {
   checkFields(type.fields, `类型 ${type.key}`);
 }
 
+// 修图方言：包装句必须留 {request}，否则所有人的指令都会被吞掉
+if (!String(EDIT?.wrapper || '').includes('{request}')) problems.push('修图：EDIT.wrapper 里没有 {request}');
+if (!buildEditPrompt({ request: '改一下' })) problems.push('修图：buildEditPrompt 返回空');
+
 for (const problem of problems) console.error(`✗ ${problem}`);
+
 const enumCount = [...PAGE, ...TYPES.flatMap((type) => type.fields || [])].filter((field) => field.type === 'enum').length;
 if (!problems.length) {
   console.log(`配置：${PAGE.length} 个页面字段、${TYPES.length} 个类型、${enumCount} 个枚举字段`);

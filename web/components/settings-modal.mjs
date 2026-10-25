@@ -4,7 +4,10 @@
 import { html, api, apiPut, useState, useEffect, toast } from '../lib.mjs';
 
 /** 这几个永远由代码填，不进表单 */
-const AUTO = ['prompt', 'width', 'height', 'seed'];
+const AUTO = ['prompt', 'width', 'height', 'seed', 'image'];
+
+/** 修图工作流只认这两个占位符：参考图 + 指令 */
+const EDIT_NEEDS = ['prompt', 'image'];
 
 export default function SettingsModal({ open, config, onClose, onSaved }) {
   const [form, setForm] = useState(null);
@@ -12,6 +15,7 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
   const [status, setStatus] = useState(null);
   const [workflows, setWorkflows] = useState([]);
   const [wf, setWf] = useState({ raw: '', params: [], ok: false, missing: [] });
+  const [wfEdit, setWfEdit] = useState({ params: [], missing: [] });
 
   useEffect(() => {
     if (!open || !config) return;
@@ -49,6 +53,22 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
       .catch(() => setWf({ raw: '', params: [], ok: false, missing: [] }));
   }, [open, form?.workflow?.name]);
 
+  // 修图工作流：只检查 {{prompt}} 和 {{image}}，参数表单不跟它走
+  useEffect(() => {
+    if (!open) return;
+    const name = form?.edit?.name;
+    if (!name) {
+      setWfEdit({ params: [], missing: [] });
+      return;
+    }
+    api(`/api/workflows/${encodeURIComponent(name)}`)
+      .then((data) => {
+        const names = new Set((data.params || []).map((p) => p.name));
+        setWfEdit({ params: data.params || [], missing: EDIT_NEEDS.filter((key) => !names.has(key)) });
+      })
+      .catch(() => setWfEdit({ params: [], missing: EDIT_NEEDS, error: '读不到这个工作流' }));
+  }, [open, form?.edit?.name]);
+
   if (!open || !form) return null;
 
   const patchComfy = (patch) => setForm({ ...form, comfy: { ...form.comfy, ...patch } });
@@ -83,6 +103,7 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
       const saved = await apiPut('/api/config', {
         comfy: form.comfy,
         workflow: form.workflow,
+        edit: form.edit,
         params: form.params || {},
       });
       onSaved?.(saved);
@@ -140,7 +161,7 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
 
         <section class="panel-box">
           <header>
-            工作流
+            生图工作流（MOSS）
             ${form.workflow.name ? html`<span class="tag">${form.workflow.name}</span>` : html`<span class="tag" style="background:#000;color:#fff">未设置</span>`}
           </header>
           <div class="body">
@@ -173,6 +194,35 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
                 <button class="btn" disabled=${busy === 'wf'} onClick=${saveWorkflow}>${busy === 'wf' ? '保存中…' : '保存工作流'}</button>
               </div>
             </details>
+          </div>
+        </section>
+
+        <section class="panel-box">
+          <header>
+            修图工作流（图片编辑）
+            ${form.edit?.name ? html`<span class="tag">${form.edit.name}</span>` : html`<span class="tag">不用修图</span>`}
+          </header>
+          <div class="body">
+            <div class="row">
+              <select
+                class="select grow"
+                value=${form.edit?.name || ''}
+                onChange=${(e) => setForm({ ...form, edit: { ...(form.edit || {}), name: e.currentTarget.value } })}
+              >
+                <option value="">（不用修图）</option>
+                ${workflows.map((w) => html`<option value=${w.name}>${w.name}</option>`)}
+              </select>
+            </div>
+            ${wfEdit.missing?.length
+              ? html`<div class="status bad">
+                  缺占位符：${wfEdit.missing.map((m) => `{{${m}}}`).join('、')}。编辑工作流只需要替换两处：LoadImage 的 image 写成
+                  {{image}}，提示词节点写成 {{prompt}}。
+                </div>`
+              : null}
+            <div class="row wrap">
+              ${(wfEdit.params || []).map((p) => html`<span class="chip ghost">{{${p.name}}}</span>`)}
+            </div>
+            <div class="hint">修图拿这一页当前那一版当参考图，结果存成新版本；尺寸、步数、模型全部按工作流本身。</div>
           </div>
         </section>
 

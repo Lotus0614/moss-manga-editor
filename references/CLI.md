@@ -25,13 +25,14 @@ manga doctor [--json]
   "archive": "C:\\Users\\me\\.moss-manga",
   "comfy": { "url": "http://127.0.0.1:8188", "reachable": true, "version": "0.3.x", "checkpoints": 14, "loras": 30 },
   "workflow": { "name": "default.json", "ok": true, "params": ["prompt", "seed", "width", "height", "steps", "cfg", "ckpt"] },
+  "edit": { "name": "edit.json", "ok": true, "params": ["image", "prompt"], "missing": [] },
   "ckpt": "moss_v1.safetensors",
   "projects": 2,
   "problems": []
 }
 ```
 
-`configured` 为 false 时看 `problems`，一条一条解决。
+`configured` 为 false 时看 `problems`，一条一条解决。`edit` 是修图工作流：没配就一直是 `{"name": ""}`，不算问题；配了但文件缺失或缺 `{{prompt}}`/`{{image}}` 才算问题。
 
 ---
 
@@ -42,13 +43,13 @@ manga init [--comfy URL] [--ckpt 文件名] [--workflow 文件] [--archive 路�
 manga config get [点号路径]
 manga config set 键=值 [键=值...]
 manga workflow path                    # 打印配置根与工作流目录
-manga workflow save <文件> [--name default.json]
+manga workflow save <文件> [--name default.json] [--no-activate]
 manga workflow check [--name default.json]
 manga workflow list
 manga workflow show [--name default.json]
 ```
 
-`workflow save` 只做两件事：校验是 API 格式、复制到 `config/workflows/<name>`，然后报告占位符情况。**它不改你的文件**——`{{prompt}}` / `{{width}}` / `{{height}}` 这些由调用方（AI）读懂 JSON 后自己写进文件。
+`workflow save` 只做两件事：校验是 API 格式、复制到 `config/workflows/<name>`，然后报告占位符情况。**它不改你的文件**——`{{prompt}}` / `{{width}}` / `{{height}}` 这些由调用方（AI）读懂 JSON 后自己写进文件。保存后默认把它设为当前生图工作流；加 `--no-activate` 只存不切（导修图工作流时必须加）。
 
 `workflow check` 的输出：
 
@@ -62,7 +63,7 @@ manga workflow show [--name default.json]
 }
 ```
 
-`ok: false` 不阻止保存，但 `doctor` 会把它列为问题。
+`ok: false` 不阻止保存，但 `doctor` 会把它列为问题。带 `{{image}}` 的工作流会被认作**修图工作流**，只要求 `{{prompt}}` + `{{image}}`（尺寸、步数、模型都在工作流里），`missing` 也只列这两个。
 
 `config set` 的值会先尝试当 JSON 解析，所以 `editable.layout=true` 是布尔、`defaults.steps=30` 是数字。
 
@@ -77,7 +78,8 @@ manga workflow show [--name default.json]
 | `defaults.steps` `defaults.cfg` `defaults.sampler` `defaults.scheduler` | 出图参数 |
 | `defaults.negative` | 负面提示词 |
 | `defaults.lora` | 默认 LoRA，形如 `<lora:名字:0.7>` |
-| `workflow.name` | 当前工作流文件名 |
+| `workflow.name` | 当前生图工作流文件名 |
+| `edit.name` | 修图工作流文件名（留空 = 不修图，网页不显示修图按钮） |
 | `editable.layout` `editable.text` `editable.bubbleType` `editable.style` | Agent 能不能改这些 |
 | `editable.params.seed` 等 | Agent 能不能改这些参数 |
 
@@ -179,6 +181,35 @@ manga render --page 3 [--seed 123] [--steps 20] [--cfg 5] [--dry-run] [--json]
 
 ---
 
+## edit
+
+用编辑模型改**已经出好的图**：拿这一页当前采用的版本当参考图，一句中文指令，结果存成新版本。
+
+```bash
+manga edit --page 5 --prompt "把左上角气泡的尾巴删掉" [--seed 123] [--dry-run] [--json]
+```
+
+```json
+{
+  "ok": true,
+  "image": "/media/rainy-konbini/<sha>.png",
+  "file": "<sha>.png",
+  "base": "v024",
+  "prompt": "在这张漫画里把左上角气泡的尾巴删掉。没提到的部分保持原样：…",
+  "ms": 32400,
+  "version": { "id": "v074", "kind": "edit", "base": "v024" }
+}
+```
+
+- 前提：`config.edit.name` 指向一份编辑工作流（只要 `{{prompt}}` + `{{image}}`），见 `WORKFLOW.md` 的「修图工作流」。
+- 只做**不改大布局**的修改：气泡尾巴、多余的手指、糊掉的台词、局部颜色。改机位、换人、改分镜属于重新 `render`。
+- 参考图默认是「当前采用的版本」；要换基准就先去历史里切版本，命令只有一条路。
+- `--dry-run` 打印最终整句提示词和填好的图，不提交。
+- 工作流里写了 `{{seed}}` 时 `--seed` 才有意义；没写就用工作流里固定的种子（同样的话重跑结果一样）。
+- 失败时 `{ "ok": false, "code": "edit", "error": "..." }`。
+
+---
+
 ## changes / ack（人类用，Agent 不用）
 
 ```bash
@@ -230,7 +261,7 @@ manga open [--port 5123]
 
 ## 自定义占位符（任意）
 
-工作流里的 `{{名字}}` 是**任意**的，没有白名单。除了内置那批（prompt/width/height/seed/steps/cfg/sampler/scheduler/ckpt/negative/denoise/lora_name/lora_strength/batch_size），你自己加的键会从 `config.params` 取值：
+工作流里的 `{{名字}}` 是**任意**的，没有白名单。除了内置那批（prompt/width/height/seed/image/steps/cfg/sampler/scheduler/ckpt/negative/denoise/lora_name/lora_strength/batch_size），你自己加的键会从 `config.params` 取值：
 
 ```bash
 manga config set 'params.lora_data=<lora:moss\xxx:0.8>'

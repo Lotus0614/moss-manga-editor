@@ -300,11 +300,16 @@ export async function addVersion(dir, slug, version) {
   store.items.push(item);
   store.currentByPage[item.page] = id;
   await writeJson(versionsFile(dir, slug), store);
-  if (version.promptJson) {
+  // 出图和修图都留一份可复盘的原文；其余版本只有 versions.json 里那条摘要
+  if (version.promptJson || version.editPrompt) {
     await writeJson(join(projectDir(dir, slug), 'versions', `${id}.json`), {
       id,
       page: version.page,
-      prompt: version.promptJson,
+      kind: version.kind || 'render',
+      base: version.base,
+      image: version.image,
+      prompt: version.promptJson || version.prompt,
+      editPrompt: version.editPrompt,
       seed: version.seed,
     });
   }

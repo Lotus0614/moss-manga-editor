@@ -33,6 +33,7 @@ import {
 } from './scripts/lib/archive.mjs';
 import { listWorkflows, readWorkflow, saveWorkflow, checkWorkflow } from './scripts/lib/workflow.mjs';
 import { renderPage } from './scripts/lib/render.mjs';
+import { editPage } from './scripts/lib/edit.mjs';
 import { compilePage } from './core/compile.mjs';
 import { normalizeCharacters } from './core/characters.mjs';
 import { createPanelItem } from './core/manga-doc.mjs';
@@ -355,7 +356,7 @@ async function route(req, res, url) {
       return json(res, 200, store);
     }
 
-    const pageMatch = rest.match(/^pages\/([^/]+)(?:\/(compile|render))?$/);
+    const pageMatch = rest.match(/^pages\/([^/]+)(?:\/(compile|render|edit))?$/);
     if (pageMatch) {
       const pageId = safe(pageMatch[1]);
       const action = pageMatch[2];
@@ -370,7 +371,7 @@ async function route(req, res, url) {
       if (action === 'render' && method === 'POST') {
         const payload = await body(req);
         const config = await readConfig(CONFIG_DIR);
-        const job = { id: `job_${Date.now().toString(36)}`, page: page.id, index: page.index, status: 'running', progress: 0, at: new Date().toISOString() };
+        const job = { id: `job_${Date.now().toString(36)}`, page: page.id, index: page.index, kind: 'render', status: 'running', progress: 0, at: new Date().toISOString() };
         jobs.push(job);
         if (jobs.length > 60) jobs.shift();
         bus.emit('job', { ...job });
@@ -389,6 +390,46 @@ async function route(req, res, url) {
         })
           .then((result) => {
             Object.assign(job, { status: 'done', progress: 100, image: result.image, seed: result.seed, ms: result.ms });
+            bus.emit('job', { ...job });
+          })
+          .catch((err) => {
+            Object.assign(job, { status: 'error', error: err.message });
+            bus.emit('job', { ...job });
+          });
+        return json(res, 202, { jobId: job.id });
+      }
+
+      if (action === 'edit' && method === 'POST') {
+        const payload = await body(req);
+        const config = await readConfig(CONFIG_DIR);
+        const job = {
+          id: `job_${Date.now().toString(36)}`,
+          page: page.id,
+          index: page.index,
+          kind: 'edit',
+          prompt: String(payload.prompt || ''),
+          status: 'running',
+          progress: 0,
+          at: new Date().toISOString(),
+        };
+        jobs.push(job);
+        if (jobs.length > 60) jobs.shift();
+        bus.emit('job', { ...job });
+        editPage({
+          dir: ARCHIVE,
+          configDir: CONFIG_DIR,
+          slug,
+          project,
+          page,
+          config,
+          opts: payload,
+          onProgress: (p) => {
+            job.progress = p?.max ? Math.round((p.value / p.max) * 100) : job.progress;
+            bus.emit('job', { ...job });
+          },
+        })
+          .then((result) => {
+            Object.assign(job, { status: 'done', progress: 100, image: result.image, base: result.base, versionId: result.version?.id, ms: result.ms });
             bus.emit('job', { ...job });
           })
           .catch((err) => {

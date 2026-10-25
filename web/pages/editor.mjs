@@ -72,6 +72,9 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const [changes, setChanges] = useState(null);
   const [showExport, setShowExport] = useState(false);
   const [exporting, setExporting] = useState('');
+  // 修图：点「修图」才展开输入框；没配修图工作流时按钮不出现
+  const [editOpen, setEditOpen] = useState(false);
+  const [editText, setEditText] = useState('');
   // 外部改动来了但手上有未保存的编辑 → 先提示，不覆盖
   const [external, setExternal] = useState('');
 
@@ -183,12 +186,12 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
       setGen(job);
       if (job.status === 'done') {
         setBusyGen(false);
-        toast('生成完成');
+        toast(job.kind === 'edit' ? '修图完成' : '生成完成');
         reloadPage(cur.id);
         refreshPages();
       } else if (job.status === 'error') {
         setBusyGen(false);
-        toast(job.error || '生成失败', 'bad');
+        toast(job.error || (job.kind === 'edit' ? '修图失败' : '生成失败'), 'bad');
       }
     });
 
@@ -438,6 +441,29 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     }
   }
 
+  /** 修图：把这一页当前那一版交给编辑模型，改完存新版本 */
+  async function editImage() {
+    const request = editText.trim();
+    if (!page || !request || generating) return;
+    if (!config?.edit?.name) {
+      toast('还没有修图工作流：在设置里选一份 Qwen 编辑工作流', 'bad');
+      onOpenSettings?.();
+      return;
+    }
+    setBusyGen(true);
+    try {
+      const res = await apiPost(`/api/projects/${projectId}/pages/${page.id}/edit`, { prompt: request });
+      const started = { page: page.id, kind: 'edit', status: 'running', progress: 0, id: res.jobId, prompt: request };
+      jobsRef.current[page.id] = started;
+      setGen(started);
+      setEditText('');
+      setEditOpen(false);
+    } catch (err) {
+      setBusyGen(false);
+      toast(err.message, 'bad');
+    }
+  }
+
   async function addPage() {
     try {
       const doc = await apiPost(`/api/projects/${projectId}/pages`, {});
@@ -525,6 +551,8 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const version = versions.find((v) => v.id === current) || versions.slice(-1)[0];
   const image = version?.image || '';
   const generating = busyGen || Boolean(gen && (gen.status === 'queued' || gen.status === 'running'));
+  const editing = Boolean(generating && gen?.kind === 'edit');
+  const canEdit = Boolean(config?.edit?.name);
   const scale = fitScale * zoom;
 
   function addItem(type) {
@@ -620,10 +648,43 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         <button class=${cls('btn ghost', !showBoxes && 'inv')} onClick=${() => setShowBoxes((v) => !v)}>${showBoxes ? '隐藏框' : '显示框'}</button>
         <button class="btn ghost" onClick=${undo} title="Ctrl+Z">撤销</button>
         <button class="btn ghost" onClick=${() => setShowExport(true)}>导出</button>
+        ${canEdit
+          ? html`<button
+              class=${cls('btn', editOpen && 'ghost')}
+              disabled=${generating || !image}
+              title="用编辑模型改这一版图；只做不改大布局的小修改"
+              onClick=${() => setEditOpen((v) => !v)}
+            >
+              ${editing ? `修图中 ${gen?.progress || 0}%` : '修图'}
+            </button>`
+          : null}
         <button class="btn inv" disabled=${errors.length > 0 || generating} onClick=${generate}>
-          ${generating ? `生成中 ${gen?.progress || 0}%` : '生成'}
+          ${generating && !editing ? `生成中 ${gen?.progress || 0}%` : '生成'}
         </button>
       </div>
+
+      ${editOpen
+        ? html`<div class="edit-bar">
+            <span class="tip">修图</span>
+            <input
+              class="input"
+              value=${editText}
+              placeholder="要改什么，比如：把左上角气泡的尾巴删掉 / 把第三格多出来的手去掉"
+              onInput=${(e) => setEditText(e.currentTarget.value)}
+              onKeyDown=${(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  editImage();
+                }
+                if (e.key === 'Escape') setEditOpen(false);
+              }}
+            />
+            <button class="btn inv" disabled=${!editText.trim() || generating} onClick=${editImage}>
+              ${editing ? `修图中 ${gen?.progress || 0}%` : '开始修'}
+            </button>
+            <button class="btn ghost" onClick=${() => { setEditOpen(false); setEditText(''); }}>取消</button>
+          </div>`
+        : null}
 
       <div
         class="stage"

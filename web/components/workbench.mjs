@@ -40,13 +40,16 @@ export function HistoryPanel({ versions, current, onPick }) {
       ${list.map((v) => {
         const on = v.id === activeId;
         return html`<div class=${cls('version', on && 'on')} key=${v.id}>
-          <img src=${v.image} alt="" loading="lazy" title="预览这一版" onClick=${() => onPick(v.id)} />
-          <div class="vmeta"><b>${v.seed}</b>${formatTime(v.at).slice(5)}</div>
+          <img src=${v.image} alt="" loading="lazy" title=${v.kind === 'edit' ? `修图版：${v.editPrompt || ''}` : '渲染版'} onClick=${() => onPick(v.id)} />
+          <div class="vmeta">
+            ${v.kind === 'edit' ? html`<span title=${`基于 ${v.base || '?'}：${v.editPrompt || ''}`}>✎</span>` : null}
+            <b>${v.seed ?? '—'}</b>${formatTime(v.at).slice(5)}
+          </div>
           <button class="vbtn" disabled=${on} onClick=${() => onPick(v.id)}>${on ? '当前' : '用这版'}</button>
         </div>`;
       })}
     </div>
-    <span class="hint">点「用这版」把它设为当前采用的图；历史只读，不会改布局。</span>
+    <span class="hint">点「用这版」把它设为当前采用的图；历史只读，不会改布局。带 ✎ 的是修图版。</span>
   </div>`;
 }
 

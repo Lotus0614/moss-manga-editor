@@ -54,12 +54,21 @@ export async function readWorkflow(configDir, name) {
   return { name: safe, raw: await readFile(file, 'utf8'), file };
 }
 
-/** 校验：只要求三个由代码填的占位符 */
+/** 校验：生图要 prompt/width/height，修图（带 {{image}} 的）只要 prompt/image */
 export function checkWorkflow(raw) {
   const desc = describeWorkflow(stripBom(String(raw)));
-  if (!desc.ok) return { ok: false, error: desc.error, nodeCount: 0, params: [], missing: [], warnings: [] };
+  if (!desc.ok) return { ok: false, kind: '', error: desc.error, nodeCount: 0, params: [], missing: [], warnings: [] };
 
   const names = new Set(desc.params.map((p) => p.name));
+
+  // {{image}} = 图生图（修图）工作流：画布尺寸和种子由工作流自己定，不要求占位符
+  if (names.has('image')) {
+    const missing = ['prompt', 'image'].filter((key) => !names.has(key));
+    const warnings = [];
+    if (!names.has('seed')) warnings.push('没有 {{seed}}：每次都用工作流里写死的种子，同样的指令重跑结果一样');
+    return { ok: missing.length === 0, kind: 'edit', error: '', nodeCount: desc.nodeCount, params: desc.params, missing, warnings };
+  }
+
   const missing = ['prompt', 'width', 'height'].filter((key) => !names.has(key));
   const warnings = [];
   if (missing.includes('prompt')) warnings.push('没有 {{prompt}}：生成的图不会带分格布局');
@@ -67,7 +76,7 @@ export function checkWorkflow(raw) {
   if (missing.includes('height')) warnings.push('没有 {{height}}：高度写死，改不了画布');
   if (!names.has('seed')) warnings.push('没有 {{seed}}：没法记录 seed');
 
-  return { ok: missing.length === 0, error: '', nodeCount: desc.nodeCount, params: desc.params, missing, warnings };
+  return { ok: missing.length === 0, kind: 'render', error: '', nodeCount: desc.nodeCount, params: desc.params, missing, warnings };
 }
 
 /** 保存工作流，并把占位符里的默认值抄一份出来（调用方写进 config.params） */
@@ -87,7 +96,7 @@ export async function saveWorkflow(configDir, source, name = 'default.json') {
 }
 
 /** 自动参数：永远由代码填，不进表单 */
-export const AUTO_PARAMS = ['prompt', 'width', 'height', 'seed'];
+export const AUTO_PARAMS = ['prompt', 'width', 'height', 'seed', 'image'];
 
 /** 只组装自动项；用户参数由调用方从 config.params / project.params 合并 */
 export function buildValues({ page, opts = {} }) {
@@ -95,7 +104,8 @@ export function buildValues({ page, opts = {} }) {
   return { prompt: '', width, height, seed: pickSeed(opts.seed) };
 }
 
-function pickSeed(value) {
+/** 没给就随机：同一页连续出图才有变化 */
+export function pickSeed(value) {
   if (value === '' || value === undefined || value === null) return Math.floor(Math.random() * 2 ** 31);
   const n = Number(value);
   if (Number.isFinite(n) && n >= 0) return n;

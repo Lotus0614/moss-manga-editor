@@ -97,6 +97,43 @@ export class ComfyClient {
   }
 
   /**
+   * 上传图片到 ComfyUI 的 input 目录，返回 LoadImage 认的路径（子目录会带上前缀）。
+   * 修图要用：编辑工作流的参考图必须先躺在 input 里。
+   */
+  async uploadImage(buffer, filename, { subfolder = 'moss', type = 'input', overwrite = true, timeoutMs = 60000 } = {}) {
+    const form = new FormData();
+    form.append('image', new Blob([buffer]), filename);
+    form.append('overwrite', String(Boolean(overwrite)));
+    if (subfolder) form.append('subfolder', subfolder);
+    form.append('type', type);
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(`${this.base}/upload/image`, {
+        method: 'POST',
+        headers: this.headers(),
+        body: form,
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => '');
+        throw new ComfyError(`上传参考图失败（${res.status}）${detail ? `：${detail.slice(0, 200)}` : ''}`, { status: res.status });
+      }
+      const data = await res.json();
+      const name = data?.name || filename;
+      const sub = data?.subfolder ?? subfolder;
+      return sub ? `${sub}/${name}` : name;
+    } catch (err) {
+      if (err instanceof ComfyError) throw err;
+      if (err.name === 'AbortError') throw new ComfyError('上传参考图超时');
+      throw new ComfyError(`连不上 ComfyUI（${this.base}）：${err.message}`);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
    * 边看进度边等结果。进度靠 WebSocket（失败就静默降级成纯轮询）。
    */
   async run(graph, { onProgress = () => {}, onEvent = () => {}, timeoutMs = this.timeoutMs } = {}) {

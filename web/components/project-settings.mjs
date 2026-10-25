@@ -1,10 +1,10 @@
-﻿// 项目设置：新建页默认值 + 项目级工作流参数（留空 = 跟随全局）。
+// 项目设置：新建页默认值 + 项目级工作流参数（留空 = 跟随全局）。
 // 参数列表同样由工作流占位符生成，代码不认识具体名字。
 
 import { html, api, apiPut, useState, useEffect, toast } from '../lib.mjs';
 import { pageField, optionsOf } from '../../config/manga.mjs';
 
-const AUTO = ['prompt', 'width', 'height', 'seed'];
+const AUTO = ['prompt', 'width', 'height', 'seed', 'image'];
 
 export default function ProjectSettings({ slug, open, onClose, onSaved, onOpenGlobal }) {
   const STYLES = optionsOf(pageField('style'));

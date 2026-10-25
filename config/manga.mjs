@@ -221,6 +221,23 @@ const fill = (template, vars = {}) =>
         vars[key] !== undefined ? String(vars[key]) : match,
     );
 
+// ---------------------------------------------------------------- 修图
+// 编辑模型（图生图）只接「不改大布局的小修」：作者/AI 只写改哪里，
+// 这句包装负责把「其余别动」说死。空请求返回空串，由调用方报错。
+
+export const EDIT = {
+    wrapper:
+        '在这张漫画里{request}。没提到的部分保持原样：格子排列、气泡位置和形状、气泡里的文字一个字都不改，画风不变。',
+};
+
+export function buildEditPrompt({ request } = {}) {
+    const text = String(request || '')
+        .trim()
+        .replace(/[。.]+$/, '');
+    if (!text) return '';
+    return fill(EDIT.wrapper, { request: text });
+}
+
 // ---------------------------------------------------------------- 辅助
 
 /** 面板格：只用来数格数，不参与编号 */
@@ -488,9 +505,9 @@ export function buildSummary({ page, items, resolveCharacter }) {
         cast.push(castLine(item, resolveCharacter));
     }
     const castBlock = cast.length
-        ? `CHARACTERS IN THIS PAGE (each one appears only inside its own box):\n${cast
+        ? `<|character_list|>\nCHARACTERS IN THIS PAGE (each one appears only inside its own box):\n${cast
               .map((char) => `- ${char.name}${char.text ? `: ${char.text}` : ''}`)
-              .join('\n')}`
+              .join('\n')}\n<|/character_list|>`
         : '';
     if (castBlock) parts.push(castBlock);
 
@@ -570,4 +587,5 @@ export default {
     types: TYPES,
     snippets: SNIPPETS,
     buildSummary,
+    buildEditPrompt,
 };

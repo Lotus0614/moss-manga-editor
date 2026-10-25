@@ -333,6 +333,7 @@ In sharp contrast, the girl on the right has NO glasses and spotless skin with z
             "id": "v003",
             "page": "p01",
             "image": "/media/<slug>/<sha>.png",
+            "kind": "render", // render 渲染 / edit 修图
             "seed": 909507867,
             "width": 768,
             "height": 1280,
@@ -343,11 +344,22 @@ In sharp contrast, the girl on the right has NO glasses and spotless skin with z
             "workflow": "moss-user.json",
             "ms": 18183,
         },
+        {
+            "id": "v004",
+            "page": "p01",
+            "image": "/media/<slug>/<sha>.png",
+            "kind": "edit", // 修图版：只记基准和指令，尺寸由编辑工作流决定
+            "base": "v003",
+            "editPrompt": "把左上角气泡的尾巴删掉",
+            "prompt": "在这张漫画里把左上角气泡的尾巴删掉。没提到的部分保持原样：…",
+            "workflow": "edit.json",
+            "ms": 32400,
+        },
     ],
 }
 ```
 
-历史只读：切 `currentByPage` 只影响预览用哪一版，改不动已生成的图。
+历史只读：切 `currentByPage` 只影响预览用哪一版，改不动已生成的图。渲染版和修图版都可能是当前版；`versions/<id>.json` 里存着完整提示词（渲染是 `promptJson`，修图是 `editPrompt` + 包好的 `prompt`），用来复盘或重跑。
 
 ## journal.jsonl
 

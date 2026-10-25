@@ -8,9 +8,10 @@
 
 - **分镜即数据**：一页是一份 JSON，面板、气泡、原生元素共用一个 `items` 数组，坐标直接对应画面
 - **提示词可改**：形状、机位、画风、气泡措辞、句式都在 `config/` 里，改文件即生效，不用动代码
-- **编译有校验**：越界、空描述、文字溢出、气泡重叠会在出图前报错
+- **编译有校验**：越界、空描述、尺寸不合法、类型不认识会在出图前报错
 - **历史可回看**：每次渲染存一个版本，带 seed 与 prompt 快照
 - **网页可编辑**：拖版面、改台词、调透明度、缩放平移
+- **瑕疵可修**：另配一份编辑模型（Qwen Image Edit 之类）后，一句话改已经出好的图（气泡尾巴、多出来的手、糊掉的台词），结果存成新版本
 
 ## 快速开始
 
@@ -48,6 +49,7 @@ AGENT.md         工作手册（画画流程与约定）
 | 命令参数                                             | `references/CLI.md`        |
 | ComfyUI 工作流与占位符                               | `references/WORKFLOW.md`   |
 | 分镜版式、节奏、人物、背景                           | `references/TECHNIQUES.md` |
+| 成人向页面：构图、体位、**tag 词库**                 | `references/R18-MANGA.md`  |
 | MOSS 官方 Layout JSON 规范（一般情况不用读这个文档） | `references/MOSSS_LAYOUT.md` |
 
 ## 常用命令
@@ -58,6 +60,7 @@ node manga.mjs project new --name "雨夜"
 node manga.mjs page new --title "第 1 页"
 node manga.mjs compile --page 1       # 只编译，不出图
 node manga.mjs render --page 1        # 出图
+node manga.mjs edit --page 1 --prompt "把左上角气泡的尾巴删掉"   # 修图（要先配编辑工作流）
 node manga.mjs serve                  # 网页预览
 node manga.mjs stop
 ```
@@ -67,6 +70,7 @@ node manga.mjs stop
 - Node 22 或更高
 - 运行中的 ComfyUI（默认 `http://127.0.0.1:8188`）
 - 一份用「导出 (API)」保存的 MOSS 工作流
+- （可选）一份图片编辑工作流（Qwen Image Edit 等），用于修图
 
 ## License
 

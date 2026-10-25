@@ -80,9 +80,10 @@ default.json：7 个节点
 
 | 占位符 | 来源 |
 |---|---|
-| `{{prompt}}` | 页面编译出的 Moss Layout JSON |
-| `{{width}}` `{{height}}` | 页面尺寸 |
+| `{{prompt}}` | 生图：页面编译出的 Moss Layout JSON；修图：包好的那句修改指令 |
+| `{{width}}` `{{height}}` | 页面尺寸（生图用；修图工作流写了也会填） |
 | `{{seed}}` | 每次随机（`--seed 42` 才固定） |
+| `{{image}}` | 修图：上传到 ComfyUI `input/moss/` 的参考图路径 |
 
 **其余全部由用户填**，写在占位符的默认值里：
 
@@ -114,6 +115,9 @@ manga config set params.steps=24 'params.lora_data=<lora:moss\khn:0.9>'
 | `需要参数 {{ckpt}}，但没有值也没有默认值` | 工作流要 ckpt 但没人填 | `manga config set params.ckpt=<文件名>` |
 | `这一页还有错误：...` | 页面内容过不了校验 | `manga compile --page N` 看具体哪条 |
 | `等待生成结果超时` | 图太大/步数太高 | `comfy.timeoutMs` 调大，或 `--steps` 降低 |
+| `修图工作流 edit.json 缺占位符：{{image}}` | 编辑工作流的 LoadImage 没替换 | 把 `image` 改成 `{{image}}`，再 `workflow check --name edit.json` |
+| `这一页还没有图` | 修图要先有一版图当参考 | 先 `manga render --page N` |
+| `工作流 xxx 是修图工作流（含 {{image}}）` | 把 edit.json 配成了生图工作流 | `config set workflow.name=default.json` |
 
 ## 换工作流
 
@@ -123,3 +127,31 @@ manga workflow check
 ```
 
 同名文件直接覆盖，不需要先删旧的；`save` 会自动把它设为当前工作流。
+
+## 修图工作流
+
+生图和修图是**两份**工作流，互不影响：
+
+| 用途 | 配置键 | 占位符 |
+|---|---|---|
+| 生图（MOSS） | `workflow.name` | `{{prompt}}` `{{width}}` `{{height}}`（+ 任意参数） |
+| 修图（Qwen Image Edit 之类） | `edit.name` | 只要 `{{prompt}}` `{{image}}` |
+
+修图工作流来自 ComfyUI 里调好的编辑工作流，**导出 (API) 之后只改两处**：
+
+- `LoadImage` 的 `image` → `{{image}}`
+- 提示词那个字符串节点（常见是 `PrimitiveStringMultiline` 的 `value`）→ `{{prompt}}`
+
+其余全部原样：模型、LoRA、尺寸、步数、采样器、超分、保存节点都不动——修图的画幅和画质由这份工作流决定，代码不覆盖。
+
+```bash
+manga workflow save ./qwen-edit.api.json --name edit.json --no-activate
+manga config set edit.name=edit.json
+manga workflow check --name edit.json
+```
+
+`--no-activate` 不能省：不加会把生图工作流也切成这份。`check` 看到 `{{image}}` 就按修图工作流校验（只要求 prompt / image），所以不会再去抱怨缺 `{{width}}` / `{{height}}`。
+
+提交时 `manga edit` 会：读这一页当前版本的图 → `POST /upload/image` 传到 `input/moss/` → 把返回值填进 `{{image}}` → 提交 → 取图 → 存成新版本。工作流里没写 `{{seed}}` 时种子是写死的，同样的指令重跑会得到同一张图；想让它每次都变，把 `KSampler` 的 `seed` 也写成 `{{seed}}`。
+
+生图工作流里**不该**出现 `{{image}}`：一旦有，`render` 会直接报错说是修图工作流，免得把整页图喂进去。

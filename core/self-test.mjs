@@ -9,6 +9,7 @@ import { createPage, createPanelItem, createBubbleItem, toMoss, fromMoss, normal
 import { validatePage } from './validate.mjs';
 import { decompile } from './decompile.mjs';
 import { fillGraph, scanTokens, MissingParam, describeWorkflow } from './placeholders.mjs';
+import { buildEditPrompt } from '../config/manga.mjs';
 
 let passed = 0;
 const failures = [];
@@ -319,6 +320,15 @@ test('describeWorkflow 拒绝非 API 格式', () => {
   assert.equal(describeWorkflow('{"nodes":[],"links":[]}').ok, false);
   assert.equal(describeWorkflow('not json').ok, false);
   assert.equal(describeWorkflow('{"1":{"class_type":"A","inputs":{}}}').ok, true);
+});
+
+// ---------------------------------------------------------------- 修图
+
+test('修图提示词把「别动别处」说死，空请求不出句子', () => {
+  const got = buildEditPrompt({ request: '把左上角气泡的尾巴删掉。' });
+  assert.ok(got.startsWith('在这张漫画里把左上角气泡的尾巴删掉。'));
+  assert.ok(got.includes('气泡里的文字一个字都不改'));
+  assert.equal(buildEditPrompt({ request: '  ' }), '');
 });
 
 // ---------------------------------------------------------------- 汇总

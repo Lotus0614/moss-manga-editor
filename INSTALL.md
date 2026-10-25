@@ -61,7 +61,8 @@ node manga.mjs doctor          # 应该显示 ComfyUI 可连
 
 **这一步只要 JSON，别问参数。**
 
-> 「把 ComfyUI 里调好的工作流用『导出 (API)』存成 JSON，把文件路径或内容发我。」
+> 「把 ComfyUI 里调好的工作流用『导出 (API)』存成 JSON，把文件路径或内容发我。
+> 如果装了 Qwen 的图片编辑模型，把那份编辑工作流也一起发我（可选）。」
 
 拿到之后，先自己读一遍 JSON：顶层是 `节点 id → { class_type, inputs }` 才算 API 格式（不是 `nodes` / `links` 那种界面格式）。
 
@@ -75,6 +76,23 @@ node manga.mjs doctor          # 应该显示 ComfyUI 可连
 node manga.mjs workflow save ./moss.api.json
 node manga.mjs workflow check
 ```
+
+### 修图工作流（可选）
+
+编辑模型（Qwen Image Edit 之类）只做一件事：**用一句话改已经出好的图**，不改大布局。它那份 JSON **只替换两处**，别的都别动（模型、尺寸、步数、超分全在工作流里）：
+
+| 位置 | 改成 |
+|---|---|
+| `LoadImage` 的 `image` | `{{image}}` |
+| 提示词那个字符串节点的 `value` | `{{prompt}}` |
+
+```bash
+node manga.mjs workflow save ./qwen-edit.api.json --name edit.json --no-activate
+node manga.mjs config set edit.name=edit.json
+node manga.mjs workflow check --name edit.json    # 认作「修图工作流」，只要 prompt / image
+```
+
+`--no-activate` 很重要：不加会把生图工作流也切成这份。配好之后网页设置里会同时看到「生图工作流」和「修图工作流」，页面上也会出现「修图」按钮。用户没有编辑模型就跳过这一节，网页不会出现那个按钮。
 
 ## 6. 推荐可调参数
 

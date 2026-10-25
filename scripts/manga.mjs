@@ -42,6 +42,7 @@ import {
 import { listWorkflows, readWorkflow, saveWorkflow, checkWorkflow } from './lib/workflow.mjs';
 import { ComfyClient } from './lib/comfy.mjs';
 import { prepareRender, renderPage } from './lib/render.mjs';
+import { prepareEdit, fillEdit, editPage } from './lib/edit.mjs';
 import { compilePage } from '../core/compile.mjs';
 import { diffPage, describeOp } from './lib/diff.mjs';
 import { createItem } from '../core/manga-doc.mjs';
@@ -137,6 +138,7 @@ async function cmdDoctor() {
     version: VERSION,
     comfy: { url: '', reachable: false, version: '', checkpoints: 0, loras: 0 },
     workflow: { name: '', ok: false, params: [], error: '' },
+    edit: { name: '', ok: false, params: [], missing: [] },
     ckpt: '',
     projects: 0,
     problems: [],
@@ -202,6 +204,25 @@ async function cmdDoctor() {
     result.problems.push(`读取工作流失败：${err.message}`);
   }
 
+  // 修图工作流是可选的：没配就不查；配了但缺文件 / 缺占位符才算问题
+  if (config.edit?.name) {
+    try {
+      const wf = await readWorkflow(CONFIG_DIR, config.edit.name);
+      const checkedEdit = checkWorkflow(wf.raw);
+      const names = new Set(checkedEdit.params.map((p) => p.name));
+      const missing = ['prompt', 'image'].filter((key) => !names.has(key));
+      result.edit = { name: wf.name, ok: !checkedEdit.error && !missing.length, params: checkedEdit.params.map((p) => p.name), missing };
+      if (checkedEdit.error) result.problems.push(`修图工作流解析失败：${checkedEdit.error}`);
+      else if (missing.length) {
+        result.problems.push(
+          `修图工作流缺占位符：${missing.map((m) => `{{${m}}}`).join('、')}（只改两处：LoadImage 的 image、提示词节点）`
+        );
+      }
+    } catch (err) {
+      result.problems.push(`修图工作流：${err.message}`);
+    }
+  }
+
   const projects = await listProjects(DIR).catch(() => []);
   result.projects = projects.length;
   if (!archiveExists) result.problems.push(`存档还没建立：${DIR}（运行 manga init 会自动建）`);
@@ -214,6 +235,7 @@ async function cmdDoctor() {
       `存档：${DIR}`,
       `ComfyUI：${config.comfy.url} ${result.comfy.reachable ? `✓ ${result.comfy.version}` : '✗ 连不上'}`,
       `工作流：${result.workflow.name || '（未设置）'} ${result.workflow.ok ? `✓ ${result.workflow.params.length} 个参数` : '✗'}`,
+      `修图：${config.edit?.name ? `${result.edit.name} ${result.edit.ok ? '✓' : '✗ 缺占位符'}` : '（未配置，网页不显示修图按钮）'}`,
       `检查点：${result.ckpt || '（不需要）'}`,
       `项目：${projects.length} 个`,
       result.configured ? '状态：已配置，可以直接开始画' : `状况：${result.problems.length} 个问题`,
@@ -307,11 +329,16 @@ async function cmdWorkflow() {
     if (!file) fail('用法：manga workflow save <API JSON 文件> [--name default.json]');
     const name = String(flags.name || 'default.json');
     const saved = await saveWorkflow(CONFIG_DIR, String(file), name);
-    await writeConfig(CONFIG_DIR, { workflow: { name: saved.name } });
+    if (!flags['no-activate']) await writeConfig(CONFIG_DIR, { workflow: { name: saved.name } });
     const lines = [
       `已保存 ${saved.name}（${saved.nodeCount} 个节点，${saved.params.length} 个占位符）`,
       `参数：${saved.params.map((p) => `{{${p.name}}}`).join(' ') || '（没有占位符）'}`,
-      saved.ok ? '三项关键占位符齐全（prompt / width / height）。' : `缺：${saved.missing.map((m) => `{{${m}}}`).join('、')}`,
+      flags['no-activate'] ? '没有切换当前生图工作流（--no-activate）。' : '已设为当前生图工作流。',
+      saved.ok
+        ? saved.kind === 'edit'
+          ? '占位符齐全（{{prompt}} {{image}}）。'
+          : '三项关键占位符齐全（prompt / width / height）。'
+        : `缺：${saved.missing.map((m) => `{{${m}}}`).join('、')}`,
     ];
     for (const w of saved.warnings) lines.push(`  提醒：${w}`);
     return out({ ok: saved.ok, workflow: { name: saved.name, params: saved.params, missing: saved.missing, warnings: saved.warnings } }, lines.join('\n'));
@@ -326,9 +353,9 @@ async function cmdWorkflow() {
       result.error
         ? `解析失败：${result.error}`
         : [
-            `${wf.name}：${result.nodeCount} 个节点`,
+            `${wf.name}：${result.nodeCount} 个节点${result.kind === 'edit' ? '（修图）' : ''}`,
             `占位符：${result.params.map((p) => `{{${p.name}}}`).join(' ') || '（没有）'}`,
-            result.ok ? '可以直接生成。' : `缺：${result.missing.map((m) => `{{${m}}}`).join('、')}`,
+            result.ok ? (result.kind === 'edit' ? '可以修图。' : '可以直接生成。') : `缺：${result.missing.map((m) => `{{${m}}}`).join('、')}`,
             ...result.warnings.map((w) => `  提醒：${w}`),
           ].join('\n')
     );
@@ -624,6 +651,48 @@ async function cmdRender() {
   }
 }
 
+async function cmdEdit() {
+  const project = await needProject();
+  const page = await needPage(project);
+  const config = await readConfig(CONFIG_DIR);
+
+  if (flags['dry-run']) {
+    const prepared = await prepareEdit({ dir: DIR, configDir: CONFIG_DIR, project, page, config, opts: flags });
+    if (!prepared.ok) return fail(prepared.error, 'edit');
+    const graph = fillEdit(prepared, '<上传后的参考图>');
+    return out(
+      { ok: true, dryRun: true, workflow: prepared.workflow, base: prepared.base.id, prompt: prepared.prompt, values: prepared.values, graph },
+      [`会基于 ${prepared.base.id} 修图，工作流 ${prepared.workflow}`, `提示词：${prepared.prompt}`].join('\n')
+    );
+  }
+
+  const started = Date.now();
+  try {
+    const result = await editPage({
+      dir: DIR,
+      configDir: CONFIG_DIR,
+      slug: project.slug,
+      project,
+      page,
+      config,
+      opts: flags,
+      onProgress: (p) => {
+        if (!JSON_MODE && p?.max) process.stderr.write(`\r修图中 ${Math.round((p.value / p.max) * 100)}%   `);
+      },
+    });
+    if (!JSON_MODE) process.stderr.write('\r');
+    const human = [
+      `第 ${page.index} 页已修好（${Date.now() - started}ms，基于 ${result.base}）`,
+      `图片：${result.image}`,
+      `版本：${result.version.id}`,
+      `提示词：${result.prompt}`,
+    ].join('\n');
+    out({ ok: true, ...result }, human);
+  } catch (err) {
+    return fail(err.message, err.code || 'edit');
+  }
+}
+
 async function cmdChanges() {
   const since = flags.since !== undefined ? Number(flags.since) : undefined;
   const result = await changes(DIR, since);
@@ -741,7 +810,7 @@ function cmdHelp() {
     manga init [--comfy URL] [--ckpt NAME] [--workflow FILE] [--archive DIR]
     manga config get [键] | config set 键=值 ...
     manga workflow path                   打印工作流该放哪（配置根）
-    manga workflow save <文件> [--name default.json]
+    manga workflow save <文件> [--name default.json] [--no-activate]
     manga workflow check [--name default.json]
     manga workflow list | show
 
@@ -761,6 +830,7 @@ function cmdHelp() {
   出图
     manga compile --page N                       打印 Moss JSON 与校验
     manga render  --page N [--seed S] [--steps N] [--dry-run]
+    manga edit    --page N --prompt "把左上角气泡的尾巴删掉" [--seed S] [--dry-run]
     manga changes [--since N] | manga ack
 
   预览
@@ -782,6 +852,7 @@ const COMMANDS = {
   page: cmdPage,
   compile: cmdCompile,
   render: cmdRender,
+  edit: cmdEdit,
   changes: cmdChanges,
   ack: cmdAck,
   serve: cmdServe,

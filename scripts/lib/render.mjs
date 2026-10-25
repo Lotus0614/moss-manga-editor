@@ -3,7 +3,7 @@
 import { compilePage } from '../../core/compile.mjs';
 import { blocking } from '../../core/validate.mjs';
 import { comfyFromSettings } from './comfy.mjs';
-import { readWorkflow, buildValues, fillWorkflow } from './workflow.mjs';
+import { readWorkflow, buildValues, fillWorkflow, checkWorkflow } from './workflow.mjs';
 import { saveImage, addVersion } from './archive.mjs';
 
 export async function prepareRender({ dir, configDir = dir, project, page, config, opts = {} }) {
@@ -24,6 +24,16 @@ export async function prepareRender({ dir, configDir = dir, project, page, confi
     workflow = await readWorkflow(configDir, config.workflow.name);
   } catch (err) {
     return { ok: false, error: err.message, warnings: compiled.warnings };
+  }
+
+  // 修图工作流（带 {{image}}）喂不进生图：它没有 {{width}}/{{height}}，误配了要说清楚
+  const meta = checkWorkflow(workflow.raw);
+  if (meta.kind === 'edit') {
+    return {
+      ok: false,
+      error: `工作流 ${workflow.name} 是修图工作流（含 {{image}}），不能拿来生图；修图用 \`manga edit\``,
+      warnings: compiled.warnings,
+    };
   }
 
   // 取值：自动项覆盖一切；用户参数 项目 > 全局
@@ -64,6 +74,7 @@ export async function renderPage({ dir, configDir, slug, project, page, config, 
     image: stored.url,
     file: stored.file,
     hash: stored.hash,
+    kind: 'render',
     promptJson: prepared.compiled.json,
     seed: prepared.values.seed,
     width: prepared.values.width,

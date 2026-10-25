@@ -343,6 +343,18 @@ a { color: inherit; }
 .work-head .title { font-size: 12px; font-weight: 600; }
 .work-head .meta { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.12em; color: var(--mid); }
 
+/* 修图：贴在顶栏下面的一行，按需展开 */
+.edit-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: #fffdf6;
+}
+.edit-bar .input { flex: 1; min-width: 0; }
+.edit-bar .tip { font-size: 10.5px; color: var(--mid); white-space: nowrap; }
+
 .stage {
   flex: 1;
   min-height: 0;

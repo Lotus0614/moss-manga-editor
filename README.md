@@ -13,6 +13,10 @@
 - **网页可编辑**：拖版面、改台词、调透明度、缩放平移
 - **瑕疵可修**：另配一份编辑模型（Qwen Image Edit 之类）后，一句话改已经出好的图（气泡尾巴、多出来的手、糊掉的台词），结果存成新版本
 
+## 更新
+
+- **2026-10-25** 支持用 **Qwen Image 2.1** 编辑已出的漫画：编辑器里「生成」旁边多一个「修图」，写一句话就能改掉气泡尾巴、多出来的手指、糊掉的台词，结果存成新版本；命令行对应 `manga edit`。修图只做**不改大布局**的小修，改机位、换人、改分镜仍然重新生成。
+
 ## 快速开始
 
 把 `INSTALL.md` 发给 AI，它会按流程完成安装与配置。
@@ -36,20 +40,20 @@ scripts/         命令行
 web/             网页编辑器
 references/      格式、命令、工作流、漫画技巧
 INSTALL.md       安装步骤（可整份交给 AI 执行）
-AGENT.md         工作手册（画画流程与约定）
+AGENTS.md        入口：项目怎么运作、文档分工、画一页的流程
 ```
 
 ## 文档
 
 | 需要什么                                             | 看哪里                     |
 | ---------------------------------------------------- | -------------------------- |
-| 安装                                                 | `INSTALL.md`               |
-| 画一页的流程                                         | `AGENT.md`                 |
-| 页面 JSON 与坐标                                     | `references/FORMAT.md`     |
+| **入口**：项目怎么运作、文档分工、画一页的流程       | `AGENTS.md`                |
+| 页面 JSON、字段可用值、坐标、尺寸                     | `references/FORMAT.md`     |
+| 分镜版式、提示词写法、文字、排查                     | `references/TECHNIQUES.md` |
+| 成人向页面：构图、体位、**tag 词库**                 | `references/R18-MANGA.md`  |
 | 命令参数                                             | `references/CLI.md`        |
 | ComfyUI 工作流与占位符                               | `references/WORKFLOW.md`   |
-| 分镜版式、节奏、人物、背景                           | `references/TECHNIQUES.md` |
-| 成人向页面：构图、体位、**tag 词库**                 | `references/R18-MANGA.md`  |
+| 安装                                                 | `INSTALL.md`               |
 | MOSS 官方 Layout JSON 规范（一般情况不用读这个文档） | `references/MOSSS_LAYOUT.md` |
 
 ## 常用命令

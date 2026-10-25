@@ -140,7 +140,12 @@ manga page delete --page 3
 
 `--summary` 输出紧凑大纲（每格一行），不带 `--summary` 输出完整 JSON。**给 AI 看用 `--summary`**，省上下文。
 
-`page set` 的补丁规则见 `RECIPES.md`；越权改动会报 `scope` 错误：
+补丁规则：
+
+- `items` 里**带 `id` 的条目按 id 覆盖**，同 id 不会被复制；不带 `id` 的新增
+- `removeItems: ["pn_a", …]` 按 id 删除
+- 其余页面级字段直接覆盖（`id` 和 `rev` 不会变）
+- 越权改动会报 `scope` 错误（能不能改由 `config.editable.*` 决定）：
 
 ```json
 { "ok": false, "code": "scope", "error": "这些改动超出了允许范围（版面）：~ 格 pn_a 位置 ..." }
@@ -247,7 +252,12 @@ manga stop
 manga open [--port 5123]
 ```
 
-`serve` 是后台进程（pid 写在 `data/server.pid`），不占前台。用户改完页面刷新即可。
+`serve` 是后台进程（pid 写在 `data/server.pid`），不占前台，**幂等**：已经在跑时不会再起一个，
+只回报地址（`预览服务已经在跑：http://127.0.0.1:5123`）。所以「检查有没有启动」不需要别的命令，直接跑 `serve` 就行。
+
+`open` 只是把浏览器打开到该地址，不启动服务。`stop` 按端口找进程，`start.bat`、`serve` 起的都能关。
+
+默认端口 5123，占用时换 `--port`。地址固定是 `http://127.0.0.1:<port>`。
 
 ---
 

@@ -4,5 +4,5 @@ config/config.json
 config/workflows
 *.tmp
 .DS_Store
-
+tmp
 .dsh-write-test.txt

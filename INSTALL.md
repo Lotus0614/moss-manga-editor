@@ -62,7 +62,7 @@ node manga.mjs doctor          # 应该显示 ComfyUI 可连
 **这一步只要 JSON，别问参数。**
 
 > 「把 ComfyUI 里调好的工作流用『导出 (API)』存成 JSON，把文件路径或内容发我。
-> 如果装了 Qwen 的图片编辑模型，把那份编辑工作流也一起发我（可选）。」
+> 如果装了 Qwen Image 2.1 的图片编辑模型，强烈推荐把那份编辑工作流也一起发我（可选）。」
 
 拿到之后，先自己读一遍 JSON：顶层是 `节点 id → { class_type, inputs }` 才算 API 格式（不是 `nodes` / `links` 那种界面格式）。
 
@@ -81,9 +81,9 @@ node manga.mjs workflow check
 
 编辑模型（Qwen Image Edit 之类）只做一件事：**用一句话改已经出好的图**，不改大布局。它那份 JSON **只替换两处**，别的都别动（模型、尺寸、步数、超分全在工作流里）：
 
-| 位置 | 改成 |
-|---|---|
-| `LoadImage` 的 `image` | `{{image}}` |
+| 位置                           | 改成         |
+| ------------------------------ | ------------ |
+| `LoadImage` 的 `image`         | `{{image}}`  |
 | 提示词那个字符串节点的 `value` | `{{prompt}}` |
 
 ```bash
@@ -112,11 +112,11 @@ node manga.mjs workflow check --name edit.json    # 认作「修图工作流」�
 装好了。
 
 接下来你想怎么开始？
-A. 就在这个对话里开始画 —— 我会读 AGENT.md，按「构思剧情 → 分镜确认 → 出图 → 你改我重出」走
-B. 新开一个对话，把这个目录当工作区 —— 那边我同样按 AGENT.md 工作
+A. 就在这个对话里开始画 —— 我会读 AGENTS.md，按「构思剧情 → 分镜确认 → 出图 → 你改我重出」走
+B. 新开一个对话，把这个目录当工作区 —— 那边我同样按 AGENTS.md 工作
 C. 先看看界面 —— 双击 start.bat，或者我现在帮你跑 node manga.mjs serve
 ```
 
-- 选 **A** → 立刻读 `AGENT.md`，进入画漫画流程
+- 选 **A** → 立刻读 `AGENTS.md`，进入画漫画流程
 - 选 **B** → 到此为止，不要继续
 - 选 **C** → `node manga.mjs serve --open`，把 `http://127.0.0.1:5123` 给用户，并说明「你自己也能建项目、改页面，改完我重出」

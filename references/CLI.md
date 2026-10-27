@@ -191,7 +191,7 @@ manga render --page 3 [--seed 123] [--steps 20] [--cfg 5] [--dry-run] [--json]
 用编辑模型改**已经出好的图**：拿这一页的渲染图当参考图，一句中文指令，结果存成新版本。
 
 ```bash
-manga edit --page 5 --prompt "把左上角气泡的尾巴删掉" [--seed 123] [--dry-run] [--json]
+manga edit --page 5 --prompt "把左上角气泡的尾巴删掉" [--dry-run] [--json]
 manga edit --page 5 --prompt "把框里的气泡改成浅蓝色" --overlay marks.png --marks @marks.json
 ```
 
@@ -210,7 +210,7 @@ manga edit --page 5 --prompt "把框里的气泡改成浅蓝色" --overlay marks
 }
 ```
 
-- 前提：`config.edit.name` 指向一份编辑工作流（`{{prompt}}` + `{{image}}` + `{{seed}}`），见 `WORKFLOW.md` 的「修图工作流」；缺任何一个 `edit` 会直接拒绝，不是提醒。
+- 前提：`config.edit.name` 指向一份编辑工作流（见 `WORKFLOW.md` 的「修图工作流」，占位符由 `workflow check` 检查）；缺占位符时 `edit` 会直接拒绝，不是提醒。
 - 只做**不改大布局**的修改：气泡尾巴、多余的手指、糊掉的台词、删掉画面里某个物体、整页转黑白。改机位、换人、改分镜属于重新 `render`。
 - **多个改动写进同一句**：分两次修等于第二次拿改过的图再改，版式和画质会越修越偏。
 - **参考图是「当前采用的版本」**：渲染版、修图版都行。弹窗里会推荐从渲染版（vXXX）开始，连续在修图版上编辑会让版式和画质慢慢偏移。
@@ -218,8 +218,6 @@ manga edit --page 5 --prompt "把框里的气泡改成浅蓝色" --overlay marks
 - `--marks`：标记清单，如 `'[{"tool":"rect","color":"red"}]'`（`tool` = `rect`/`ellipse`/`brush`，`color` = `config/manga.mjs` 里 `EDIT.swatches` 的 `value`）。
   Windows 下引号容易被吃掉，写成 `--marks @marks.json` 从文件读。
 - `--dry-run` 打印最终整句提示词和填好的图，不提交。
-- 工作流里写了 `{{seed}}` 时 `--seed` 才有意义；**默认每次随机**。别把「生成这一版参考图时用的种子」再拿来修图——
-  同种子会把参考图复制一遍，输出明显发糊；要复现某一张才写死种子。
 - 失败时 `{ "ok": false, "code": "edit", "error": "..." }`。
 
 ---

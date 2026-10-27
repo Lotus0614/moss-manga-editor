@@ -10,7 +10,7 @@ import { buildEditPrompt, describeMarks } from '../../config/manga.mjs';
 import { checkWorkflow, saveWorkflow } from '../lib/workflow.mjs';
 import { ensureConfig, writeConfig, readConfig } from '../lib/config.mjs';
 import { ensureArchive, createProject, createPage, addVersion, getVersions, setCurrentVersion } from '../lib/archive.mjs';
-import { sourceVersion, prepareEdit, fillEdit, buildEditValues } from '../lib/edit.mjs';
+import { sourceVersion, recommendedVersion, prepareEdit, fillEdit, buildEditValues } from '../lib/edit.mjs';
 
 let passed = 0;
 const failures = [];
@@ -161,7 +161,7 @@ await test('切到别的版本后，修图以当前采用的版本为准', async
   assert.equal(picked.seed, 11);
 });
 
-await test('当前版是修图版时，退回它的基准渲染版（不在改过的图上再改）', async () => {
+await test('当前版是修图版时，照样从它出发（不再强制退回渲染版）', async () => {
   const store = await getVersions(dir, project.slug);
   const render = store.items.find((v) => v.seed === 11);
   const edit = await addVersion(dir, project.slug, {
@@ -174,13 +174,14 @@ await test('当前版是修图版时，退回它的基准渲染版（不在改�
   });
   await setCurrentVersion(dir, project.slug, page.id, edit.id);
   const picked = sourceVersion(await getVersions(dir, project.slug), page.id);
-  assert.equal(picked.id, render.id);
-  assert.equal(picked.kind, 'render');
+  assert.equal(picked.id, edit.id);
+  // 但推荐的那版仍然是渲染版，界面上据此提示
+  const recommend = recommendedVersion(await getVersions(dir, project.slug), page.id);
+  assert.equal(recommend.id, render.id);
 });
 
-await test('基准链断掉时也退回渲染版，不会拿修图版开刀', async () => {
+await test('基准链断掉时，推荐版本退回渲染版；编辑仍用当前那一版', async () => {
   const store = await getVersions(dir, project.slug);
-  const render = store.items.find((v) => v.seed === 22);
   const orphan = await addVersion(dir, project.slug, {
     page: page.id,
     pageIndex: 1,
@@ -190,14 +191,16 @@ await test('基准链断掉时也退回渲染版，不会拿修图版开刀', as
     editPrompt: '改歪的版本',
   });
   await setCurrentVersion(dir, project.slug, page.id, orphan.id);
-  const picked = sourceVersion(await getVersions(dir, project.slug), page.id);
-  assert.equal(picked.kind, 'render');
-  assert.ok([render.id, store.items.find((v) => v.seed === 11).id].includes(picked.id));
+  const store2 = await getVersions(dir, project.slug);
+  assert.equal(sourceVersion(store2, page.id).id, orphan.id);
+  const recommend = recommendedVersion(store2, page.id);
+  assert.equal(recommend.kind, 'render');
+  assert.ok([store.items.find((v) => v.seed === 11).id, store.items.find((v) => v.seed === 22).id].includes(recommend.id));
 });
 
-await test('整页只有修图版时，明说没有可用的基准', async () => {
+await test('整页只有修图版时，也能修（推荐版本就是它自己）', async () => {
   const lonely = await createPage(dir, project.slug, { title: '只有修图版' });
-  await addVersion(dir, project.slug, {
+  const only = await addVersion(dir, project.slug, {
     page: lonely.page.id,
     pageIndex: lonely.page.index,
     image: '/media/x/only-edit.png',
@@ -213,8 +216,9 @@ await test('整页只有修图版时，明说没有可用的基准', async () =>
     config: { edit: { name: 'edit.json' } },
     opts: { prompt: '删掉尾巴' },
   });
-  assert.equal(got.ok, false);
-  assert.match(got.error, /没有可当基准的渲染图/);
+  assert.equal(got.ok, true);
+  assert.equal(got.base.id, only.id);
+  assert.equal(recommendedVersion(await getVersions(dir, project.slug), lonely.page.id).id, only.id);
 });
 
 await test('fillEdit 把参考图写成 LoadImage 的 image', () => {

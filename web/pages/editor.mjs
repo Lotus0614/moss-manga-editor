@@ -61,6 +61,8 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const [versions, setVersions] = useState([]);
   // 修图真正会拿来当参考的那一版（永远是渲染版，由服务端算好）
   const [editBase, setEditBase] = useState(null);
+  // 推荐从哪一版改（渲染版），只是提示
+  const [editRecommend, setEditRecommend] = useState(null);
   const [current, setCurrent] = useState('');
   const [selection, setSelection] = useState(null);
   const [tab, setTab] = useState('prompt');
@@ -134,6 +136,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         setVersions(data.versions || []);
         setCurrent(data.current || '');
         setEditBase(data.editBase || null);
+        setEditRecommend(data.editRecommend || null);
         setApp({ page: data.page });
         setSelection(null);
         history.current = [];
@@ -280,6 +283,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         setVersions(data.versions || []);
         setCurrent(data.current || '');
         setEditBase(data.editBase || null);
+        setEditRecommend(data.editRecommend || null);
       })
       .catch(() => {});
   }
@@ -299,6 +303,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         setVersions(data.versions || []);
         setCurrent(data.current || '');
         setEditBase(data.editBase || null);
+        setEditRecommend(data.editRecommend || null);
       })
       .catch(() => {});
   }
@@ -830,7 +835,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     <${EditModal}
       open=${editOpen}
       base=${editBase}
-      current=${current}
+      recommended=${editRecommend}
       busy=${editing}
       progress=${gen?.progress || 0}
       onClose=${() => setEditOpen(false)}

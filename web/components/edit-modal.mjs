@@ -9,7 +9,7 @@ import { EDIT } from '../../config/manga.mjs';
 
 const firstSwatch = (EDIT.swatches || [])[0] || { value: 'red', hex: '#e11d48' };
 
-export default function EditModal({ open, base, current, busy, progress, onClose, onStart }) {
+export default function EditModal({ open, base, recommended, busy, progress, onClose, onStart }) {
   const [tool, setTool] = useState(EDIT.tools[0]?.value || 'rect');
   const [paint, setPaint] = useState({ value: firstSwatch.value, hex: firstSwatch.hex });
   const [size, setSize] = useState(6);
@@ -238,8 +238,10 @@ export default function EditModal({ open, base, current, busy, progress, onClose
         </div>
 
         <div class="edit-hint hint">
-          ${base?.id && current && base.id !== current
-            ? html`当前采用的是 ${current}（修图版），修图仍从渲染版 ${base.id} 出发；<br />`
+          ${recommended
+            ? html`${base?.id && base.id !== recommended.id
+                ? `当前编辑的是 ${base.id}${base.kind === 'edit' ? '（修图版）' : ''}。`
+                : ''}推荐使用 ${recommended.id} 进行编辑，多次编辑可能导致图像偏移。<br />`
             : null}
           在图上框出要改的地方（不框 = 整页），然后写一句要改什么。涂鸦只是给模型指位置，不会留在成品里。
         </div>

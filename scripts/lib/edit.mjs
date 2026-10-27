@@ -15,11 +15,20 @@ import { getVersions, currentOf, imageBytes, saveImage, addVersion } from './arc
 /** 编辑工作流必须提供的两个占位符：参考图 + 指令 */
 export const EDIT_PARAMS = ['prompt', 'image'];
 
-/**
- * 拿来当参考图的版本：当前采用的渲染版；当前是修图版时顺着 base 退回去。
- * 修图永远从渲染图出发——在改过的图上再改，版式和画质会一次次跑偏。
- */
+/** 拿来当参考图的版本：就是当前采用的那一版（渲染版、修图版都行） */
 export function sourceVersion(store, pageId) {
+  const items = (store?.items || []).filter((v) => v.page === pageId);
+  if (!items.length) return null;
+  const current = currentOf(store, pageId);
+  return items.find((v) => v.id === current) || items[items.length - 1];
+}
+
+/**
+ * 推荐拿来当参考图的那一版：顺着 base 一路退回渲染版。
+ * 只是「建议」——在改过的图上接着改会让版式和画质越跑越偏，所以界面上提示一下，
+ * 但不再强制，用户想从哪一版改就从哪一版改。
+ */
+export function recommendedVersion(store, pageId) {
   const items = (store?.items || []).filter((v) => v.page === pageId);
   if (!items.length) return null;
   const current = currentOf(store, pageId);
@@ -33,8 +42,8 @@ export function sourceVersion(store, pageId) {
     seen.add(base.id);
     base = base.base ? byId.get(base.base) : null;
   }
-  // 基准链断了（老数据没有 base）：退回这一页最早那版渲染
-  return base && base.kind !== 'edit' ? base : items.find((v) => v.kind !== 'edit') || null;
+  // 基准链断了（老数据没有 base）：退回这一页最早那版渲染；一版渲染都没有就只能推荐当前这版
+  return base && base.kind !== 'edit' ? base : items.find((v) => v.kind !== 'edit') || picked;
 }
 
 /** 提交给工作流的取值：用户参数（项目 > 全局）再叠自动项 */
@@ -69,13 +78,7 @@ export async function prepareEdit({ dir, configDir, project, page, config, opts 
   const store = await getVersions(dir, project.slug);
   const base = sourceVersion(store, page.id);
   if (!base) {
-    const hasAny = (store?.items || []).some((v) => v.page === page.id);
-    return {
-      ok: false,
-      error: hasAny
-        ? '这一页没有可当基准的渲染图（修图不从改过的图出发）：重新 `manga render --page N` 出一版再修'
-        : '这一页还没有图：先在网页点「生成」，或用 `manga render` 出一版，修图是改现成的图',
-    };
+    return { ok: false, error: '这一页还没有图：先在网页点「生成」，或用 `manga render` 出一版，修图是改现成的图' };
   }
 
   const marks = Array.isArray(opts.marks) ? opts.marks : [];

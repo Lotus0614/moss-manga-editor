@@ -33,7 +33,7 @@ import {
 } from './scripts/lib/archive.mjs';
 import { listWorkflows, readWorkflow, saveWorkflow, checkWorkflow } from './scripts/lib/workflow.mjs';
 import { renderPage } from './scripts/lib/render.mjs';
-import { editPage, sourceVersion } from './scripts/lib/edit.mjs';
+import { editPage, sourceVersion, recommendedVersion } from './scripts/lib/edit.mjs';
 import { compilePage } from './core/compile.mjs';
 import { normalizeCharacters } from './core/characters.mjs';
 import { createPanelItem } from './core/manga-doc.mjs';
@@ -467,13 +467,15 @@ async function route(req, res, url) {
       if (method === 'GET') {
         const store = await getVersions(ARCHIVE, slug);
         const items = store.items.filter((v) => v.page === page.id);
-        // 修图要基于「渲染图」：这一页真正会被拿来当参考的那一版
+        // 修图用「当前采用的那一版」；另外给一个「推荐从哪版改」的提示（渲染版）
         const base = sourceVersion(store, page.id);
+        const recommend = recommendedVersion(store, page.id);
         return json(res, 200, {
           page,
           versions: items,
           current: currentOf(store, page.id),
-          editBase: base ? { id: base.id, image: base.image } : null,
+          editBase: base ? { id: base.id, image: base.image, kind: base.kind || 'render' } : null,
+          editRecommend: recommend ? { id: recommend.id, image: recommend.image } : null,
         });
       }
       if (method === 'PUT') {

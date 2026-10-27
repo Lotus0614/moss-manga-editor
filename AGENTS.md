@@ -24,6 +24,7 @@ JSON，`render` 发给 ComfyUI 出图；出完可以在网页里拖、在历史�
 | --- | --- | --- |
 | `references/FORMAT.md` | **格式**：存档目录、`project.json` / `page.json` 每个字段的可用值、坐标、尺寸、校验规则 | 写或改页面 JSON 之前 |
 | `references/TECHNIQUES.md` | **生成经验**：`scene` 怎么搭、`desc` 怎么写、版式、语序、文字、画错了怎么调 | 想分镜、写提示词时（主力文档） |
+| `references/HAIR.md` | **发型 tag 词库**：131 个发型词按用途分组 + A–Z + 别名对照 | 定角色 `look`、要「同一个人」跨页一致时 |
 | `references/R18-MANGA.md` | 成人向专章：满版、嵌格、同格双视角、体位与 **tag 词库** | 画 R18 页面时先读这份 |
 | `references/CLI.md` | 命令参数、返回结构、退出码 | 不确定命令怎么用时查 |
 | `references/WORKFLOW.md` | 接入 / 更换 ComfyUI 工作流、占位符、报错对照 | 换工作流或出图报错时 |

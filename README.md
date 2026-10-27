@@ -50,6 +50,7 @@ AGENTS.md        入口：项目怎么运作、文档分工、画一页的流程
 | **入口**：项目怎么运作、文档分工、画一页的流程       | `AGENTS.md`                |
 | 页面 JSON、字段可用值、坐标、尺寸                     | `references/FORMAT.md`     |
 | 分镜版式、提示词写法、文字、排查                     | `references/TECHNIQUES.md` |
+| 发型 tag 词库（人物一致性的锚点）                    | `references/HAIR.md`       |
 | 成人向页面：构图、体位、**tag 词库**                 | `references/R18-MANGA.md`  |
 | 命令参数                                             | `references/CLI.md`        |
 | ComfyUI 工作流与占位符                               | `references/WORKFLOW.md`   |

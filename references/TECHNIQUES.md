@@ -378,22 +378,19 @@ Clothes: grey zip hoodie worn open (open hoodie), white ribbed camisole (white c
 
 #### 发型词库
 
+完整的 131 个 tag（按用途分组 + A–Z 索引 + 别名对照）在 **`references/HAIR.md`**——要挑发型就去那儿翻，
+常用的几组直接抄：
+
 | 用途 | tag |
 | --- | --- |
-| 长度与基本形态 | `long hair` `medium hair` `short hair` `big hair` `hair down` `hair up` `hair pulled back` |
-| 马尾 | `ponytail` `side ponytail` `high ponytail` `short ponytail` `braided ponytail` `two side up` `one side up` |
-| 双马尾 | `twintails` `high twintails` `low twintails` `pigtails` `bunches` |
-| 辫子 | `braid` `twin braids` `french braid` `dutch braid` `cornrows` `braided bangs` |
-| 丸子与盘发 | `hair bun` `double buns` `single hair bun` `top knot` `topknot` `chignon` `updo` `beehive hairdo` `nihongami` `japari bun` |
-| 刘海 | `bangs` `blunt bangs` `side blunt bangs` `swept bangs` `side swept bangs` `asymmetric bangs` `crossed bangs` `centre parting bangs` `double parted bangs` `air bangs` `bangs pinned back` |
-| 质感 | `straight hair` `wavy hair` `curly hair` `fluffy hair` `flipped hair` `ringlets` `drill hair` `twin drills` `coil hair` `shag` `perm` `disheveled hair` |
-| 鬓角与细节 | `sidelocks` `curly sidelocks` `hair behind ear` `hair around ear` `hair over shoulder` `hair half over shoulder` `hair intakes` `hair wings` `stray hair` `ahoge` `antenna hair` `hair between eyes` `hair flaps` `detached hair` |
-| 遮脸（只在特写用） | `hair over eyes` `hair over one eye` `hair over face` `hair over mouth` `eyebrows hidden by hair` `hair in mouth` |
-| 造型变化 | `hair undone` `hair half undone` `asymmetrical hair` `shag` `hair spread out` |
-| 夸张造型 | `afro` `mohawk` `pompadour` `bowl cut` `quiff` `fade (haircut)` `heart hair` `food themed hair` `flower shaped hair` `bow shaped hair` `cloud hair` `tall hair` `helicopter hair` `hair ears` `hair tattoo` `hair on horn` `hair between horns` `hair through headwear` |
+| 长度与基本形态 | `long hair` `medium hair` `short hair` `hair down` `hair up` `hair pulled back` `hime cut` |
+| 马尾 / 双马尾 | `ponytail` `high ponytail` `side ponytail` `twintails` `high twintails` `pigtails` |
+| 辫子 / 盘发 | `braid` `twin braids` `french braid` `hair bun` `double buns` `topknot` `chignon` `updo` |
+| 刘海 | `bangs` `blunt bangs` `side swept bangs` `asymmetric bangs` `centre parting bangs` `air bangs` |
+| 质感 | `straight hair` `wavy hair` `curly hair` `fluffy hair` `drill hair` `perm` `disheveled hair` |
+| 鬓角与细节 | `sidelocks` `hair behind ear` `hair over shoulder` `ahoge` `hair between eyes` `stray hair` |
 
-这批词是从 ComfyUI 的「随机提示词」模板（category = `头发造型`）抽 240 条去重来的，都是 Danbooru 的写法，
-可以直接抄进 `look`。同一个造型在库里常有别名（`ponytail` / `pony tail`、`twin braids` / `twin drills`），
+同一个造型在库里常有别名（`ponytail` / `pony tail`、`twin braids` / `twin drills`），
 **一个人只准用一个写法**——别名混用是「同一个人画成两个」最常见的原因。
 
 ### 三条反直觉的经验

@@ -353,6 +353,49 @@ Clothes: grey zip hoodie worn open (open hoodie), white ribbed camisole (white c
 分格复述：角色格子里的 `desc` 只写位置和姿势（`inside PANEL ONE only, kneeling`），
 外貌不要重复——已经由角色表自动带进 summary 了。
 
+### 发型：最稳的锚点（附词库）
+
+衣服会换、表情会变、机位会换，**只有发型不变**——它是模型判断「这是同一个人」最稳的依据。所以：
+
+1. `look` 里固定写 **2–3 个 tag**：长度 + 造型 + 一个癖性（刘海 / 呆毛 / 发饰），之后每页都用**同一串字面**。
+   `ponytail` 写成 `side ponytail`、`twin braids` 写成 `braid`，在模型眼里就是换了个人。
+2. 不在 `character.desc` 里重写发型（外貌只写一次）。这一格确实变了（湿发、被风吹乱、扎起来）才写，
+   并且 `desc` 开头加 `!`，让这一格不进本页角色表。
+3. 长发容易糊住画面：`hair behind ear`、`hair over shoulder`、`hair pulled back` 能保住脸又不挡动作。
+   `hair up` 是**换发型**，不是「把头发撩起来」。
+4. 遮脸 tag（`hair over eyes`、`hair over face`、`bangs pinned back`）只在特写里用，正脸格用了就认不出人。
+5. 凌乱/汗湿用 `disheveled hair`、`hair undone`；一扎起来（`hair up`、`ponytail`）就是另一个角色了。
+
+常用组合，照抄（除了词序不要改字面）：
+
+| 人设 | `look` 里的发型串 |
+| --- | --- |
+| 黑长直 | `long straight hair, side blunt bangs, hair behind ear` |
+| 高马尾、运动系 | `high ponytail, side swept bangs, sidelocks` |
+| 双马尾 | `high twintails, air bangs, hair between eyes` |
+| 披发 | `hair down, centre parting bangs, hair over shoulder` |
+| 盘发 | `chignon, swept bangs, hair behind ear` |
+
+#### 发型词库
+
+| 用途 | tag |
+| --- | --- |
+| 长度与基本形态 | `long hair` `medium hair` `short hair` `big hair` `hair down` `hair up` `hair pulled back` |
+| 马尾 | `ponytail` `side ponytail` `high ponytail` `short ponytail` `braided ponytail` `two side up` `one side up` |
+| 双马尾 | `twintails` `high twintails` `low twintails` `pigtails` `bunches` |
+| 辫子 | `braid` `twin braids` `french braid` `dutch braid` `cornrows` `braided bangs` |
+| 丸子与盘发 | `hair bun` `double buns` `single hair bun` `top knot` `topknot` `chignon` `updo` `beehive hairdo` `nihongami` `japari bun` |
+| 刘海 | `bangs` `blunt bangs` `side blunt bangs` `swept bangs` `side swept bangs` `asymmetric bangs` `crossed bangs` `centre parting bangs` `double parted bangs` `air bangs` `bangs pinned back` |
+| 质感 | `straight hair` `wavy hair` `curly hair` `fluffy hair` `flipped hair` `ringlets` `drill hair` `twin drills` `coil hair` `shag` `perm` `disheveled hair` |
+| 鬓角与细节 | `sidelocks` `curly sidelocks` `hair behind ear` `hair around ear` `hair over shoulder` `hair half over shoulder` `hair intakes` `hair wings` `stray hair` `ahoge` `antenna hair` `hair between eyes` `hair flaps` `detached hair` |
+| 遮脸（只在特写用） | `hair over eyes` `hair over one eye` `hair over face` `hair over mouth` `eyebrows hidden by hair` `hair in mouth` |
+| 造型变化 | `hair undone` `hair half undone` `asymmetrical hair` `shag` `hair spread out` |
+| 夸张造型 | `afro` `mohawk` `pompadour` `bowl cut` `quiff` `fade (haircut)` `heart hair` `food themed hair` `flower shaped hair` `bow shaped hair` `cloud hair` `tall hair` `helicopter hair` `hair ears` `hair tattoo` `hair on horn` `hair between horns` `hair through headwear` |
+
+这批词是从 ComfyUI 的「随机提示词」模板（category = `头发造型`）抽 240 条去重来的，都是 Danbooru 的写法，
+可以直接抄进 `look`。同一个造型在库里常有别名（`ponytail` / `pony tail`、`twin braids` / `twin drills`），
+**一个人只准用一个写法**——别名混用是「同一个人画成两个」最常见的原因。
+
 ### 三条反直觉的经验
 
 1. **否定服装描述会反效果。**写 `NO white collar`，模型会画出一个白领子。

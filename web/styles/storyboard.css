@@ -356,7 +356,9 @@ a { color: inherit; }
 }
 .edit-canvas {
   position: relative;
+  justify-self: center; /* 网格子项默认会被拉满，图就偏左了 */
   align-self: center;
+  width: fit-content;
   line-height: 0;
   max-width: 100%;
   border: 1px solid var(--ink);

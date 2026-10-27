@@ -55,10 +55,14 @@ export default function EditModal({ open, base, busy, progress, onClose, onStart
   const hex = paint.hex;
   const rendering = Boolean(busy);
 
-  /** 屏幕坐标 → 图片像素坐标 */
+  /**
+   * 屏幕坐标 → 图片像素坐标。
+   * 量的是 <img> 的盒子而不是 <svg> 的：SVG 是绝对定位铺满容器的，
+   * 容器哪怕比图宽一点，按 SVG 量就会把笔迹横向拉伸/偏移（左边画跑右边）。
+   */
   function toImage(event) {
-    const box = svgRef.current?.getBoundingClientRect();
-    if (!box || !natural.w) return null;
+    const box = imgRef.current?.getBoundingClientRect();
+    if (!box || !box.width || !natural.w) return null;
     const x = ((event.clientX - box.left) / box.width) * natural.w;
     const y = ((event.clientY - box.top) / box.height) * natural.h;
     return [Math.round(Math.max(0, Math.min(natural.w, x))), Math.round(Math.max(0, Math.min(natural.h, y)))];

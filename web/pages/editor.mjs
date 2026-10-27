@@ -23,6 +23,7 @@ import PagePanel from '../components/page-panel.mjs';
 import ItemForm from '../components/item-form.mjs';
 import { TYPES, itemType } from '../../config/manga.mjs';
 import { PromptPanel, HistoryPanel, ChangesPanel } from '../components/workbench.mjs';
+import EditModal from '../components/edit-modal.mjs';
 import { exportLongImage, exportPdf } from '../components/export.mjs';
 import { compilePage } from '../../core/compile.mjs';
 import { createItem } from '../../core/manga-doc.mjs';
@@ -58,6 +59,8 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const [pagesLoaded, setPagesLoaded] = useState(false);
   const [page, setPage] = useState(null);
   const [versions, setVersions] = useState([]);
+  // 修图真正会拿来当参考的那一版（永远是渲染版，由服务端算好）
+  const [editBase, setEditBase] = useState(null);
   const [current, setCurrent] = useState('');
   const [selection, setSelection] = useState(null);
   const [tab, setTab] = useState('prompt');
@@ -72,15 +75,12 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
   const [changes, setChanges] = useState(null);
   const [showExport, setShowExport] = useState(false);
   const [exporting, setExporting] = useState('');
-  // 修图：点「修图」才展开输入框；没配修图工作流时按钮不出现
+  // 修图：点按钮开弹窗，弹窗里画框/涂鸦 + 写指令
   const [editOpen, setEditOpen] = useState(false);
-  const [editText, setEditText] = useState('');
-  const [editBarH, setEditBarH] = useState(0);
   // 外部改动来了但手上有未保存的编辑 → 先提示，不覆盖
   const [external, setExternal] = useState('');
 
   const stageRef = useRef(null);
-  const editBarRef = useRef(null);
   const pageRef = useRef(null);
   const saveTimer = useRef(null);
   const dirtyRef = useRef(false);
@@ -133,6 +133,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         pageRef.current = data.page;
         setVersions(data.versions || []);
         setCurrent(data.current || '');
+        setEditBase(data.editBase || null);
         setApp({ page: data.page });
         setSelection(null);
         history.current = [];
@@ -172,20 +173,6 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     return () => ro.disconnect();
   }, [page?.size?.[0], page?.size?.[1], page]);
 
-  // 修图输入条把画布往下顶，右上角的缩放条得跟着让位（量实际高度，别估）
-  useEffect(() => {
-    const el = editBarRef.current;
-    if (!el) {
-      setEditBarH(0);
-      return;
-    }
-    const fit = () => setEditBarH(el.offsetHeight);
-    fit();
-    const ro = new ResizeObserver(fit);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [editOpen]);
-
   useEffect(() => {
     const es = new EventSource('/api/jobs/stream');
     es.addEventListener('job', (event) => {
@@ -202,6 +189,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
       setGen(job);
       if (job.status === 'done') {
         setBusyGen(false);
+        if (job.kind === 'edit') setEditOpen(false);
         toast(job.kind === 'edit' ? '修图完成' : '生成完成');
         reloadPage(cur.id);
         refreshPages();
@@ -292,6 +280,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         pageRef.current = data.page;
         setVersions(data.versions || []);
         setCurrent(data.current || '');
+        setEditBase(data.editBase || null);
       })
       .catch(() => {});
   }
@@ -457,23 +446,18 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     }
   }
 
-  /** 修图：把这一页当前那一版交给编辑模型，改完存新版本 */
-  async function editImage() {
-    const request = editText.trim();
+  /** 修图：弹窗里框好区域、写好指令，交给编辑模型，改完存新版本 */
+  async function startEdit({ prompt: request, overlay, marks }) {
     if (!page || !request || generating) return;
-    if (!config?.edit?.name) {
-      toast('还没有修图工作流：在设置里选一份 Qwen 编辑工作流', 'bad');
-      onOpenSettings?.();
-      return;
-    }
     setBusyGen(true);
     try {
-      const res = await apiPost(`/api/projects/${projectId}/pages/${page.id}/edit`, { prompt: request });
+      const res = await apiPost(`/api/projects/${projectId}/pages/${page.id}/edit`, {
+        prompt: request,
+        ...(overlay ? { overlay, marks } : {}),
+      });
       const started = { page: page.id, kind: 'edit', status: 'running', progress: 0, id: res.jobId, prompt: request };
       jobsRef.current[page.id] = started;
       setGen(started);
-      setEditText('');
-      setEditOpen(false);
     } catch (err) {
       setBusyGen(false);
       toast(err.message, 'bad');
@@ -666,10 +650,10 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         <button class="btn ghost" onClick=${() => setShowExport(true)}>导出</button>
         ${canEdit
           ? html`<button
-              class=${cls('btn', editOpen && 'ghost')}
-              disabled=${generating || !image}
-              title="用编辑模型改这一版图；只做不改大布局的小修改"
-              onClick=${() => setEditOpen((v) => !v)}
+              class="btn"
+              disabled=${generating || !editBase}
+              title=${editBase ? `修 v${String(editBase.id).replace(/^v/, '')} 这一版（弹出涂鸦框选）` : '这一页还没有渲染图'}
+              onClick=${() => setEditOpen(true)}
             >
               ${editing ? `修图中 ${gen?.progress || 0}%` : '修图'}
             </button>`
@@ -678,29 +662,6 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
           ${generating && !editing ? `生成中 ${gen?.progress || 0}%` : '生成'}
         </button>
       </div>
-
-      ${editOpen
-        ? html`<div class="edit-bar" ref=${editBarRef}>
-            <span class="tip">修图</span>
-            <input
-              class="input"
-              value=${editText}
-              placeholder="要改什么，比如：把左上角气泡的尾巴删掉 / 把第三格多出来的手去掉"
-              onInput=${(e) => setEditText(e.currentTarget.value)}
-              onKeyDown=${(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  editImage();
-                }
-                if (e.key === 'Escape') setEditOpen(false);
-              }}
-            />
-            <button class="btn inv" disabled=${!editText.trim() || generating} onClick=${editImage}>
-              ${editing ? `修图中 ${gen?.progress || 0}%` : '开始修'}
-            </button>
-            <button class="btn ghost" onClick=${() => { setEditOpen(false); setEditText(''); }}>取消</button>
-          </div>`
-        : null}
 
       <div
         class="stage"
@@ -758,7 +719,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
         <span><span class="k">Ctrl</span><span class="k">Z</span>撤销</span>
         <span><span class="k">Del</span>删除</span>
       </div>
-      <div class="canvas-ctrl top" style=${`top:${44 + editBarH}px`}>
+      <div class="canvas-ctrl top">
         <input type="range" min="0.5" max="3" step="0.05" value=${zoom} title="缩放" style="width:90px" onInput=${(e) => setZoom(Number(e.currentTarget.value))} />
         <button class="icon-btn" title="适应画布" onClick=${() => setZoom(1)}>
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6">
@@ -845,6 +806,15 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
           </div>
         </div>`
       : null}
+
+    <${EditModal}
+      open=${editOpen}
+      base=${editBase}
+      busy=${editing}
+      progress=${gen?.progress || 0}
+      onClose=${() => setEditOpen(false)}
+      onStart=${startEdit}
+    />
   </div>`;
 
   // ---------------------------------------------------------------- 页面属性

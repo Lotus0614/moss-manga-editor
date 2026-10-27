@@ -78,7 +78,8 @@ export async function prepareEdit({ dir, configDir, project, page, config, opts 
     };
   }
 
-  const prompt = buildEditPrompt({ request: opts.prompt });
+  const marks = Array.isArray(opts.marks) ? opts.marks : [];
+  const prompt = buildEditPrompt({ request: opts.prompt, marks });
   if (!prompt) return { ok: false, error: '写一句要改什么：manga edit --page 3 --prompt "把左上角气泡的尾巴删掉"' };
 
   let workflow;
@@ -101,7 +102,7 @@ export async function prepareEdit({ dir, configDir, project, page, config, opts 
 
   const values = buildEditValues({ page, config, project, prompt, seed: opts.seed, image: '' });
   // 工作流没写 {{seed}} 时种子是写死的，记一个没用上的随机数只会误导
-  return { ok: true, workflow: workflow.name, raw: workflow.raw, base, prompt, values, seedParam: names.has('seed') };
+  return { ok: true, workflow: workflow.name, raw: workflow.raw, base, prompt, values, marks, seedParam: names.has('seed') };
 }
 
 /** 把参考图的名字填进图里（--dry-run 用一个占位名字，正式提交用上传后的路径） */
@@ -114,10 +115,16 @@ export async function editPage({ dir, configDir, slug, project, page, config, op
   if (!prepared.ok) throw Object.assign(new Error(prepared.error), { code: 'edit' });
 
   const client = comfyFromSettings(config);
-  const buffer = await imageBytes(dir, slug, prepared.base.file);
-  const ext = (prepared.base.file.split('.').pop() || 'png').toLowerCase();
+  // 涂鸦图（画好标记的那张）由调用方给；没有就用这一版的渲染图
+  const overlay = Buffer.isBuffer(opts.overlay) && opts.overlay.length ? opts.overlay : null;
+  const buffer = overlay || (await imageBytes(dir, slug, prepared.base.file));
+  const ext = overlay
+    ? String(opts.overlayExt || 'png').toLowerCase()
+    : (prepared.base.file.split('.').pop() || 'png').toLowerCase();
   const hash = createHash('sha256').update(buffer).digest('hex').slice(0, 12);
   const image = await client.uploadImage(buffer, `moss_edit_${hash}.${ext}`);
+  // 涂鸦图存一份进存档：出问题能回看当时标的是哪块
+  const marksStore = overlay ? await saveImage(dir, slug, overlay, ext) : null;
 
   const graph = fillEdit(prepared, image);
   const result = await client.run(graph, {
@@ -143,6 +150,7 @@ export async function editPage({ dir, configDir, slug, project, page, config, op
     editPrompt: String(opts.prompt || '').trim(),
     prompt: prepared.prompt,
     ...(prepared.seedParam ? { seed: prepared.values.seed } : {}),
+    ...(marksStore ? { overlay: marksStore.url, marks: prepared.marks } : {}),
     workflow: prepared.workflow,
     comfyPromptId: result.promptId,
     ms: result.ms,

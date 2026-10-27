@@ -656,12 +656,34 @@ async function cmdEdit() {
   const page = await needPage(project);
   const config = await readConfig(CONFIG_DIR);
 
+  const opts = { ...flags };
+  // 涂鸦图：网页里画好的那张整页图，直接当参考图喂进去
+  if (flags.overlay) {
+    try {
+      opts.overlay = await readFile(resolve(String(flags.overlay)));
+      opts.overlayExt = (String(flags.overlay).split('.').pop() || 'png').toLowerCase();
+    } catch (err) {
+      return fail(`读不到涂鸦图 ${flags.overlay}：${err.message}`, 'edit');
+    }
+  }
+  if (flags.marks) {
+    // 标记是一段 JSON，Windows 下直接写在命令行里引号很容易被吃掉：支持 --marks @文件
+    try {
+      const raw = String(flags.marks).startsWith('@')
+        ? await readFile(resolve(String(flags.marks).slice(1)), 'utf8')
+        : String(flags.marks);
+      opts.marks = JSON.parse(raw);
+    } catch {
+      return fail('--marks 要写成 JSON，例如 \'[{"tool":"rect","color":"red"}]\'，或 --marks @marks.json', 'edit');
+    }
+  }
+
   if (flags['dry-run']) {
-    const prepared = await prepareEdit({ dir: DIR, configDir: CONFIG_DIR, project, page, config, opts: flags });
+    const prepared = await prepareEdit({ dir: DIR, configDir: CONFIG_DIR, project, page, config, opts });
     if (!prepared.ok) return fail(prepared.error, 'edit');
     const graph = fillEdit(prepared, '<上传后的参考图>');
     return out(
-      { ok: true, dryRun: true, workflow: prepared.workflow, base: prepared.base.id, prompt: prepared.prompt, values: prepared.values, graph },
+      { ok: true, dryRun: true, workflow: prepared.workflow, base: prepared.base.id, prompt: prepared.prompt, marks: prepared.marks, values: prepared.values, graph },
       [`会基于 ${prepared.base.id} 修图，工作流 ${prepared.workflow}`, `提示词：${prepared.prompt}`].join('\n')
     );
   }
@@ -675,7 +697,7 @@ async function cmdEdit() {
       project,
       page,
       config,
-      opts: flags,
+      opts,
       onProgress: (p) => {
         if (!JSON_MODE && p?.max) process.stderr.write(`\r修图中 ${Math.round((p.value / p.max) * 100)}%   `);
       },

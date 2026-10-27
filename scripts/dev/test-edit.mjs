@@ -6,7 +6,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { buildEditPrompt } from '../../config/manga.mjs';
+import { buildEditPrompt, describeMarks } from '../../config/manga.mjs';
 import { checkWorkflow, saveWorkflow } from '../lib/workflow.mjs';
 import { ensureConfig, writeConfig, readConfig } from '../lib/config.mjs';
 import { ensureArchive, createProject, createPage, addVersion, getVersions, setCurrentVersion } from '../lib/archive.mjs';
@@ -37,6 +37,25 @@ await test('修图提示词只包一层「别动别处」', () => {
 await test('空请求返回空串（由调用方报错）', () => {
   assert.equal(buildEditPrompt({ request: '   ' }), '');
   assert.equal(buildEditPrompt({}), '');
+});
+
+await test('画了标记就说明「只改标出来的地方」', () => {
+  const got = buildEditPrompt({ request: '把气泡尾巴删掉', marks: [{ tool: 'rect', color: 'red' }] });
+  assert.ok(got.includes('只改图中红色方框标出来的地方'));
+  assert.ok(got.includes('不要把标记画进画面'));
+});
+
+await test('多个标记、重复标记都能收成一句话', () => {
+  assert.equal(describeMarks([]), '');
+  assert.equal(
+    describeMarks([
+      { tool: 'rect', color: 'red' },
+      { tool: 'brush', color: 'blue' },
+      { tool: 'rect', color: 'red' },
+    ]),
+    '红色方框和蓝色涂鸦'
+  );
+  assert.equal(describeMarks([{ tool: 'ellipse', color: 'nope' }]), '彩色圆圈');
 });
 
 // ---------------------------------------------------------------- 工作流识别
@@ -117,6 +136,21 @@ await test('默认拿该页最新一版当参考图，取页面尺寸', async ()
   assert.equal(got.values.width, page.size[0]);
   assert.equal(got.values.height, page.size[1]);
   assert.ok(got.prompt.startsWith('在这张漫画里删掉尾巴'));
+});
+
+await test('涂鸦标记会带进提示词、并记在预检结果里', async () => {
+  const marks = [{ tool: 'ellipse', color: 'blue' }];
+  const got = await prepareEdit({
+    dir,
+    configDir,
+    project,
+    page,
+    config: { edit: { name: 'edit.json' } },
+    opts: { prompt: '把她的手改短', marks },
+  });
+  assert.equal(got.ok, true);
+  assert.deepEqual(got.marks, marks);
+  assert.ok(got.prompt.includes('蓝色圆圈'));
 });
 
 await test('切到别的版本后，修图以当前采用的版本为准', async () => {

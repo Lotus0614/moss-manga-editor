@@ -224,17 +224,57 @@ const fill = (template, vars = {}) =>
 // ---------------------------------------------------------------- 修图
 // 编辑模型（图生图）只接「不改大布局的小修」：作者/AI 只写改哪里，
 // 这句包装负责把「其余别动」说死。空请求返回空串，由调用方报错。
+//
+// 画面上涂鸦/框选之后，标记本身会画进参考图，mark 句式负责说明「只改标出来的地方」；
+// tools / swatches 是弹窗工具栏用的词表，跟句子一起放在这里，改文件即生效。
 
 export const EDIT = {
     wrapper:
         '在这张漫画里{request}。没提到的部分保持原样：格子排列、气泡位置和形状、气泡里的文字一个字都不改，画风不变。',
+    marked:
+        '在这张漫画里，只改图中{marks}标出来的地方：{request}。这些标记只是给你指位置，不要把标记画进画面。标出的区域以外一律保持原样：格子排列、气泡位置和形状、气泡里的文字一个字都不改，画风不变。',
+    /** 涂鸦工具：value 进数据，label 是界面按钮，name 是拼进提示词的说法 */
+    tools: [
+        { value: 'rect', label: '方框', name: '方框' },
+        { value: 'ellipse', label: '圆圈', name: '圆圈' },
+        { value: 'brush', label: '画笔', name: '涂鸦' },
+    ],
+    /** 预设颜色：value 进数据，hex 是画上去的颜色，label 是拼进提示词的说法 */
+    swatches: [
+        { value: 'red', label: '红', hex: '#e11d48' },
+        { value: 'orange', label: '橙', hex: '#ea580c' },
+        { value: 'green', label: '绿', hex: '#16a34a' },
+        { value: 'blue', label: '蓝', hex: '#2563eb' },
+        { value: 'purple', label: '紫', hex: '#7c3aed' },
+        { value: 'black', label: '黑', hex: '#111827' },
+    ],
 };
 
-export function buildEditPrompt({ request } = {}) {
+/** 标记 → 「红色方框和蓝色涂鸦」 */
+export function describeMarks(marks) {
+    const list = Array.isArray(marks) ? marks : [];
+    const seen = new Set();
+    const parts = [];
+    for (const mark of list) {
+        const tool = EDIT.tools.find((item) => item.value === mark?.tool);
+        const swatch = EDIT.swatches.find((item) => item.value === mark?.color);
+        if (!tool) continue;
+        const phrase = swatch ? `${swatch.label}色${tool.name}` : `彩色${tool.name}`;
+        if (seen.has(phrase)) continue;
+        seen.add(phrase);
+        parts.push(phrase);
+    }
+    if (!parts.length) return '';
+    return parts.join('和');
+}
+
+export function buildEditPrompt({ request, marks } = {}) {
     const text = String(request || '')
         .trim()
         .replace(/[。.]+$/, '');
     if (!text) return '';
+    const label = describeMarks(marks);
+    if (label) return fill(EDIT.marked, { request: text, marks: label });
     return fill(EDIT.wrapper, { request: text });
 }
 

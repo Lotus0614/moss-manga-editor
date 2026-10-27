@@ -343,17 +343,66 @@ a { color: inherit; }
 .work-head .title { font-size: 12px; font-weight: 600; }
 .work-head .meta { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.12em; color: var(--mid); }
 
-/* 修图：贴在顶栏下面的一行，按需展开 */
-.edit-bar {
+/* 修图弹窗：上面工具栏，中间原图 + 涂鸦层，下面提示词 */
+.modal.edit-modal { width: min(940px, 100%); }
+.edit-modal .body { gap: 10px; }
+.edit-tools {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--line);
-  background: #fffdf6;
 }
-.edit-bar .input { flex: 1; min-width: 0; }
-.edit-bar .tip { font-size: 10.5px; color: var(--mid); white-space: nowrap; }
+.edit-canvas {
+  position: relative;
+  align-self: center;
+  line-height: 0;
+  max-width: 100%;
+  border: 1px solid var(--ink);
+  background: #fff;
+}
+.edit-canvas img {
+  display: block;
+  max-height: 56vh;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.edit-draw {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+}
+.edit-swatches { display: flex; align-items: center; gap: 5px; }
+.edit-swatches .sw {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--ink);
+  padding: 0;
+  cursor: pointer;
+}
+.edit-swatches .sw.on { outline: 2px solid var(--ink); outline-offset: 1px; }
+.edit-swatches .sw-pick {
+  width: 20px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: none;
+  cursor: pointer;
+}
+.edit-hint { font-size: 10.5px; }
+.edit-foot {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.edit-foot .textarea { flex: 1; min-width: 0; }
 
 .stage {
   flex: 1;

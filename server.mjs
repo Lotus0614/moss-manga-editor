@@ -33,7 +33,7 @@ import {
 } from './scripts/lib/archive.mjs';
 import { listWorkflows, readWorkflow, saveWorkflow, checkWorkflow } from './scripts/lib/workflow.mjs';
 import { renderPage } from './scripts/lib/render.mjs';
-import { editPage } from './scripts/lib/edit.mjs';
+import { editPage, sourceVersion } from './scripts/lib/edit.mjs';
 import { compilePage } from './core/compile.mjs';
 import { normalizeCharacters } from './core/characters.mjs';
 import { createPanelItem } from './core/manga-doc.mjs';
@@ -144,6 +144,17 @@ async function body(req, limit = 8 * 1024 * 1024) {
   } catch (err) {
     throw Object.assign(new Error(`JSON 解析失败：${err.message}`), { status: 400 });
   }
+}
+
+/** data:image/png;base64,… → { buffer, ext }；不是图片就返回 null */
+function decodeDataUrl(raw) {
+  const text = String(raw || '').trim();
+  const hit = text.match(/^data:image\/(png|jpeg|jpg|webp);base64,([\s\S]+)$/i);
+  if (!hit) return null;
+  const buffer = Buffer.from(hit[2], 'base64');
+  if (!buffer.length) return null;
+  const kind = hit[1].toLowerCase();
+  return { buffer, ext: kind === 'jpeg' || kind === 'jpg' ? 'jpg' : kind };
 }
 
 async function sendFile(res, file, type) {
@@ -400,14 +411,18 @@ async function route(req, res, url) {
       }
 
       if (action === 'edit' && method === 'POST') {
-        const payload = await body(req);
+        // 涂鸦图是整页 PNG 的 data URL，比普通请求大得多
+        const payload = await body(req, 32 * 1024 * 1024);
         const config = await readConfig(CONFIG_DIR);
+        const overlay = decodeDataUrl(payload.overlay);
+        if (payload.overlay && !overlay) return fail(res, 400, '涂鸦图格式不对：要 data:image/png;base64,…');
         const job = {
           id: `job_${Date.now().toString(36)}`,
           page: page.id,
           index: page.index,
           kind: 'edit',
           prompt: String(payload.prompt || ''),
+          marks: Array.isArray(payload.marks) ? payload.marks.length : 0,
           status: 'running',
           progress: 0,
           at: new Date().toISOString(),
@@ -422,7 +437,12 @@ async function route(req, res, url) {
           project,
           page,
           config,
-          opts: payload,
+          opts: {
+            prompt: payload.prompt,
+            seed: payload.seed,
+            marks: payload.marks,
+            ...(overlay ? { overlay: overlay.buffer, overlayExt: overlay.ext } : {}),
+          },
           onProgress: (p) => {
             job.progress = p?.max ? Math.round((p.value / p.max) * 100) : job.progress;
             bus.emit('job', { ...job });
@@ -442,7 +462,14 @@ async function route(req, res, url) {
       if (method === 'GET') {
         const store = await getVersions(ARCHIVE, slug);
         const items = store.items.filter((v) => v.page === page.id);
-        return json(res, 200, { page, versions: items, current: currentOf(store, page.id) });
+        // 修图要基于「渲染图」：这一页真正会被拿来当参考的那一版
+        const base = sourceVersion(store, page.id);
+        return json(res, 200, {
+          page,
+          versions: items,
+          current: currentOf(store, page.id),
+          editBase: base ? { id: base.id, image: base.image } : null,
+        });
       }
       if (method === 'PUT') {
         const payload = await body(req);

@@ -322,6 +322,7 @@ text 项可以用它标文字性质（`ui_text`、`calligraphy`）。只标「�
 
 - `kind`：`render` 渲染 / `edit` 修图
 - `base`：修图版出发的那一版，永远是 `render`（修图不从修图版出发）
+- `overlay` + `marks`：修图时圈过区域才有——画好标记的整页图（存在 `images/`）和标记清单（`[{tool,color}]`）
 - 历史只读。切 `currentByPage` 只影响预览用哪一版，改不动已生成的图
 - `versions/<id>.json` 存着当次完整提示词（渲染是 `promptJson`，修图是 `editPrompt` + 包好的 `prompt`）
 

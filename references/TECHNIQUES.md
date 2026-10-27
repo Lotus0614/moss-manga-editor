@@ -306,27 +306,52 @@ In sharp contrast, the girl on the right has NO glasses and spotless skin with z
 只有主角需要跨页一致，所以**只给主角建角色表**（`manga character add`）；路人和背景人物
 直接写在各自格子的 `desc` 里，不必建角色。
 
-### 外貌的写法
+### 铁律：没写死的属性，每次都会被重掷
 
-主角设定只写一次（角色表），分格用短关键词复述。建议按这个顺序描述：
+留自由度就是留不一致。查「同一个人画得不一样」，**第一步是把可变量列出来逐条写死，不是加形容词**。
 
-1. 性别与年龄
-2. 发型（长度、刘海、发饰）
-3. 五官（眼型、痣、肤色）
-4. 上装（款式、颜色、领子、配饰）
-5. 下装（款式、颜色、长度）
-6. 袜鞋
-7. 随身物
-8. 体型
+- 没写瞳色 → 这次灰、下次蓝
+- 只写 `long` 不写多长 → 一会儿齐肩一会儿及腰
+- 衣服只写「灰色外套」不写开合与长度 → 版型每次不同
 
+### 同一属性，tag 比长句可靠
+
+模型是按 booru 词条聚权重的，长句里的度量它不读：
+
+| 想表达 | 别写 | 写 |
+| --- | --- | --- |
+| 头发到腰 | `hair reaching the middle of her back` | `long hair` / `very long hair` |
+| 齐肩短发 | `hair cut just below her ears` | `bob cut` |
+| 眼睛颜色 | `her eyes were a cool grey` | `grey eyes` |
+| 磨边裤脚 | `the hem was frayed and uneven` | `frayed hem` |
+
+### 推荐写法：槽位 + tag 钉死
+
+角色表（`look`）按身体部位分段，**每段一句定性 + 该部位的 tag**，只写看得见的东西：
+
+```text
+[age]-year-old woman.
+Hair: long hair, straight hair, silver hair, blunt bangs - centre part, past the waist.
+Eyes: narrow eyes, grey eyes, thin eyebrows.
+Skin: pale skin, mole under eye.
+Body: slim waist, large breasts, long legs.
+Clothes: grey zip hoodie worn open (open hoodie), white ribbed camisole (white camisole),
+         short denim shorts with a frayed hem (denim shorts, frayed hem). barefoot.
 ```
-W = a 22 year old college girl, long straight black hair with a blunt fringe,
-small hair clip; white short-sleeved sailor blouse with a dark square collar
-edged in two white stripes and a thin ribbon tie; knee-length pleated skirt;
-white loose socks bunched at the calves; dark loafers; school bag; large bust.
-```
 
-分格复述：`W in her white sailor blouse and navy skirt, black hair with a clip`
+- **必写死**：头发长度与刘海（`long hair` / `very long hair` / `bob cut` / `blunt bangs`）、
+  瞳色（`grey eyes`）、体型（`slim waist` / `large breasts` / `long legs`）、
+  每件衣服的单品名与状态（`open hoodie` / `denim shorts` / `frayed hem` / `barefoot`）
+- **加 1–2 个辨识标记**：痣（`mole under eye`）、`ahoge`、固定发饰、眼镜、耳环、疤痕。
+  这是唯一能一眼认出「同一个人」的东西——**脸换个种子就变，痣和发饰不变**
+- **纯 tag 最稳**，代价是体型会往词条的平均值靠（更 pin-up、更像设定图）。
+  所以用上面的形式：tag 负责准，句子只做黏合
+- **不写**：性格、气质、气味、他人评价（`her smile is professional and empty`、
+  `she smells like cigarettes`）。它们占权重但不产生像素，还会把写死的细节挤淡。
+  想表达性格就放进台词
+
+分格复述：角色格子里的 `desc` 只写位置和姿势（`inside PANEL ONE only, kneeling`），
+外貌不要重复——已经由角色表自动带进 summary 了。
 
 ### 三条反直觉的经验
 
@@ -337,6 +362,16 @@ white loose socks bunched at the calves; dark loafers; school bag; large bust.
    （实画里出现过「女仆装串到主角身上」）。把主角放第一段，其他人用 `In sharp contrast, …` 开头切断。
 3. **名字只写罗马音。**提示词里的汉字会被模型当成「要画在画面上的字」（袖章、箱子上冒出来的那种）。
    但**对话台词里叫名字要用中文**——那是给人读的字。
+
+### 控制不住的
+
+| 想控制 | 结果 |
+| --- | --- |
+| 袖子挽到肘上（`sleeves rolled up`） | 无效，一律画成长袖 |
+| 用 `oversized` 这类程度词控制版型 | 不稳，时准时不准 |
+| 靠脸型或画风区分角色 | 无效，必须靠痣、发饰这类硬标记 |
+
+同一张图反复不对，先怀疑「这个属性漏写了」，再去加形容词。见 §14「排查」。
 
 ---
 
@@ -406,6 +441,8 @@ node manga.mjs edit --page 1 --prompt "把左上角气泡的尾巴删掉"
 ```
 
 - **一次把要改的都写进同一句**：多个毛病合在一次修图里说清（「删掉左上角气泡的尾巴，再把第三格那只多余的手去掉」）
+- **能框就框**：网页点「修图」后用方框 / 圆圈 / 画笔在图上圈出要改的地方（可撤回），模型只改圈内；
+  不圈等于整页都能动，容易顺手把别处也改了
 - **不要拿修过的图接着修**：修图永远从渲染图出发（当前版是修图版时，会自动退回它出发的那一版渲染图）。
   想改第二轮，就把新要求并进第一轮的说法重说一遍，而不是在改过的图上再改一次
 - 位置说准：「左上角的气泡」「第三格右边那只手」「第二格她的外套」
@@ -426,6 +463,7 @@ node manga.mjs edit --page 1 --prompt "把左上角气泡的尾巴删掉"
 | 气泡尾巴连到别人的头 | 气泡贴着别人头 / 说话人不在画面却用了带尾气泡 | 拉开 80px；画外音换 `speech-notail` |
 | 内心气泡连到别人身上 | 想事情的人不在这一格 | 把本人的头放进这一格 |
 | 服装串到别的角色身上 | 负面描述（`NO …`）反向生效，或角色表顺序串味 | 改成正面描述；区分特征写进 character 框 |
+| 同一个人每次画出来都不一样（头发长短、瞳色变） | 角色表里没把该属性写死，或只用了模糊自然语言 | 按 §11 用 tag 写死，并加一个辨识标记 |
 | 人物变四头身 | 小格写了 `full body` | 改 `waist-up medium shot` |
 | 破框冲到空白纸上，版面浪费 | 破框方向没有邻格 | 改成压进相邻那一格（同场景） |
 | 画面里冒出莫名其妙的英文/汉字 | `desc` 里有 meta 句子（「这是她的角色框」），或海报允许有字 | 删掉解释性文字；海报写 NO text or lettering |

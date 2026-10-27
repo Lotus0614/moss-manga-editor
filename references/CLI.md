@@ -192,7 +192,11 @@ manga render --page 3 [--seed 123] [--steps 20] [--cfg 5] [--dry-run] [--json]
 
 ```bash
 manga edit --page 5 --prompt "把左上角气泡的尾巴删掉" [--seed 123] [--dry-run] [--json]
+manga edit --page 5 --prompt "把框里的气泡改成浅蓝色" --overlay marks.png --marks @marks.json
 ```
+
+网页里点「修图」会打开弹窗：上面选方框 / 圆圈 / 画笔，调粗细和颜色，在图上圈出要改的地方（可撤回），
+下面写指令。不圈 = 整页都能改；圈了就把标记画进参考图，靠提示词约束模型只改那块。
 
 ```json
 {
@@ -210,6 +214,9 @@ manga edit --page 5 --prompt "把左上角气泡的尾巴删掉" [--seed 123] [-
 - 只做**不改大布局**的修改：气泡尾巴、多余的手指、糊掉的台词、删掉画面里某个物体、整页转黑白。改机位、换人、改分镜属于重新 `render`。
 - **多个改动写进同一句**：分两次修等于第二次拿改过的图再改，版式和画质会越修越偏。
 - **参考图永远是渲染图**：当前版是修图版时，自动退回它出发的那一版渲染图，不在改过的图上再改；基准链断了会报错让你先 `render`。
+- `--overlay <png>`：直接用一张画好标记的整页图当参考图（网页弹窗就是这么提交的），涂鸦图会一起存进存档。
+- `--marks`：标记清单，如 `'[{"tool":"rect","color":"red"}]'`（`tool` = `rect`/`ellipse`/`brush`，`color` = `config/manga.mjs` 里 `EDIT.swatches` 的 `value`）。
+  Windows 下引号容易被吃掉，写成 `--marks @marks.json` 从文件读。
 - `--dry-run` 打印最终整句提示词和填好的图，不提交。
 - 工作流里写了 `{{seed}}` 时 `--seed` 才有意义；没写就用工作流里固定的种子（同样的话重跑结果一样）。
 - 失败时 `{ "ok": false, "code": "edit", "error": "..." }`。

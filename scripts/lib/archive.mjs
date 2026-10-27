@@ -310,6 +310,8 @@ export async function addVersion(dir, slug, version) {
       image: version.image,
       prompt: version.promptJson || version.prompt,
       editPrompt: version.editPrompt,
+      overlay: version.overlay,
+      marks: version.marks,
       seed: version.seed,
     });
   }

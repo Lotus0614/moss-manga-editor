@@ -218,7 +218,8 @@ manga edit --page 5 --prompt "把框里的气泡改成浅蓝色" --overlay marks
 - `--marks`：标记清单，如 `'[{"tool":"rect","color":"red"}]'`（`tool` = `rect`/`ellipse`/`brush`，`color` = `config/manga.mjs` 里 `EDIT.swatches` 的 `value`）。
   Windows 下引号容易被吃掉，写成 `--marks @marks.json` 从文件读。
 - `--dry-run` 打印最终整句提示词和填好的图，不提交。
-- 工作流里写了 `{{seed}}` 时 `--seed` 才有意义；没写就用工作流里固定的种子（同样的话重跑结果一样）。
+- 工作流里写了 `{{seed}}` 时 `--seed` 才有意义；**默认每次随机**。别把「生成这一版参考图时用的种子」再拿来修图——
+  同种子会把参考图复制一遍，输出明显发糊；要复现某一张才写死种子。
 - 失败时 `{ "ok": false, "code": "edit", "error": "..." }`。
 
 ---

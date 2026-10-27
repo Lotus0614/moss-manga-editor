@@ -351,7 +351,12 @@ async function route(req, res, url) {
       if (method === 'GET') {
         const pages = await listPages(ARCHIVE, slug);
         const versions = await getVersions(ARCHIVE, slug);
-        const coverOf = (pageId) => versions.items.filter((v) => v.page === pageId).slice(-1)[0]?.image || '';
+        // 左页序列显示这一页**当前采用**的那版，不是最新那版
+        const coverOf = (pageId) => {
+          const current = currentOf(versions, pageId);
+          const picked = versions.items.find((v) => v.id === current);
+          return picked?.image || versions.items.filter((v) => v.page === pageId).slice(-1)[0]?.image || '';
+        };
         return json(res, 200, { pages: pages.map((p) => ({ ...p, cover: coverOf(p.id) })) });
       }
       if (method === 'POST') {

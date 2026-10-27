@@ -273,6 +273,24 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
       .catch(() => {});
   }
 
+  /** 只刷新版本相关状态（不动页面内容，免得冲掉没保存的编辑） */
+  function reloadVersions(id) {
+    return api(`/api/projects/${projectId}/pages/${id}`)
+      .then((data) => {
+        setVersions(data.versions || []);
+        setCurrent(data.current || '');
+        setEditBase(data.editBase || null);
+      })
+      .catch(() => {});
+  }
+
+  /** 打开修图弹窗前先确认基准版本：换过历史版本时，弹窗里的图必须跟着换 */
+  async function openEdit() {
+    if (!page || generating) return;
+    await reloadVersions(page.id);
+    setEditOpen(true);
+  }
+
   function reloadPage(id) {
     api(`/api/projects/${projectId}/pages/${id}`)
       .then((data) => {
@@ -509,6 +527,8 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     setCurrent(id);
     try {
       await apiPost(`/api/projects/${projectId}/versions/current`, { id, pageId: page.id });
+      // 换版本要顺带刷新 editBase，否则打开修图弹窗还是拿旧的那张图
+      await reloadVersions(page.id);
       refreshPages();
     } catch (err) {
       toast(err.message, 'bad');
@@ -653,7 +673,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
               class="btn"
               disabled=${generating || !editBase}
               title=${editBase ? `修 v${String(editBase.id).replace(/^v/, '')} 这一版（弹出涂鸦框选）` : '这一页还没有渲染图'}
-              onClick=${() => setEditOpen(true)}
+              onClick=${openEdit}
             >
               ${editing ? `修图中 ${gen?.progress || 0}%` : '修图'}
             </button>`
@@ -810,6 +830,7 @@ export default function EditorPage({ projectId, pageId, config, onOpenSettings }
     <${EditModal}
       open=${editOpen}
       base=${editBase}
+      current=${current}
       busy=${editing}
       progress=${gen?.progress || 0}
       onClose=${() => setEditOpen(false)}

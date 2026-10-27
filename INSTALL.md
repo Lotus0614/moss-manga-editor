@@ -79,17 +79,20 @@ node manga.mjs workflow check
 
 ### 修图工作流（可选）
 
-编辑模型（Qwen Image Edit 之类）只做一件事：**用一句话改已经出好的图**，不改大布局。它那份 JSON **只替换两处**，别的都别动（模型、尺寸、步数、超分全在工作流里）：
+编辑模型（Qwen Image Edit 之类）只做一件事：**用一句话改已经出好的图**，不改大布局。它那份 JSON **只替换三处**，别的都别动（模型、尺寸、步数、超分全在工作流里）：
 
-| 位置                           | 改成         |
-| ------------------------------ | ------------ |
-| `LoadImage` 的 `image`         | `{{image}}`  |
-| 提示词那个字符串节点的 `value` | `{{prompt}}` |
+| 位置                           | 改成                 |
+| ------------------------------ | -------------------- |
+| `LoadImage` 的 `image`         | `{{image}}`          |
+| 提示词那个字符串节点的 `value` | `{{prompt}}`         |
+| `KSampler` 的 `seed`           | `{{seed}}`（必填）   |
+
+`{{seed}}` 不是可选项：种子写死的话，连续修图会一直复用同一颗种子，输出会明显发糊。`workflow check` 现在会把它当缺失项报出来。
 
 ```bash
 node manga.mjs workflow save ./qwen-edit.api.json --name edit.json --no-activate
 node manga.mjs config set edit.name=edit.json
-node manga.mjs workflow check --name edit.json    # 认作「修图工作流」，只要 prompt / image
+node manga.mjs workflow check --name edit.json    # 认作「修图工作流」，要 prompt / image / seed
 ```
 
 `--no-activate` 很重要：不加会把生图工作流也切成这份。配好之后网页设置里会同时看到「生图工作流」和「修图工作流」，页面上也会出现「修图」按钮。用户没有编辑模型就跳过这一节，网页不会出现那个按钮。

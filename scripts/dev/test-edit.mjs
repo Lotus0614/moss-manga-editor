@@ -63,6 +63,12 @@ await test('多个标记、重复标记都能收成一句话', () => {
 const EDIT_WF = JSON.stringify({
   1: { class_type: 'LoadImage', inputs: { image: '{{image}}' } },
   2: { class_type: 'PrimitiveStringMultiline', inputs: { value: '{{prompt}}' } },
+  3: { class_type: 'KSampler', inputs: { seed: '{{seed}}' } },
+});
+
+const NO_SEED_WF = JSON.stringify({
+  1: { class_type: 'LoadImage', inputs: { image: '{{image}}' } },
+  2: { class_type: 'PrimitiveStringMultiline', inputs: { value: '{{prompt}}' } },
 });
 
 const RENDER_WF = JSON.stringify({
@@ -70,11 +76,19 @@ const RENDER_WF = JSON.stringify({
   2: { class_type: 'EmptyLatentImage', inputs: { width: '{{width}}', height: '{{height}}' } },
 });
 
-await test('带 {{image}} 的是修图工作流，只要求 prompt/image', () => {
+await test('带 {{image}} 的是修图工作流，要 prompt/image/seed', () => {
   const got = checkWorkflow(EDIT_WF);
   assert.equal(got.kind, 'edit');
   assert.equal(got.ok, true);
   assert.deepEqual(got.missing, []);
+});
+
+await test('缺 {{seed}} 的修图工作流不算合格（种子写死会让连续修图发糊）', () => {
+  const got = checkWorkflow(NO_SEED_WF);
+  assert.equal(got.kind, 'edit');
+  assert.equal(got.ok, false);
+  assert.deepEqual(got.missing, ['seed']);
+  assert.ok(got.warnings.some((w) => w.includes('发糊')));
 });
 
 await test('不带 image 的仍按生图校验', () => {
@@ -123,6 +137,14 @@ await test('缺 {{image}} 时点名缺哪个占位符', async () => {
   const got = await prepareEdit({ dir, configDir, project, page, config: { edit: { name: 'bad.json' } }, opts: { prompt: '删掉尾巴' } });
   assert.equal(got.ok, false);
   assert.match(got.error, /\{\{image\}\}/);
+});
+
+await test('缺 {{seed}} 时预检直接拦住，不让它带着写死的种子跑', async () => {
+  await saveWorkflow(configDir, NO_SEED_WF, 'noseed.json');
+  const got = await prepareEdit({ dir, configDir, project, page, config: { edit: { name: 'noseed.json' } }, opts: { prompt: '删掉尾巴' } });
+  assert.equal(got.ok, false);
+  assert.match(got.error, /\{\{seed\}\}/);
+  assert.match(got.error, /发糊/);
 });
 
 // ---------------------------------------------------------------- 组装

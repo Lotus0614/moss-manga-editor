@@ -6,8 +6,8 @@ import { html, api, apiPut, useState, useEffect, toast } from '../lib.mjs';
 /** 这几个永远由代码填，不进表单 */
 const AUTO = ['prompt', 'width', 'height', 'seed', 'image'];
 
-/** 修图工作流只认这两个占位符：参考图 + 指令 */
-const EDIT_NEEDS = ['prompt', 'image'];
+/** 修图工作流只认这三个占位符：参考图 + 指令 + 种子（种子写死会让连续修图发糊） */
+const EDIT_NEEDS = ['prompt', 'image', 'seed'];
 
 export default function SettingsModal({ open, config, onClose, onSaved }) {
   const [form, setForm] = useState(null);
@@ -215,8 +215,8 @@ export default function SettingsModal({ open, config, onClose, onSaved }) {
             </div>
             ${wfEdit.missing?.length
               ? html`<div class="status bad">
-                  缺占位符：${wfEdit.missing.map((m) => `{{${m}}}`).join('、')}。编辑工作流只需要替换两处：LoadImage 的 image 写成
-                  {{image}}，提示词节点写成 {{prompt}}。
+                  缺占位符：${wfEdit.missing.map((m) => `{{${m}}}`).join('、')}。编辑工作流要替换三处：LoadImage 的 image 写成
+                  {{image}}，提示词节点写成 {{prompt}}，KSampler 的 seed 写成 {{seed}}（种子写死会让连续修图发糊）。
                 </div>`
               : null}
             <div class="row wrap">

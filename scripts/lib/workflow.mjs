@@ -54,18 +54,21 @@ export async function readWorkflow(configDir, name) {
   return { name: safe, raw: await readFile(file, 'utf8'), file };
 }
 
-/** 校验：生图要 prompt/width/height，修图（带 {{image}} 的）只要 prompt/image */
+/** 校验：生图要 prompt/width/height，修图（带 {{image}} 的）要 prompt/image/seed */
 export function checkWorkflow(raw) {
   const desc = describeWorkflow(stripBom(String(raw)));
   if (!desc.ok) return { ok: false, kind: '', error: desc.error, nodeCount: 0, params: [], missing: [], warnings: [] };
 
   const names = new Set(desc.params.map((p) => p.name));
 
-  // {{image}} = 图生图（修图）工作流：画布尺寸和种子由工作流自己定，不要求占位符
+  // {{image}} = 图生图（修图）工作流：画布尺寸由工作流自己定，但**种子必须可换**
+  // （种子写死 → 每次修图都在同一个种子上再修，输出会糊，必须在导入时就拦住）
   if (names.has('image')) {
-    const missing = ['prompt', 'image'].filter((key) => !names.has(key));
+    const missing = ['prompt', 'image', 'seed'].filter((key) => !names.has(key));
     const warnings = [];
-    if (!names.has('seed')) warnings.push('没有 {{seed}}：每次都用工作流里写死的种子，同样的指令重跑结果一样');
+    if (missing.includes('seed')) {
+      warnings.push('没有 {{seed}}：种子写死，连续修图会复用同一颗种子，输出明显发糊');
+    }
     return { ok: missing.length === 0, kind: 'edit', error: '', nodeCount: desc.nodeCount, params: desc.params, missing, warnings };
   }
 

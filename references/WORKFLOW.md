@@ -135,12 +135,16 @@ manga workflow check
 | 用途 | 配置键 | 占位符 |
 |---|---|---|
 | 生图（MOSS） | `workflow.name` | `{{prompt}}` `{{width}}` `{{height}}`（+ 任意参数） |
-| 修图（Qwen Image Edit 之类） | `edit.name` | 只要 `{{prompt}}` `{{image}}` |
+| 修图（Qwen Image Edit 之类） | `edit.name` | `{{prompt}}` `{{image}}` `{{seed}}` |
 
-修图工作流来自 ComfyUI 里调好的编辑工作流，**导出 (API) 之后只改两处**：
+修图工作流来自 ComfyUI 里调好的编辑工作流，**导出 (API) 之后只改三处**：
 
 - `LoadImage` 的 `image` → `{{image}}`
 - 提示词那个字符串节点（常见是 `PrimitiveStringMultiline` 的 `value`）→ `{{prompt}}`
+- `KSampler` 的 `seed` → `{{seed}}`
+
+**第三处不是可选项**：种子写死时，每次修图都复用同一颗种子，`manga edit` 就算生成了随机种子也没地方填；
+连着修第二遍、第三遍时会一直用上一次的种子，输出明显发糊。`workflow check` 会把缺 `{{seed}}` 报成不合格。
 
 其余全部原样：模型、LoRA、尺寸、步数、采样器、超分、保存节点都不动——修图的画幅和画质由这份工作流决定，代码不覆盖。
 
@@ -150,8 +154,8 @@ manga config set edit.name=edit.json
 manga workflow check --name edit.json
 ```
 
-`--no-activate` 不能省：不加会把生图工作流也切成这份。`check` 看到 `{{image}}` 就按修图工作流校验（只要求 prompt / image），所以不会再去抱怨缺 `{{width}}` / `{{height}}`。
+`--no-activate` 不能省：不加会把生图工作流也切成这份。`check` 看到 `{{image}}` 就按修图工作流校验（要 prompt / image / seed），所以不会再去抱怨缺 `{{width}}` / `{{height}}`。
 
-提交时 `manga edit` 会：读这一页当前版本的图 → `POST /upload/image` 传到 `input/moss/` → 把返回值填进 `{{image}}` → 提交 → 取图 → 存成新版本。工作流里没写 `{{seed}}` 时种子是写死的，同样的指令重跑会得到同一张图；想让它每次都变，把 `KSampler` 的 `seed` 也写成 `{{seed}}`。
+提交时 `manga edit` 会：读这一页当前版本的图 → `POST /upload/image` 传到 `input/moss/` → 把返回值填进 `{{image}}` → 提交 → 取图 → 存成新版本。种子默认每次随机（`--seed` 才写死）。
 
 生图工作流里**不该**出现 `{{image}}`：一旦有，`render` 会直接报错说是修图工作流，免得把整页图喂进去。

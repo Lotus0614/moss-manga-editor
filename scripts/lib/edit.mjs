@@ -12,8 +12,8 @@ import { comfyFromSettings } from './comfy.mjs';
 import { readWorkflow, fillWorkflow, pickSeed } from './workflow.mjs';
 import { getVersions, currentOf, imageBytes, saveImage, addVersion } from './archive.mjs';
 
-/** 编辑工作流必须提供的两个占位符：参考图 + 指令 */
-export const EDIT_PARAMS = ['prompt', 'image'];
+/** 编辑工作流必须提供的三个占位符：参考图 + 指令 + 种子（种子写死会让连续修图发糊） */
+export const EDIT_PARAMS = ['prompt', 'image', 'seed'];
 
 /** 拿来当参考图的版本：就是当前采用的那一版（渲染版、修图版都行） */
 export function sourceVersion(store, pageId) {
@@ -99,7 +99,7 @@ export async function prepareEdit({ dir, configDir, project, page, config, opts 
   if (missing.length) {
     return {
       ok: false,
-      error: `修图工作流 ${workflow.name} 缺占位符：${missing.map((m) => `{{${m}}}`).join('、')}（只改两处：LoadImage 的 image、提示词节点）`,
+      error: `修图工作流 ${workflow.name} 缺占位符：${missing.map((m) => `{{${m}}}`).join('、')}（三处：LoadImage 的 image、提示词节点、KSampler 的 seed；seed 写死会让连续修图发糊）`,
     };
   }
 

@@ -210,12 +210,12 @@ async function cmdDoctor() {
       const wf = await readWorkflow(CONFIG_DIR, config.edit.name);
       const checkedEdit = checkWorkflow(wf.raw);
       const names = new Set(checkedEdit.params.map((p) => p.name));
-      const missing = ['prompt', 'image'].filter((key) => !names.has(key));
+      const missing = ['prompt', 'image', 'seed'].filter((key) => !names.has(key));
       result.edit = { name: wf.name, ok: !checkedEdit.error && !missing.length, params: checkedEdit.params.map((p) => p.name), missing };
       if (checkedEdit.error) result.problems.push(`修图工作流解析失败：${checkedEdit.error}`);
       else if (missing.length) {
         result.problems.push(
-          `修图工作流缺占位符：${missing.map((m) => `{{${m}}}`).join('、')}（只改两处：LoadImage 的 image、提示词节点）`
+          `修图工作流缺占位符：${missing.map((m) => `{{${m}}}`).join('、')}（三处：LoadImage 的 image、提示词节点、KSampler 的 seed）`
         );
       }
     } catch (err) {
@@ -336,7 +336,7 @@ async function cmdWorkflow() {
       flags['no-activate'] ? '没有切换当前生图工作流（--no-activate）。' : '已设为当前生图工作流。',
       saved.ok
         ? saved.kind === 'edit'
-          ? '占位符齐全（{{prompt}} {{image}}）。'
+          ? '占位符齐全（{{prompt}} {{image}} {{seed}}）。'
           : '三项关键占位符齐全（prompt / width / height）。'
         : `缺：${saved.missing.map((m) => `{{${m}}}`).join('、')}`,
     ];

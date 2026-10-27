@@ -6,3 +6,4 @@ config/workflows
 .DS_Store
 tmp
 .dsh-write-test.txt
+.workbuddy

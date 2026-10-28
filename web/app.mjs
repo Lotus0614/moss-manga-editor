@@ -19,7 +19,7 @@ function Topbar({ route, onOpenSettings, onOpenProjectSettings, onOpenCharacters
   const project = app.project;
   const page = app.page;
   return html`<div class="topbar">
-    <div class="brand" onClick=${() => go('/projects')}>MOSS MANGA</div>
+    <div class="brand" onClick=${() => go('/projects')}>MOSS MANGA STUDIO</div>
     <span class="tag">PREVIEW</span>
     ${route.name === 'editor' && project
       ? html`<div class="crumb"><b>${project.name}</b>${page ? ` / 第 ${page.index} 页${page.title ? ` · ${page.title}` : ''}` : ''}</div>`

@@ -79,7 +79,7 @@ export default function ProjectsPage() {
                 (p) => html`<div class="card" key=${p.slug} onClick=${() => go(`/p/${p.slug}`)}>
                   <div class="cover">
                     ${p.cover ? html`<img src=${p.cover} alt="" loading="lazy" />` : html`<span class="empty">NO IMAGE</span>`}
-                    ${p.covers && p.covers.length > 1
+                    ${p.covers && p.covers.length > 0
                       ? html`<div class="filmstrip">
                           ${p.covers.map((src) => html`<img src=${src} alt="" loading="lazy" />`)}
                         </div>`

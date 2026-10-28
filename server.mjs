@@ -284,14 +284,16 @@ async function route(req, res, url) {
         const store = await getVersions(ARCHIVE, project.slug);
         const pages = await listPages(ARCHIVE, project.slug);
         const latest = store.items.slice(-1)[0];
-        // 每页当前版，最多取 3 张做成胶片条，让「这个项目一共几张图」看得出来
-        const covers = pages
+        // 按页序的「当前采用」版本图片（空串 = 这页还没出图）
+        const currentImages = pages
           .map((p) => {
             const id = currentOf(store, p.id);
             return store.items.find((v) => v.id === id)?.image || '';
           })
-          .filter(Boolean)
-          .slice(0, 3);
+          .filter(Boolean);
+        // 封面固定用第一页的当前版；第一页还没出图时往后顺延，卡片不至于空着
+        // 胶片条只放封面之后的页，避免和封面重复
+        const covers = currentImages.slice(1, 4);
         withCover.push({
           slug: project.slug,
           name: project.name,
@@ -299,7 +301,7 @@ async function route(req, res, url) {
           pages: pages.length,
           images: store.items.length,
           covers,
-          cover: latest?.image || '',
+          cover: currentImages[0] || '',
           updatedAt: latest?.at || project.createdAt,
         });
       }

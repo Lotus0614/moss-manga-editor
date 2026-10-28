@@ -1,4 +1,4 @@
-# moss-manga
+# moss-manga-studio
 
 - 使用 MOSS Image 创作生成漫画的工作台，可以由 Agent 生成漫画并手动调整生成的内容。
 - 项目未添加任何依赖，所有都通过原生JS实现，方便 Agent 对项目进行修改。

@@ -20,7 +20,7 @@
 ## 2. 拉取项目
 
 ```bash
-git clone https://github.com/Lotus0614/moss-manga-editor.git .
+git clone https://github.com/Lotus0614/moss-manga-studio.git .
 # 或者把压缩包解到当前目录
 ```
 
